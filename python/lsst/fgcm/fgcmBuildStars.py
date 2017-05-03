@@ -38,6 +38,32 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
     """
 
+    # only need a single butler instance to run on
+    @staticmethod
+    def getTargetList(parsedCmd):
+        return [parsedCmd.butler]
+
+    def precall(self, parsedCmd):
+        return True
+
+    def __call__(self, butler):
+        print("In taskrunner __call__")
+        task = self.TaskClass(config=self.config, log=self.log)
+        if self.doRaise:
+            results = task.run(butler)
+        else:
+            try:
+                results = task.run(butler)
+            except Exception as e:
+                task.log.fatal("Failed: %s" % e)
+                if not isinstance(e, pipeBase.TaskError):
+                    traceback.print_exc(file=sys.stderr)
+
+        task.writeMetadata(butler)
+        print("Done with taskrunner")
+        if self.doReturnResults:
+            return results
+
     # turn off any multiprocessing
 
     def run(self, parsedCmd):
@@ -55,18 +81,14 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
             #        resultList = list(map(self, targetList))
             #else:
             #    log.warn("not running the task because there is no data to process")
-            
+            targetList = self.getTargetList(parsedCmd)
+            # make sure that we only get 1
+            resultList = self(targetList[0])
 
         return resultList
 
     # and override getTargetList ... want just one?
     #@staticmethod
-    #def getTargetList(parsedCmd, **kwargs):
-    #    """
-    #    Not sure what to do here
-    #    """
-
-    #    pass
 
 class FgcmBuildStarsTask(pipeBase.CmdLineTask):
     """
