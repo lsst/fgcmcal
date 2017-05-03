@@ -2,13 +2,14 @@
 
 from __future__ import division, absolute_import, print_function
 
+import sys
+import traceback
+
 import lsst.utils
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.pex.exceptions as pexExceptions
 import lsst.afw.table
-
-from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
 import lsst.fgcm
 
@@ -23,20 +24,16 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=int,
         default=2,
         )
-    #sourceSelector = sourceSelectorRegistry.makeField(
-    #    doc="How to select sources for cross-matching",
-    #    )
 
     def setDefaults(self):
-    #    sourceSelector = self.sourceSelector
-    #    sourceSelector.setDefaults()
-    #    sourceSelector.sourceFluxType = 'Calib'
         pass
 
 class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmBuildStarsTask
 
     """
+
+    #TaskClass = FgcmBuildStarsTask
 
     # only need a single butler instance to run on
     @staticmethod
@@ -69,6 +66,7 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
     def run(self, parsedCmd):
         """ runs the task, but doesn't do multiprocessing"""
 
+        print("in taskrunner run")
         resultList = []
 
         if self.precall(parsedCmd):
