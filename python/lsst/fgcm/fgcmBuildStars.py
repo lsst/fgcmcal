@@ -33,6 +33,40 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     #    sourceSelector.sourceFluxType = 'Calib'
         pass
 
+class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
+    """Subclass of TaskRunner for fgcmBuildStarsTask
+
+    """
+
+    # turn off any multiprocessing
+
+    def run(self, parsedCmd):
+        """ runs the task, but doesn't do multiprocessing"""
+
+        resultList = []
+
+        if self.precall(parsedCmd):
+            profileName = parsedCmd.profile if hasattr(parsedCmd, "profile") else None
+            log = parsedCmd.log
+            #targetList = self.getTargetList(parsedCmd)
+            # I think targetList should just have 1 entry?
+            #if len(targetList) > 0:
+            #    with profile(profileName, log):
+            #        resultList = list(map(self, targetList))
+            #else:
+            #    log.warn("not running the task because there is no data to process")
+            
+
+        return resultList
+
+    # and override getTargetList ... want just one?
+    #@staticmethod
+    #def getTargetList(parsedCmd, **kwargs):
+    #    """
+    #    Not sure what to do here
+    #    """
+
+    #    pass
 
 class FgcmBuildStarsTask(pipeBase.CmdLineTask):
     """
@@ -62,6 +96,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         parser = pipeBase.ArgumentParser(name=cls._DefaultName)
 
         return parser
+
+    # no saving of the config for now
+    def _getConfigName(self):
+        return None
+
+    # no saving of metadata for now
+    def _getMetadataName(self):
+        return None
 
     @pipeBase.timeMethod
     def run(self, dataRefs):
