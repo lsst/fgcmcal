@@ -96,7 +96,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
     """
 
     ConfigClass = FgcmBuildStarsConfig
-    #RunnerClass = FgcmBuildStarsRunner
+    RunnerClass = FgcmBuildStarsRunner
     _DefaultName = "fgcmBuildStars"
 
     def __init__(self, butler=None, **kwargs):
