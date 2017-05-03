@@ -19,18 +19,19 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     """Config for FgcmBuildStarsTask"""
 
     minPerBand = pexConfig.Field(
-        doc="Minimum observations per band"
+        doc="Minimum observations per band",
         dtype=int,
         default=2,
         )
-    sourceSelector = sourceSelectorRegistry.makeField(
-        doc="How to select sources for cross-matching",
-        )
+    #sourceSelector = sourceSelectorRegistry.makeField(
+    #    doc="How to select sources for cross-matching",
+    #    )
 
     def setDefaults(self):
-        sourceSelector = self.sourceSelector
-        sourceSelector.setDefaults()
-        sourceSelector.sourceFluxType = 'Calib'
+    #    sourceSelector = self.sourceSelector
+    #    sourceSelector.setDefaults()
+    #    sourceSelector.sourceFluxType = 'Calib'
+        pass
 
 
 class FgcmBuildStarsTask(pipeBase.CmdLineTask):
