@@ -143,8 +143,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             (others)
         """
 
-        if len(dataRefs) == 0:
-            raise ValueError("Need a list of data references!")
+        #if len(dataRefs) == 0:
+        #    raise ValueError("Need a list of data references!")
 
         print("Run")
         print("min obs: %d" % (self.config.minPerBand))
