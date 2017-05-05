@@ -59,7 +59,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     requiredFlag = pexConfig.ListField(
         doc="Flag for required bands",
         dtype=int,
-        default=(0),
+        default=(0,),
         )
 
     def setDefaults(self):
