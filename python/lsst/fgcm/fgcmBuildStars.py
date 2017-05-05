@@ -23,32 +23,32 @@ class FgcmBuildStarsConfig(pexConfig.Config):
 
     minPerBand = pexConfig.Field(
         doc="Minimum observations per band",
-        dtype=np.int32,
+        dtype=int,
         default=2,
         )
     matchRadius = pexConfig.Field(
         doc="Match radius (arcseconds)",
-        dtype=np.float32,
+        dtype=float,
         default=1.0,
         )
     isolationRadius = pexConfig.Field(
         doc="Isolation radius (arcseconds)",
-        dtype=np.float32,
+        dtype=float,
         default=2.0,
         )
     densityCutNside = pexConfig.Field(
         doc="Density cut healpix nside",
-        dtype=np.int32,
+        dtype=int,
         default=128,
         )
     densityCutMaxPerPixel = pexConfig.Field(
         doc="Density cut number of stars per pixel",
-        dtype=np.int32,
+        dtype=int,
         default=1000,
         )
     zeropointDefault = pexConfig.Field(
         doc="Zeropoint default (arbitrary?)",
-        dtype=np.float32,
+        dtype=float,
         default=25.0,
         )
     bands = pexConfig.ListField(
@@ -58,7 +58,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         )
     requiredFlag = pexConfig.ListField(
         doc="Flag for required bands",
-        dtype=np.int32,
+        dtype=int,
         default=(0),
         )
 
