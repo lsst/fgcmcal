@@ -5,6 +5,8 @@ from __future__ import division, absolute_import, print_function
 import sys
 import traceback
 
+import numpy as np
+
 import lsst.utils
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -21,8 +23,43 @@ class FgcmBuildStarsConfig(pexConfig.Config):
 
     minPerBand = pexConfig.Field(
         doc="Minimum observations per band",
-        dtype=int,
+        dtype=np.int32,
         default=2,
+        )
+    matchRadius = pexConfig.Field(
+        doc="Match radius (arcseconds)",
+        dtype=np.float32,
+        default=1.0,
+        )
+    isolationRadius = pexConfig.Field(
+        doc="Isolation radius (arcseconds)",
+        dtype=np.float32,
+        default=2.0,
+        )
+    densityCutNside = pexConfig.Field(
+        doc="Density cut healpix nside",
+        dtype=np.int32,
+        default=128,
+        )
+    densityCutMaxPerPixel = pexConfig.Field(
+        doc="Density cut number of stars per pixel",
+        dtype=np.int32,
+        default=1000,
+        )
+    zeropointDefault = pexConfig.Field(
+        doc="Zeropoint default (arbitrary?)",
+        dtype=np.float32,
+        default=25.0,
+        )
+    bands = pexConfig.ListField(
+        doc="Bands to run calibration",
+        dtype=str,
+        default=("NO_DATA",),
+        )
+    requiredFlag = pexConfig.ListField(
+        doc="Flag for required bands",
+        dtype=np.int32,
+        default=(0),
         )
 
     def setDefaults(self):
@@ -118,8 +155,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         return parser
 
     # no saving of the config for now
-    def _getConfigName(self):
-        return None
+    #def _getConfigName(self):
+    #    return None
 
     # no saving of metadata for now
     def _getMetadataName(self):
@@ -148,4 +185,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         print("Run")
         print("min obs: %d" % (self.config.minPerBand))
+        print("bands:")
+        print(self.config.bands)
+
+        # next: need to get a list of source catalogs, etc.
+        #  just a few would be fine.  Then I could see the formatting of things.
+        # how to get into interactive as well?
 
