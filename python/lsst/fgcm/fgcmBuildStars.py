@@ -254,7 +254,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             #calexp = butler.get('calexp',dataId={'visit':srcVisit,
             #                                     'ccd':self.config.referenceCCD})
             calexp = butler.get('calexp',dataId={'visit':srcVisit,
-                                                 'ccd':self.config.referenceCCD})
+                                                 'ccd':self.config.referenceCCD},
+                                bbox=bbox)
 
             visitInfo = calexp.getInfo().getVisitInfo()
 
