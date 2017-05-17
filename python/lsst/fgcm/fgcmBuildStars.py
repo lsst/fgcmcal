@@ -323,6 +323,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # loop over visits
         for visit in visitCat:
+            print("Reading sources from visit %d" % (visit['visit']))
             # loop over CCDs
             #for ccd in BLAH:
             for detector in camera:
@@ -341,6 +342,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 # based on ApFlux.  Maybe make this configurable
                 magErr = (2.5/np.log(10.)) * (sources['slot_ApFlux_fluxSigma'] /
                                               sources['slot_ApFlux_flux'])
+                magErr = np.nan_to_num(magErr)
 
                 # general flag, child/parent/etc cuts
                 # will want to make magErr range configurable.
