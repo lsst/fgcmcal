@@ -200,11 +200,17 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         print(self.config.bands)
 
 
-        # make the visit catalog
-        visitCat = self._fgcmMakeVisitCatalog(butler)
+        # make the visit catalog if necessary
+        #  question: what's the propper clobber interface?
+        if (butler.datasetExists('fgcmVisitCatalog')):
+            visitCat = butler.get('fgcmVisitCatalog')
+        else:
+            # we need to build visitCat
+            visitCat = self._fgcmMakeVisitCatalog(butler)
 
         # and compile all the stars
-        self._fgcmMakeAllStarObservations(butler, visitCat)
+        if (not butler.datasetExists('fgcmStarObservations')):
+            self._fgcmMakeAllStarObservations(butler, visitCat)
 
         # next: need to get a list of source catalogs, etc.
         #  just a few would be fine.  Then I could see the formatting of things.
@@ -283,7 +289,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         return visitCat
 
-    def _fgcmMakeAllStarObservations(butler, visitCat):
+    def _fgcmMakeAllStarObservations(self, butler, visitCat):
         """
         """
 
