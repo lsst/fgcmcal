@@ -13,6 +13,7 @@ import lsst.pipe.base as pipeBase
 import lsst.pex.exceptions as pexExceptions
 import lsst.afw.table as afwTable
 from lsst.daf.base.dateTime import DateTime
+import lsst.afw.geom as afwGeom
 
 import time
 
@@ -246,9 +247,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         visitCat.table.preallocate(len(srcVisits))
 
         startTime = time.time()
+        bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
 
         # now loop over visits and get the information
         for srcVisit in srcVisits:
+            #calexp = butler.get('calexp',dataId={'visit':srcVisit,
+            #                                     'ccd':self.config.referenceCCD})
             calexp = butler.get('calexp',dataId={'visit':srcVisit,
                                                  'ccd':self.config.referenceCCD})
 
