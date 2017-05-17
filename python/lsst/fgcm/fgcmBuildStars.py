@@ -14,6 +14,7 @@ import lsst.pex.exceptions as pexExceptions
 import lsst.afw.table as afwTable
 from lsst.daf.base.dateTime import DateTime
 import lsst.afw.geom as afwGeom
+import lsst.daf.persistence.butlerExceptions as butlerExceptions
 
 import time
 
@@ -199,8 +200,11 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         print(self.config.bands)
 
 
-
+        # make the visit catalog
         visitCat = self._fgcmMakeVisitCatalog(butler)
+
+        # and compile all the stars
+        self._fgcmMakeAllStarObservations(butler, visitCat)
 
         # next: need to get a list of source catalogs, etc.
         #  just a few would be fine.  Then I could see the formatting of things.
@@ -247,14 +251,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         visitCat.table.preallocate(len(srcVisits))
 
         startTime = time.time()
+        # reading in a small bbox is marginally faster in the scan
         bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
 
         # now loop over visits and get the information
         for srcVisit in srcVisits:
-            #calexp = butler.get('calexp',dataId={'visit':srcVisit,
-            #                                     'ccd':self.config.referenceCCD})
             calexp = butler.get('calexp_sub',dataId={'visit':srcVisit,
-                                                 'ccd':self.config.referenceCCD},
+                                                     'ccd':self.config.referenceCCD},
                                 bbox=bbox)
 
             visitInfo = calexp.getInfo().getVisitInfo()
@@ -279,3 +282,94 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         butler.put(visitCat, 'fgcmVisitCatalog')
 
         return visitCat
+
+    def _fgcmMakeAllStarObservations(butler, visitCat):
+        """
+        """
+
+        startTime=time()
+
+        # create our source schema
+        sourceSchema = butler.get('src_schema', immediate=True).schema
+
+        # create a mapper to the preferred output
+        sourceMapper = afwTable.SchemaMapper(sourceSchema)
+
+        # map to ra/dec
+        sourceMapper.addMapping(sourceSchema.find('coord_ra').key, 'ra')
+        sourceMapper.addMapping(sourceSchema.find('coord_dec').key, 'dec')
+
+        # and add the fields we want
+        sourceMapper.editOutputSchema().addField(
+            "visit", type=np.int32, doc="Visit number")
+        sourceMapper.editOutputSchema().addField(
+            "ccd", type=np.int32, doc="CCD number")
+        sourceMapper.editOutputSchema().addField(
+            "mag", type=np.float32, doc="Raw magnitude")
+        sourceMapper.editOutputSchema().addField(
+            "magerr", type=np.float32, doc"Raw magnitude error")
+
+        # create the stub of the full catalog
+        fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
+
+        # we need to know the ccds...
+        camera = butler.get('camera')
+
+        # loop over visits
+        for visit in visitCat:
+            # loop over CCDs
+            #for ccd in BLAH:
+            for detector in camera:
+                ccdId = detector.getId()
+
+                # get the dataref
+                ref = butler.dataRef('raw', dataId={'visit':visit['visit'],
+                                                    'ccd':ccdId})
+                try:
+                    sources = ref.get('src',
+                                      flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
+                except butlerExceptions.NoResults:
+                    # this ccd does not exist.  That's fine.
+                    continue
+
+                # based on ApFlux.  Maybe make this configurable
+                magErr = (2.5/np.log(10.)) * (sources['slot_ApFlux_fluxSigma'] /
+                                              sources['slot_ApFlux_flux'])
+
+                # general flag, child/parent/etc cuts
+                # will want to make magErr range configurable.
+                gdFlag = np.logical_and.reduce([~sources['base_PixelFlags_flag_saturatedCenter'],
+                                     ~sources['base_PixelFlags_flag_interpolatedCenter'],
+                                     ~sources['base_PixelFlags_flag_edge'],
+                                     ~sources['base_PixelFlags_flag_crCenter'],
+                                     ~sources['base_PixelFlags_flag_bad'],
+                                     ~sources['base_PixelFlags_flag_interpolated'],
+                                     ~sources['slot_Centroid_flag'],
+                                     ~sources['slot_Centroid_flag_edge'],
+                                     ~sources['slot_ApFlux_flag'],
+                                     ~sources['base_ClassificationExtendedness_flag'],
+                                     sources['deblend_nChild'] == 0,
+                                     sources['parent'] == 0,
+                                     sources['base_ClassificationExtendedness_value'] < 0.5,
+                                     np.isfinite(magErr),
+                                     magErr > 0.001,
+                                     magErr < 0.1])
+
+                tempCat = afwTable.BaseCatalog(fullCatalog.schema)
+                tempCat.table.preallocate(gdFlag.sum())
+                tempCat.extend(sources[gdFlag], mapper=sourceMapper)
+                tempCat['visit'][:] = visit['visit']
+                tempCat['ccd'][:] = ccdId
+                tempCat['mag'][:] = 25.0 - 2.5*np.log10(sources['slot_ApFlux_flux'][gdFlag])
+                tempCat['magerr'][:] = magErr[gdFlag]
+
+                fullCatalog.extend(tempCat)
+
+        print("Found all good star observations in %.2f s" %
+              (time.time()-startTime))
+
+        butler.put(fullCatalog, 'fgcmStarObservations')
+
+        print("Done with all stars in %.2f s" %
+              (time.time()-startTime))
+
