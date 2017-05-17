@@ -307,7 +307,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         sourceMapper.editOutputSchema().addField(
             "mag", type=np.float32, doc="Raw magnitude")
         sourceMapper.editOutputSchema().addField(
-            "magerr", type=np.float32, doc"Raw magnitude error")
+            "magerr", type=np.float32, doc="Raw magnitude error")
 
         # create the stub of the full catalog
         fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
