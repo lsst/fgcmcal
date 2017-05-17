@@ -293,7 +293,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         """
         """
 
-        startTime=time()
+        startTime=time.time()
 
         # create our source schema
         sourceSchema = butler.get('src_schema', immediate=True).schema
