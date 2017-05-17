@@ -11,7 +11,10 @@ import lsst.utils
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.pex.exceptions as pexExceptions
-import lsst.afw.table
+import lsst.afw.table as afwTable
+from lsst.daf.base.dateTime import DateTime
+
+import time
 
 import lsst.fgcm
 
@@ -60,6 +63,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         doc="Flag for required bands",
         dtype=int,
         default=(0,),
+        )
+    referenceCCD = pexConfig.Field(
+        doc="Reference CCD for scanning visits",
+        dtype=int,
+        default=13,
         )
 
     def setDefaults(self):
@@ -155,20 +163,21 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         return parser
 
     # no saving of the config for now
-    #def _getConfigName(self):
-    #    return None
+    def _getConfigName(self):
+        return None
 
     # no saving of metadata for now
     def _getMetadataName(self):
         return None
 
     @pipeBase.timeMethod
-    def run(self, dataRefs):
+    def run(self, butler):
         """
         Cross-match and make star list for FGCM
 
         Parameters
         ----------
+        butler:  a butler.  try to run all from the rerun?  is that crazy?
         dataRefs: list of lsst.daf.persistence.ButlerDataRef
             List of data references to the exposures to be fit
 
@@ -188,7 +197,79 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         print("bands:")
         print(self.config.bands)
 
+
+
+        visitCat = self._fgcmMakeVisitCatalog(butler)
+
         # next: need to get a list of source catalogs, etc.
         #  just a few would be fine.  Then I could see the formatting of things.
         # how to get into interactive as well?
 
+        # a-ha!
+        # first, need to compile all the visits
+        # second, need to compile all the observations
+
+        return None
+
+    def _fgcmMakeVisitCatalog(self,butler):
+        """
+        """
+
+        # check to see if this already exists...
+        startTime = time.time()
+
+        allVisits = butler.queryMetadata('src',
+                                         format=['visit','filter'],
+                                         dataId={'CCD':self.config.referenceCCD})
+
+        srcVisits = []
+        for dataset in allVisits:
+            if (butler.datasetExists('src',dataId={'visit':dataset[0],
+                                                   'ccd':referenceCCD})):
+                srcVisits.append(dataset[0])
+
+        print("Found all visits in %.2f" % (time.time()-startTime))
+
+        schema = afwTable.Schema()
+        schema.addField('visit',type=np.int32,doc="Visit number")
+        schema.addField('band',type=str,size=2,doc="Filter band")
+        schema.addField('telra',type=np.float64,doc="Pointing RA (deg)")
+        schema.addField('teldec',type=np.float64,doc="Pointing Dec (deg)")
+        schema.addField('telha',type=np.float64,doc="Pointing Hour Angle (deg)")
+        schema.addField('mjd',type=np.float64,doc="MJD of visit")
+        schema.addField('exptime',type=np.float32,doc="Exposure time")
+        schema.addField('pmb',type=np.float32,doc="Pressure (millibar)")
+        schema.addField('fwhm',type=np.float32,doc="Seeing FWHM?")
+        schema.addField('deepflag',type=np.int32,doc="Deep observation")
+
+        visitCat = afwTable.BaseCatalog(schema)
+        visitCat.table.preallocate(len(srcVisits))
+
+        startTime = time.time()
+
+        # now loop over visits and get the information
+        for srcVisit in srcVisits:
+            calexp = butler.get('calexp',dataId={'visit':srcVisit,'ccd':refCCD})
+
+            visitInfo = calexp.getInfo().getVisitInfo()
+
+            rec=visitCat.addNew()
+            rec['visit'] = srcVisit
+            rec['band'] = calexp.getInfo().getFilter().getName()
+            radec = visitInfo.getBoresightRaDec()
+            rec['telra'] = radec.getRa().asDegrees()
+            rec['teldec'] = radec.getDec().asDegrees()
+            rec['telha'] = visitInfo.getBoresightHourAngle().asDegrees()
+            rec['mjd'] = visitInfo.getDate().get(system=DateTime.MJD)
+            rec['exptime'] = visitInfo.getExposureTime()
+            # convert from Pa to millibar
+            rec['pmb'] = visitInfo.getWeather().getAirPressure() / 100
+            rec['fwhm'] = 0.0
+            rec['deepflag'] = 0
+
+        print("Found all VisitInfo in %.2f" % (time.time()-startTime))
+
+        # and now persist it
+        butler.put(visitCat, 'fgcmVisitCatalog')
+
+        return visitCat
