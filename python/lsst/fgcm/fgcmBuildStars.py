@@ -228,7 +228,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                                    'ccd':self.config.referenceCCD})):
                 srcVisits.append(dataset[0])
 
-        print("Found all visits in %.2f" % (time.time()-startTime))
+        print("Found all visits in %.2f s" % (time.time()-startTime))
 
         schema = afwTable.Schema()
         schema.addField('visit',type=np.int32,doc="Visit number")
@@ -249,7 +249,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # now loop over visits and get the information
         for srcVisit in srcVisits:
-            calexp = butler.get('calexp',dataId={'visit':srcVisit,'ccd':refCCD})
+            calexp = butler.get('calexp',dataId={'visit':srcVisit,
+                                                 'ccd':self.config.referenceCCD})
 
             visitInfo = calexp.getInfo().getVisitInfo()
 
@@ -267,7 +268,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             rec['fwhm'] = 0.0
             rec['deepflag'] = 0
 
-        print("Found all VisitInfo in %.2f" % (time.time()-startTime))
+        print("Found all VisitInfo in %.2f s" % (time.time()-startTime))
 
         # and now persist it
         butler.put(visitCat, 'fgcmVisitCatalog')
