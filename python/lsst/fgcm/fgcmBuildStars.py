@@ -225,7 +225,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         srcVisits = []
         for dataset in allVisits:
             if (butler.datasetExists('src',dataId={'visit':dataset[0],
-                                                   'ccd':referenceCCD})):
+                                                   'ccd':self.config.referenceCCD})):
                 srcVisits.append(dataset[0])
 
         print("Found all visits in %.2f" % (time.time()-startTime))
