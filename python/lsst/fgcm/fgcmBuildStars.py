@@ -18,7 +18,9 @@ import lsst.daf.persistence.butlerExceptions as butlerExceptions
 
 import time
 
-import lsst.fgcm
+import lsst.fgcm as lsstFgcm
+
+import fgcm
 
 
 __all__ = ['FgcmBuildStarsConfig','FgcmBuildStarsTask']
@@ -165,8 +167,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         return parser
 
     # no saving of the config for now
-    def _getConfigName(self):
-        return None
+    #def _getConfigName(self):
+    #    return None
 
     # no saving of metadata for now
     def _getMetadataName(self):
@@ -209,8 +211,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             visitCat = self._fgcmMakeVisitCatalog(butler)
 
         # and compile all the stars
+        #  this will put this dataset out.
         if (not butler.datasetExists('fgcmStarObservations')):
             self._fgcmMakeAllStarObservations(butler, visitCat)
+
+        if (not butler.datasetExists('fgcmStarIds') or
+            not butler.datasetExists('fgcmStarIndices')):
+            self._fgcmMatchStars(butler, visitCat)
 
         # next: need to get a list of source catalogs, etc.
         #  just a few would be fine.  Then I could see the formatting of things.
@@ -235,23 +242,23 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         srcVisits = []
         for dataset in allVisits:
-            if (butler.datasetExists('src',dataId={'visit':dataset[0],
-                                                   'ccd':self.config.referenceCCD})):
+            if (butler.datasetExists('src', dataId={'visit':dataset[0],
+                                                    'ccd':self.config.referenceCCD})):
                 srcVisits.append(dataset[0])
 
         print("Found all visits in %.2f s" % (time.time()-startTime))
 
         schema = afwTable.Schema()
-        schema.addField('visit',type=np.int32,doc="Visit number")
-        schema.addField('band',type=str,size=2,doc="Filter band")
-        schema.addField('telra',type=np.float64,doc="Pointing RA (deg)")
-        schema.addField('teldec',type=np.float64,doc="Pointing Dec (deg)")
-        schema.addField('telha',type=np.float64,doc="Pointing Hour Angle (deg)")
-        schema.addField('mjd',type=np.float64,doc="MJD of visit")
-        schema.addField('exptime',type=np.float32,doc="Exposure time")
-        schema.addField('pmb',type=np.float32,doc="Pressure (millibar)")
-        schema.addField('fwhm',type=np.float32,doc="Seeing FWHM?")
-        schema.addField('deepflag',type=np.int32,doc="Deep observation")
+        schema.addField('visit', type=np.int32, doc="Visit number")
+        schema.addField('band', type=str,size=2, doc="Filter band")
+        schema.addField('telra', type=np.float64, doc="Pointing RA (deg)")
+        schema.addField('teldec', type=np.float64, doc="Pointing Dec (deg)")
+        schema.addField('telha', type=np.float64, doc="Pointing Hour Angle (deg)")
+        schema.addField('mjd', type=np.float64, doc="MJD of visit")
+        schema.addField('exptime', type=np.float32, doc="Exposure time")
+        schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
+        schema.addField('fwhm', type=np.float32, doc="Seeing FWHM?")
+        schema.addField('deepflag', type=np.int32, doc="Deep observation")
 
         visitCat = afwTable.BaseCatalog(schema)
         visitCat.table.preallocate(len(srcVisits))
@@ -262,8 +269,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # now loop over visits and get the information
         for srcVisit in srcVisits:
-            calexp = butler.get('calexp_sub',dataId={'visit':srcVisit,
-                                                     'ccd':self.config.referenceCCD},
+            calexp = butler.get('calexp_sub', dataId={'visit':srcVisit,
+                                                      'ccd':self.config.referenceCCD},
                                 bbox=bbox)
 
             visitInfo = calexp.getInfo().getVisitInfo()
@@ -282,7 +289,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             rec['fwhm'] = 0.0
             rec['deepflag'] = 0
 
-        print("Found all VisitInfo in %.2f s" % (time.time()-startTime))
+        print("Found all VisitInfo in %.2f s" % (time.time() - startTime))
 
         # and now persist it
         butler.put(visitCat, 'fgcmVisitCatalog')
@@ -325,7 +332,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         for visit in visitCat:
             print("Reading sources from visit %d" % (visit['visit']))
             # loop over CCDs
-            #for ccd in BLAH:
             for detector in camera:
                 ccdId = detector.getId()
 
@@ -374,10 +380,75 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 fullCatalog.extend(tempCat)
 
         print("Found all good star observations in %.2f s" %
-              (time.time()-startTime))
+              (time.time() - startTime))
 
         butler.put(fullCatalog, 'fgcmStarObservations')
 
         print("Done with all stars in %.2f s" %
-              (time.time()-startTime))
+              (time.time() - startTime))
 
+    def _fgcmMatchStars(self, butler, visitCat):
+        """
+        """
+
+        obsCat = butler.get('fgcmStarObservations')
+
+        # get bands into a numpy array...
+        visitBands = np.zeros(len(visitCat), dtype='a2')
+        for i in xrange(len(visitCat)):
+            visitBands[i] = visitCat[i]['band']
+
+        # match to put bands with observations
+        visitIndex = np.searchsorted(visitCat['visit'],
+                                     obsCat['visit'])
+
+        obsBands = visitBands[visitIndex]
+
+        # make the fgcm starConfig dict
+        ## FIXME: make the fgcm configuration dict
+
+        # initialize the FgcmMakeStars object
+        fgcmMakeStars = fgcm.FgcmMakeStars(starConfig)
+
+        # make the reference stars
+        fgcmMakeStars.makeReferenceStars(obsCat['ra'], obsCat['dec'],
+                                         bandArray = obsBands,
+                                         bandSelected = False)
+
+        # and match all the stars
+        fgcmMakeStars.makeMatchedStars(obsCat['ra'], obsCat['dec'], obsBands)
+
+        # now persist
+
+        # afwTable for objects
+        objSchema = afwTable.Schema()
+        objSchema.addField('fgcm_id', type=np.int32, doc='FGCM Unique ID')
+        objSchema.addField('ra', type=np.float64, doc='Mean object RA')
+        objSchema.addField('dec', type=np.float64, doc='Mean object Dec')
+        objSchema.addField('obsarrindex', type=np.int32,
+                           doc='Index in obsIndexTable for first observation')
+        objSchema.addField('nobs', type=np.int32, doc='Total number of observations')
+
+        fgcmStarIdCat = afwTable.BaseCatalog(objSchema)
+        fgcmStarIdCat.table.preallocate(fgcmMakeStars.objIndexCat.size)
+
+        fgcmStarIdCat['fgcm_id'][:] = fgcmMakeStars.objIndexCat['FGCM_ID']
+        fgcmStarIdCat['ra'][:] = fgcmMakeStars.objIndexCat['RA']
+        fgcmStarIdCat['dec'][:] = fgcmMakeStars.objIndexCat['DEC']
+        fgcmStarIdCat['obsarrindex'][:] = fgcmMakeStars.objIndexCat['OBSARRINDEX']
+        fgcmStarIdCat['nobs'][:] = fgcmMakeStars.objIndexCat['NOBS']
+
+        butler.put(fgcmStarIdCat, 'fgcmStarIds')
+
+        # afwTable for observation indices
+        obsSchema = afwTable.Schema()
+        obsSchema.addField('obsindex', type=np.int32, doc='Index in observation table')
+
+        fgcmStarIndicesCat = afwTable.BaseCatalog(obsSchema)
+        fgcmStarIndicesCat.table.preallocate(fgcmMakeStars.obsIndexCat.size)
+
+        fgcmStarIndicesCat['obsindex'][:] = fgcmMakeStars.obsIndexCat['OBSINDEX']
+
+        butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
+
+        # and we're done with the stars
