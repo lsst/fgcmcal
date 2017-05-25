@@ -96,7 +96,6 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         return True
 
     def __call__(self, butler):
-        print("In taskrunner __call__")
         task = self.TaskClass(config=self.config, log=self.log)
         if self.doRaise:
             results = task.run(butler)
@@ -109,7 +108,6 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
                     traceback.print_exc(file=sys.stderr)
 
         task.writeMetadata(butler)
-        print("Done with taskrunner")
         if self.doReturnResults:
             return results
 
@@ -118,7 +116,6 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
     def run(self, parsedCmd):
         """ runs the task, but doesn't do multiprocessing"""
 
-        print("in taskrunner run")
         resultList = []
 
         if self.precall(parsedCmd):
@@ -199,10 +196,11 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         #if len(dataRefs) == 0:
         #    raise ValueError("Need a list of data references!")
 
-        print("Run")
-        print("min obs: %d" % (self.config.minPerBand))
-        print("bands:")
+        print("Using bands: ")
         print(self.config.bands)
+        print("Required Flag: ")
+        print(self.config.requiredFlag)
+        
 
 
         # make the visit catalog if necessary
