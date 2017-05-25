@@ -18,8 +18,6 @@ import lsst.daf.persistence.butlerExceptions as butlerExceptions
 
 import time
 
-import lsst.fgcm as lsstFgcm
-
 import fgcm
 
 
