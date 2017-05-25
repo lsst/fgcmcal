@@ -68,6 +68,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=int,
         default=(0,),
         )
+    referenceBand = pexConfig.Field(
+        doc="Reference band for primary matches",
+        dtype=str,
+        default=None
+        )
     referenceCCD = pexConfig.Field(
         doc="Reference CCD for scanning visits",
         dtype=int,
@@ -406,6 +411,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # make the fgcm starConfig dict
         ## FIXME: make the fgcm configuration dict
+
+        starConfig = {'bands': np.array(self.config.bands),
+                      'requiredFlag': np.array(self.config.requiredFlag),
+                      'minPerBand': self.config.minPerBand,
+                      'matchRadius': self.config.matchRadius,
+                      'isolationRadius': self.config.isolationRadius,
+                      'densNSide': self.config.densityCutNside,
+                      'densMaxPerPixel': self.config.densityCutMaxPerPixel,
+                      'referenceBand': self.config.referenceBand,
+                      'zpDefault': self.config.zeropointDefault}
 
         # initialize the FgcmMakeStars object
         fgcmMakeStars = fgcm.FgcmMakeStars(starConfig)
