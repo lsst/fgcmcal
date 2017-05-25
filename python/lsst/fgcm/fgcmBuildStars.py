@@ -51,6 +51,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=int,
         default=1000,
         )
+    matchNside = pexConfig.Field(
+        doc="Healpix Nside for matching",
+        dtype=int,
+        default=4096,
+        )
     zeropointDefault = pexConfig.Field(
         doc="Zeropoint default (arbitrary?)",
         dtype=float,
@@ -200,7 +205,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         print(self.config.bands)
         print("Required Flag: ")
         print(self.config.requiredFlag)
-        
 
 
         # make the visit catalog if necessary
@@ -413,6 +417,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                       'minPerBand': self.config.minPerBand,
                       'matchRadius': self.config.matchRadius,
                       'isolationRadius': self.config.isolationRadius,
+                      'matchNSide' : self.config.matchNside,
                       'densNSide': self.config.densityCutNside,
                       'densMaxPerPixel': self.config.densityCutMaxPerPixel,
                       'referenceBand': self.config.referenceBand,
