@@ -427,12 +427,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         fgcmMakeStars = fgcm.FgcmMakeStars(starConfig)
 
         # make the reference stars
-        fgcmMakeStars.makeReferenceStars(obsCat['ra'], obsCat['dec'],
+        #  note that the ra/dec native Angle format is radians
+        fgcmMakeStars.makeReferenceStars(np.rad2deg(obsCat['ra']),
+                                         np.rad2deg(obsCat['dec']),
                                          bandArray = obsBands,
                                          bandSelected = False)
 
         # and match all the stars
-        fgcmMakeStars.makeMatchedStars(obsCat['ra'], obsCat['dec'], obsBands)
+        fgcmMakeStars.makeMatchedStars(np.rad2deg(obsCat['ra']),
+                                       np.rad2deg(obsCat['dec']),
+                                       obsBands)
 
         # now persist
 
