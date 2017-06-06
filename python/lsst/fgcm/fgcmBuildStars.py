@@ -443,15 +443,20 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # afwTable for objects
         objSchema = afwTable.Schema()
         objSchema.addField('fgcm_id', type=np.int32, doc='FGCM Unique ID')
+        ## FIXME: should be angle?
         objSchema.addField('ra', type=np.float64, doc='Mean object RA')
         objSchema.addField('dec', type=np.float64, doc='Mean object Dec')
         objSchema.addField('obsarrindex', type=np.int32,
                            doc='Index in obsIndexTable for first observation')
         objSchema.addField('nobs', type=np.int32, doc='Total number of observations')
 
+        # make catalog and records
         fgcmStarIdCat = afwTable.BaseCatalog(objSchema)
         fgcmStarIdCat.table.preallocate(fgcmMakeStars.objIndexCat.size)
+        for i in xrange(fgcmMakeStars.objIndexCat.size):
+            fgcmStarIdCat.addNew()
 
+        # fill the catalog
         fgcmStarIdCat['fgcm_id'][:] = fgcmMakeStars.objIndexCat['FGCM_ID']
         fgcmStarIdCat['ra'][:] = fgcmMakeStars.objIndexCat['RA']
         fgcmStarIdCat['dec'][:] = fgcmMakeStars.objIndexCat['DEC']
@@ -466,6 +471,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         fgcmStarIndicesCat = afwTable.BaseCatalog(obsSchema)
         fgcmStarIndicesCat.table.preallocate(fgcmMakeStars.obsIndexCat.size)
+        for i in xrange(fgcmMakeStars.obsIndexCat.size):
+            fgcmStarIndicesCat.addNew()
 
         fgcmStarIndicesCat['obsindex'][:] = fgcmMakeStars.obsIndexCat['OBSINDEX']
 
