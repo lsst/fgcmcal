@@ -340,8 +340,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             for detector in camera:
                 ccdId = detector.getId()
 
-                # get the dataref
-                ref = butler.dataRef('raw', dataId={'visit':visit['visit'],
+                # get the dataref -- can't be numpy int
+                ref = butler.dataRef('raw', dataId={'visit':int(visit['visit']),
                                                     'ccd':ccdId})
                 try:
                     sources = ref.get('src',
