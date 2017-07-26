@@ -272,7 +272,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         lutConfig['zenithSteps'] = self.config.zenithSteps
         lutConfig['pmbStd'] = self.config.pmbStd
         lutConfig['pwvStd'] = self.config.pwvStd
-        lutConfig['o3Std'] = self.config.p3Std
+        lutConfig['o3Std'] = self.config.o3Std
         lutConfig['tauStd'] = self.config.tauStd
         lutConfig['alphaStd'] = self.config.alphaStd
         lutConfig['airmassStd'] = self.config.airmassStd
