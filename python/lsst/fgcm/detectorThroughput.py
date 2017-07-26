@@ -58,7 +58,7 @@ class DetectorThroughput(object):
             interpolator = self.makeEvenSplineInterpolator(filterRad,
                                                            self.filterData[band][key])
             print(i, key, band, x, y, radius, filterRad[0], filterRad[-1])
-            xvec[i] = interpolator(useRadius)
+            xvec[i] = interpolator(radius)
 
         # and the Tavg value
         interpolator = self.makeEvenSplineInterpolator(filterRad,
