@@ -289,12 +289,12 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
 
         # these will be in Angstroms
         # note that lambdaStep is currently in nm, because dumb.  convert to A
-        throughLambda = np.arange(self.config.lambdaRange[0],
+        throughputLambda = np.arange(self.config.lambdaRange[0],
                                   self.config.lambdaRange[1],
                                   self.config.lambdaStep*10.)
 
         print("Built throughput lambda, %.1f-%.1f, step %.2f" %
-              (throughLambda[0], throughLambda[-1], throughLambda[1]-throughLambda[0]))
+              (throughputLambda[0], throughputLambda[-1], throughputLambda[1]-throughputLambda[0]))
 
         tput = DetectorThroughput()
 
