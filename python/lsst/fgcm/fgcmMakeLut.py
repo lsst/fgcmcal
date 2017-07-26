@@ -16,7 +16,7 @@ from lsst.daf.base.dateTime import DateTime
 import lsst.afw.geom as afwGeom
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
 
-from detectorThroughput import DetectorThroughput
+from .detectorThroughput import DetectorThroughput
 
 import time
 
