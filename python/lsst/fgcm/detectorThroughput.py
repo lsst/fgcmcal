@@ -27,8 +27,6 @@ class DetectorThroughput(object):
 
         c=detector.getCenter(afwCameraGeom.FOCAL_PLANE)
 
-        print("%d: %.2f, %.2f" % (int(detector.getId()), c.getPoint().getX(), c.getPoint().getY()))
-
         return self.getThroughputXY(band,
                                     c.getPoint().getX(), c.getPoint().getY(),
                                     lam)
@@ -57,7 +55,6 @@ class DetectorThroughput(object):
 
             interpolator = self.makeEvenSplineInterpolator(filterRad,
                                                            self.filterData[band][key])
-            print(i, key, band, x, y, radius, filterRad[0], filterRad[-1])
             xvec[i] = interpolator(radius)
 
         # and the Tavg value
