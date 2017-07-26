@@ -306,7 +306,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                 # make sure we convert the calling units from A to nm
                 tDict[ccdIndex] = tput.getThroughputDetector(detector, band,
                                                              throughputLambda/10.)
-            throughputDict[b] = tDict
+            throughputDict[band] = tDict
 
         # set the throughputs
         print("Setting throughputs...")
