@@ -237,7 +237,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         nothing?
         """
 
-        if (not butler.datasetExists('fgcmLut')):
+        if (not butler.datasetExists('fgcmLookUpTable')):
             self._fgcmMakeLut(butler)
 
         return None
@@ -245,11 +245,6 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
     def _fgcmMakeLut(self, butler):
         """
         """
-
-        if (butler.datasetExists('fgcmLookUpTable')):
-            # all done
-            print("Found LUT dataset.  Leaving!")
-            return
 
         # need the camera for the detectors
         camera = butler.get('camera')
