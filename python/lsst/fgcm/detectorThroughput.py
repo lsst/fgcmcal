@@ -40,7 +40,9 @@ class DetectorThroughput(object):
         # convert radius to pixels
         filterRad = self.filterData[band]['radius'] / self._pixelScale
 
-        radius = np.sqrt(x**2. + y**2.)
+        # keep within range.  Not sure what to do about extrapolation
+        #radius = np.sqrt(x**2. + y**2.)
+        radius = np.clip(np.sqrt(x**2. + y**2.), filterRad[0], filterRad[-1])
 
         # and we need the interpolated on10, on50, on80, Tavg, off80, off50, off10
         yvec=np.array([0.0,10.0,50.0,80.0,0.0,0.0,80.0,50.0,10.0,0.0])
@@ -56,7 +58,7 @@ class DetectorThroughput(object):
             interpolator = self.makeEvenSplineInterpolator(filterRad,
                                                            self.filterData[band][key])
             print(i, key, band, x, y, radius, filterRad[0], filterRad[-1])
-            xvec[i] = interpolator(radius)
+            xvec[i] = interpolator(useRadius)
 
         # and the Tavg value
         interpolator = self.makeEvenSplineInterpolator(filterRad,
