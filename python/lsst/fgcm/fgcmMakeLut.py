@@ -159,7 +159,7 @@ class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
         return True
 
     def __call__(self, butler):
-                task = self.TaskClass(config=self.config, log=self.log)
+        task = self.TaskClass(config=self.config, log=self.log)
         if self.doRaise:
             results = task.run(butler)
         else:
