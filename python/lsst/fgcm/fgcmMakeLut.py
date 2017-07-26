@@ -249,7 +249,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         if (butler.datasetExists('fgcmLookUpTable')):
             # all done
             return
-        
+
         # need the camera for the detectors
         camera = butler.get('camera')
 
