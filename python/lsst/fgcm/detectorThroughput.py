@@ -27,6 +27,8 @@ class DetectorThroughput(object):
 
         c=detector.getCenter(afwCameraGeom.FOCAL_PLANE)
 
+        print("%d: %.2f, %.2f" % (int(detector.getId()), c.getPoint().getX(), c.getPoint().getY()))
+
         return self.getThroughputXY(band,
                                     c.getPoint().getX(), c.getPoint().getY(),
                                     lam)
