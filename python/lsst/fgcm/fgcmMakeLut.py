@@ -32,6 +32,11 @@ class FgcmMakeLutConfig(pexConfig.Config):
         dtype=str,
         default=("NO_DATA",),
         )
+    elevation = pexConfig.Field(
+        doc="Telescope elevation (m)",
+        dtype=float,
+        default=None,
+        )
     pmbRange = pexConfig.ListField(
         doc="Barometric Pressure range (millibar)",
         dtype=float,
@@ -241,11 +246,21 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         """
         """
 
+        if (butler.datasetExists('fgcmLookUpTable')):
+            # all done
+            return
+        
+        # need the camera for the detectors
+        camera = butler.get('camera')
+
+        # number of ccds from the length of the camera iterator
+        nCcd = len(camera)
+
         # make the config dictionary
         lutConfig = {}
-        lutConfig['elevation'] = needElevation
+        lutConfig['elevation'] = self.config.elevation
         lutConfig['bands'] = self.config.bands
-        lutConfig['nCCD'] = needNumberOfCCDs
+        lutConfig['nCCD'] = nCcd
         lutConfig['pmbRange'] = self.config.pmbRange
         lutConfig['pmbSteps'] = self.config.pmbSteps
         lutConfig['pwvRange'] = self.config.pwvRange
@@ -280,7 +295,6 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                                   self.config.lambdaRange[1],
                                   self.config.lambdaStep*10.)
 
-        camera = butler.get('camera')
         tput = DetectorThroughput()
 
         throughputDict = {}
