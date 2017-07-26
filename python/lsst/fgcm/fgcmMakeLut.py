@@ -299,7 +299,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         tput = DetectorThroughput()
 
         throughputDict = {}
-        for i,b in enumerate(self.config.bands):
+        for i,band in enumerate(self.config.bands):
             tDict = {}
             tDict['LAMBDA'] = throughputLambda
             for ccdIndex,detector in enumerate(camera):
