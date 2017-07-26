@@ -128,17 +128,17 @@ class FgcmMakeLutConfig(pexConfig.Config):
         default=None,
         )
     lambdaNorm = pexConfig.Field(
-        doc="Aerosol Optical Depth normalization wavelength (A)"
+        doc="Aerosol Optical Depth normalization wavelength (A)",
         dtype=float,
         default=None,
         )
     lambdaStep = pexConfig.Field(
-        doc="Wavelength step for generating atmospheres (nm)"
+        doc="Wavelength step for generating atmospheres (nm)",
         dtype=float,
         default=0.5,
         )
     lambdaRange = pexConfig.ListField(
-        doc="Wavelength range for LUT (A)"
+        doc="Wavelength range for LUT (A)",
         dtype=float,
         default=None,
         )
