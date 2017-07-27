@@ -316,6 +316,8 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         print("Making LUT...")
         self.fgcmLutMaker.makeLUT()
 
+        self.fgcmLutMaker.saveLUT('/home/erykoff/testLUT.fits')
+
         # and save the LUT
         lutSchema = afwTable.Schema()
 
@@ -367,11 +369,14 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                            size=self.fgcmLutMaker.atmStd.size)
 
         # and the LUT
-        lutSchema.addField('lut', type='ArrayF', doc='Look-up table',
-                           size=self.fgcmLutMaker.lut.size)
+        lutSchema.addField('luti0', type='ArrayF', doc='Look-up table for I0',
+                           size=self.fgcmLutMaker.lut['I0'].size)
+        lutSchema.addField('luti1', type='ArrayF', doc='Look-up table for I1',
+                           size=self.fgcmLutMaker.lut['I1'].size)
 
         # and the LUT derivatives
-        lutSchema.addField('lutderiv', type='ArrayF', doc='Derivative look-up table',
+        ## FIXME
+        lutSchema.addField('lutderiv', type='ArrayF', doc='Derivative look-up table for I0',
                            size=self.fgcmLutMaker.lutDeriv.size)
 
         lutCat = afwTable.BaseCatalog(lutSchema)
@@ -406,7 +411,8 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         rec['atmlambda'][:] = self.fgcmLutMaker.atmLambda
         rec['atmstdtrans'][:] = self.fgcmLutMaker.atmStdTrans
 
-        rec['lut'][:] = self.fgcmLutMaker.lut.flatten()
+        rec['luti0'][:] = self.fgcmLutMaker.lut['I0'].flatten()
+        rec['luti1'][:] = self.fgcmLutMaker.lut['I1'].flatten()
         rec['lutderiv'][:] = self.fgcmLutMaker.lutDeriv.flatten()
 
         butler.put(lutCat, 'fgcmLookUpTable')
