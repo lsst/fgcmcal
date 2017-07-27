@@ -323,61 +323,55 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         comma=','
         bandString = comma.join(self.config.bands)
         lutSchema.addField('bands', type=str, doc='Bands in LUT', size=len(bandString))
-        lutSchema.addField('pmb', type=np.float64, doc='Barometric Pressure',
-                           unit='millibar', size=self.fgcmLutMaker.pmb.size)
-        lutSchema.addField('pmbfactor', type=np.float64, doc='PMB scaling factor',
+        lutSchema.addField('pmb', type='ArrayD', doc='Barometric Pressure',
                            size=self.fgcmLutMaker.pmb.size)
-        lutSchema.addField('pmbElevation', type=np.float64, doc='PMB Scaling at elevation')
-        lutSchema.addField('pwv', type=np.float64, doc='Preciptable Water Vapor',
-                           unit='mm', size=self.fgcmLutMaker.pwv.size)
-        lutSchema.addField('o3', type=np.float64, doc='Ozone',
-                           unit='dobson', size=self.fgcmLutMaker.o3.size)
-        lutSchema.addField('tau', type=np.float64, doc='Aerosol optical depth',
+        lutSchema.addField('pmbfactor', type='ArrayD', doc='PMB scaling factor',
+                           size=self.fgcmLutMaker.pmb.size)
+        lutSchema.addField('pmbelevation', type=np.float64, doc='PMB Scaling at elevation')
+        lutSchema.addField('pwv', type='ArrayD', doc='Preciptable Water Vapor',
+                           size=self.fgcmLutMaker.pwv.size)
+        lutSchema.addField('o3', type='ArrayD', doc='Ozone',
+                           size=self.fgcmLutMaker.o3.size)
+        lutSchema.addField('tau', type='ArrayD', doc='Aerosol optical depth',
                            size=self.fgcmLutMaker.tau.size)
-        lutSchema.addField('lambdanorm', type=np.float64, doc='AOD wavelength',
-                           unit='Angstrom')
-        lutSchema.addField('alpha', type=np.float64, doc='Aerosol alpha',
+        lutSchema.addField('lambdanorm', type=np.float64, doc='AOD wavelength')
+        lutSchema.addField('alpha', type='ArrayD', doc='Aerosol alpha',
                            size=self.fgcmLutMaker.alpha.size)
-        lutSchema.addField('zenith', type=np.float64, doc='Zenith angle',
-                           unit='degrees', size=self.fgcmLutMaker.zenith.size)
+        lutSchema.addField('zenith', type='ArrayD', doc='Zenith angle',
+                           size=self.fgcmLutMaker.zenith.size)
         lutSchema.addField('nccd', type=np.int32, doc='Number of CCDs')
 
         # and the standard values
-        lutSchema.addField('pmbstd', type=np.float64, doc='PMB Standard',
-                           unit='millibar')
-        lutSchema.addField('pwvstd', type=np.float64, doc='PWV Standard',
-                           unit='mm')
-        lutSchema.addField('o3std', type=np.float64, doc='O3 Standard',
-                           unit='dobson')
+        lutSchema.addField('pmbstd', type=np.float64, doc='PMB Standard')
+        lutSchema.addField('pwvstd', type=np.float64, doc='PWV Standard')
+        lutSchema.addField('o3std', type=np.float64, doc='O3 Standard')
         lutSchema.addField('taustd', type=np.float64, doc='Tau Standard')
         lutSchema.addField('alphastd', type=np.float64, doc='Alpha Standard')
-        lutSchema.addField('zenithstd', type=np.float64, doc='Zenith angle Standard',
-                           unit='degree')
-        lutSchema.addField('lambdarange', type=np.float64, doc='Wavelength range',
-                           unit='A', size=2)
-        lutSchema.addField('lambdastep', type=np.float64, doc='Wavelength step',
-                           unit='nm')
-        lutSchema.addField('lambdastd', type=np.float64, doc='Standard Wavelength',
-                           unit='A', size=self.fgcmLutMaker.bands.size)
-        lutSchema.addField('i0std', type=np.float64, doc='I0 Standard',
+        lutSchema.addField('zenithstd', type=np.float64, doc='Zenith angle Standard')
+        lutSchema.addField('lambdarange', type='ArrayD', doc='Wavelength range',
+                           size=2)
+        lutSchema.addField('lambdastep', type=np.float64, doc='Wavelength step')
+        lutSchema.addField('lambdastd', type='ArrayD', doc='Standard Wavelength',
                            size=self.fgcmLutMaker.bands.size)
-        lutSchema.addField('i1std', type=np.float64, doc='I1 Standard',
+        lutSchema.addField('i0std', type='ArrayD', doc='I0 Standard',
                            size=self.fgcmLutMaker.bands.size)
-        lutSchema.addField('i10std', type=np.float64, doc='I10 Standard',
+        lutSchema.addField('i1std', type='ArrayD', doc='I1 Standard',
                            size=self.fgcmLutMaker.bands.size)
-        lutSchema.addField('lambdab', type=np.float64, doc='Wavelength for passband (no atm)',
-                           units='A', size=self.fgcmLutMaker.bands.size)
-        lutSchema.addField('atmlambda', type=np.float64, doc='Atmosphere wavelengths',
-                           units='A', size=self.fgcmLutMaker.atmLambda.size)
-        lutSchema.addField('atmstdtrans', type=np.float64, doc='Standard Atmosphere Throughput',
+        lutSchema.addField('i10std', type='ArrayD', doc='I10 Standard',
+                           size=self.fgcmLutMaker.bands.size)
+        lutSchema.addField('lambdab', type='ArrayD', doc='Wavelength for passband (no atm)',
+                           size=self.fgcmLutMaker.bands.size)
+        lutSchema.addField('atmlambda', type='ArrayD', doc='Atmosphere wavelengths',
+                           size=self.fgcmLutMaker.atmLambda.size)
+        lutSchema.addField('atmstdtrans', type='ArrayD', doc='Standard Atmosphere Throughput',
                            size=self.fgcmLutMaker.atmStd.size)
 
         # and the LUT
-        lutSchema.addField('lut', type=np.float32, doc='Look-up table',
+        lutSchema.addField('lut', type='ArrayF', doc='Look-up table',
                            size=self.fgcmLutMaker.lut.size)
 
         # and the LUT derivatives
-        lutSchema.addField('lutderiv', type=np.float32, doc='Derivative look-up table',
+        lutSchema.addField('lutderiv', type='ArrayF', doc='Derivative look-up table',
                            size=self.fgcmLutMaker.lutDeriv.size)
 
         lutCat = afwTable.BaseCatalog(lutSchema)
@@ -387,7 +381,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         rec['bands'] = bandString
         rec['pmb'][:] = self.fgcmLutMaker.pmb
         rec['pmbfactor'][:] = self.fgcmLutMaker.pmbFactor
-        rec['pmbElevation'][:] = self.fgcmLutMaker.pmbElevation
+        rec['pmbelevation'][:] = self.fgcmLutMaker.pmbElevation
         rec['pwv'][:] = self.fgcmLutMaker.pwv
         rec['o3'][:] = self.fgcmLutMaker.o3
         rec['tau'][:] = self.fgcmLutMaker.tau
