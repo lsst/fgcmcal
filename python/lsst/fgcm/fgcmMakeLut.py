@@ -316,8 +316,6 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         print("Making LUT...")
         self.fgcmLutMaker.makeLUT()
 
-        self.fgcmLutMaker.saveLUT('/home/erykoff/testLUT.fits',clobber=True)
-
         # and save the LUT
         lutSchema = afwTable.Schema()
 
