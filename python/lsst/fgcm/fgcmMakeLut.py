@@ -385,7 +385,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         rec['pwv'][:] = self.fgcmLutMaker.pwv
         rec['o3'][:] = self.fgcmLutMaker.o3
         rec['tau'][:] = self.fgcmLutMaker.tau
-        rec['lambdanorm'][:] = self.fgcmLutMaker.lambdaNorm
+        rec['lambdanorm'] = self.fgcmLutMaker.lambdaNorm
         rec['alpha'][:] = self.fgcmLutMaker.alpha
         rec['zenith'][:] = self.fgcmLutMaker.zenith
         rec['nccd'] = self.fgcmLutMaker.nCCD
