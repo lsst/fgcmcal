@@ -399,12 +399,12 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         rec['lambdarange'][:] = self.fgcmLutMaker.lambdaRange
         rec['lambdastep'] = self.fgcmLutMaker.lambdaStep
         rec['lambdastd'][:] = self.fgcmLutMaker.lambdaStd
-        rec['i0std'][:] = self.fgcmLutMaker.i0Std
-        rec['i1std'][:] = self.fgcmLutMaker.i1Std
-        rec['i10std'][:] = self.fgcmLutMaker.i10Std
-        rec['lambdab'][:] = self.fgcmLutMaker.lambdab
-        rec['atmlambda'][:] = self.fgcmLutMaker.atmlambda
-        rec['atmstdtrans'][:] = self.fgcmLutMaker.atmstdtrans
+        rec['i0std'][:] = self.fgcmLutMaker.I0Std
+        rec['i1std'][:] = self.fgcmLutMaker.I1Std
+        rec['i10std'][:] = self.fgcmLutMaker.I10Std
+        rec['lambdab'][:] = self.fgcmLutMaker.lambdaB
+        rec['atmlambda'][:] = self.fgcmLutMaker.atmLambda
+        rec['atmstdtrans'][:] = self.fgcmLutMaker.atmStdTrans
 
         rec['lut'][:] = self.fgcmLutMaker.lut.flatten()
         rec['lutderiv'][:] = self.fgcmLutMaker.lutDeriv.flatten()
