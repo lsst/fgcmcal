@@ -316,7 +316,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         print("Making LUT...")
         self.fgcmLutMaker.makeLUT()
 
-        self.fgcmLutMaker.saveLUT('/home/erykoff/testLUT.fits')
+        self.fgcmLutMaker.saveLUT('/home/erykoff/testLUT.fits',clobber=True)
 
         # and save the LUT
         lutSchema = afwTable.Schema()
@@ -375,9 +375,42 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                            size=self.fgcmLutMaker.lut['I1'].size)
 
         # and the LUT derivatives
-        ## FIXME
-        lutSchema.addField('lutderiv', type='ArrayF', doc='Derivative look-up table for I0',
-                           size=self.fgcmLutMaker.lutDeriv.size)
+        lutSchema.addField('lutderiv_pmb', type='ArrayF',
+                           doc='Derivative look-up table for I0 PMB',
+                           size=self.fgcmLutMaker.lutDeriv['D_PMB'].size)
+        lutSchema.addField('lutderiv_pwv', type='ArrayF',
+                           doc='Derivative look-up table for I0 PWV',
+                           size=self.fgcmLutMaker.lutDeriv['D_PWV'].size)
+        lutSchema.addField('lutderiv_o3', type='ArrayF',
+                           doc='Derivative look-up table for I0 O3',
+                           size=self.fgcmLutMaker.lutDeriv['D_O3'].size)
+        lutSchema.addField('lutderiv_lntau', type='ArrayF',
+                           doc='Derivative look-up table for I0 ln(tau)',
+                           size=self.fgcmLutMaker.lutDeriv['D_LNTAU'].size)
+        lutSchema.addField('lutderiv_alpha', type='ArrayF',
+                           doc='Derivative look-up table for I0 alpha',
+                           size=self.fgcmLutMaker.lutDeriv['D_ALPHA'].size)
+        lutSchema.addField('lutderiv_seczenith', type='ArrayF',
+                           doc='Derivative look-up table for I0 sec(zenith)',
+                           size=self.fgcmLutMaker.lutDeriv['D_SECZENITH'].size)
+        lutSchema.addField('lutderiv_pmb_i1', type='ArrayF',
+                           doc='Derivative look-up table for I1 PMB',
+                           size=self.fgcmLutMaker.lutDeriv['D_PMB_I1'].size)
+        lutSchema.addField('lutderiv_pwv_i1', type='ArrayF',
+                           doc='Derivative look-up table for I1 PWV',
+                           size=self.fgcmLutMaker.lutDeriv['D_PWV_I1'].size)
+        lutSchema.addField('lutderiv_o3_i1', type='ArrayF',
+                           doc='Derivative look-up table for I1 O3',
+                           size=self.fgcmLutMaker.lutDeriv['D_O3_I1'].size)
+        lutSchema.addField('lutderiv_lntau_i1', type='ArrayF',
+                           doc='Derivative look-up table for I1 ln(tau)',
+                           size=self.fgcmLutMaker.lutDeriv['D_LNTAU_I1'].size)
+        lutSchema.addField('lutderiv_alpha_i1', type='ArrayF',
+                           doc='Derivative look-up table for I1 alpha',
+                           size=self.fgcmLutMaker.lutDeriv['D_ALPHA_I1'].size)
+        lutSchema.addField('lutderiv_seczenith_i1', type='ArrayF',
+                           doc='Derivative look-up table for I1 sec(zenith)',
+                           size=self.fgcmLutMaker.lutDeriv['D_SECZENITH_I1'].size)
 
         lutCat = afwTable.BaseCatalog(lutSchema)
         lutCat.table.preallocate(1)
@@ -413,7 +446,19 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
 
         rec['luti0'][:] = self.fgcmLutMaker.lut['I0'].flatten()
         rec['luti1'][:] = self.fgcmLutMaker.lut['I1'].flatten()
-        rec['lutderiv'][:] = self.fgcmLutMaker.lutDeriv.flatten()
+
+        rec['lutderiv_pmb'][:] = self.fgcmLutMaker.lutDeriv['D_PMB'].flatten()
+        rec['lutderiv_pwv'][:] = self.fgcmLutMaker.lutDeriv['D_PWV'].flatten()
+        rec['lutderiv_o3'][:] = self.fgcmLutMaker.lutDeriv['D_O3'].flatten()
+        rec['lutderiv_lntau'][:] = self.fgcmLutMaker.lutDeriv['D_LNTAU'].flatten()
+        rec['lutderiv_alpha'][:] = self.fgcmLutMaker.lutDeriv['D_ALPHA'].flatten()
+        rec['lutderiv_seczenith'][:] = self.fgcmLutMaker.lutDeriv['D_SECZENITH'].flatten()
+        rec['lutderiv_pmb_i1'][:] = self.fgcmLutMaker.lutDeriv['D_PMB_I1'].flatten()
+        rec['lutderiv_pwv_i1'][:] = self.fgcmLutMaker.lutDeriv['D_PWV_I1'].flatten()
+        rec['lutderiv_o3_i1'][:] = self.fgcmLutMaker.lutDeriv['D_O3_I1'].flatten()
+        rec['lutderiv_lntau_i1'][:] = self.fgcmLutMaker.lutDeriv['D_LNTAU_I1'].flatten()
+        rec['lutderiv_alpha_i1'][:] = self.fgcmLutMaker.lutDeriv['D_ALPHA_I1'].flatten()
+        rec['lutderiv_seczenith_i1'][:] = self.fgcmLutMaker.lutDeriv['D_SECZENITH_I1'].flatten()
 
         butler.put(lutCat, 'fgcmLookUpTable')
 
