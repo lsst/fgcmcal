@@ -373,7 +373,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                            size=self.fgcmLutMaker.atmStd.size)
 
         # and the look-up-tables
-        lutSchema.addField('luttype', type=str, size=10, doc='Look-up table type')
+        lutSchema.addField('luttype', type=str, size=20, doc='Look-up table type')
         lutSchema.addField('lut', type='ArrayF', doc='Look-up table for luttype',
                            size=self.fgcmLutMaker.lut['I0'].size)
 
