@@ -377,6 +377,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         bands = np.array(self.config.bands)
         fitFlag = np.array(self.config.fitFlag,dtype=np.bool)
 
+        print('Using bands: ',bands)
+        print('fitFlag: ',fitFlag)
+
         camera = butler.get('camera')
 
         # process the starColorCuts
