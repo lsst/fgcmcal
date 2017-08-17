@@ -573,7 +573,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmExpInfo['PMB'][:] = visitCat['pmb']
         # Note that we have to go through asAstropy() to get a string
         #  array out of an afwTable
-        fgcmExpInfo['BAND'][:] = visitCatalog.asAstropy()['band']
+        fgcmExpInfo['BAND'][:] = visitCat.asAstropy()['band']
 
         # and we need to know the ccd offsets from the camera geometry
         ccdOffsets = np.zeros(lutIndexVals['NCCD'],dtype=[('CCDNUM','i4'),
