@@ -437,7 +437,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'sigma0Cal': self.config.sigma0Cal,
                       'sigma0Phot': self.config.sigma0Phot,
                       'mapLongitudeRef': self.config.mapLongitudeRef,
-                      'mapNside': self.config.mapNSide,
+                      'mapNSide': self.config.mapNSide,
                       'varNSig': self.config.varNSig,
                       'varMinBand': self.config.varMinBand,
                       'useSedLUT': False,
