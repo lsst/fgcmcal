@@ -590,51 +590,20 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         camera=butler.get('camera')
         for i,detector in enumerate(camera):
             point = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
-            pupilPoint = camera.transform(point, afwCameraGeom.PUPIL)
+            bbox = detector.getBBox()
 
-            p2d = afwGeom.Point2D(point.getPoint().getX()*0.015,point.getPoint().getY()*0.015)
-            point2 = afwCameraGeom.CameraPoint(p2d, point.getCameraSys())
-            pupilPoint2 = camera.transform(point2, afwCameraGeom.PUPIL)
-            print np.rad2deg(pupilPoint.getPoint().getX())
-            print np.rad2deg(pupilPoint2.getPoint().getX())
-            print np.rad2deg(pupilPoint.getPoint().getX()*0.015)
-
+            ## FIXME: is this orientation correct?
             ccdOffsets['CCDNUM'][i] = detector.getId()
-            ccdOffsets['DELTA_RA'][i] = np.rad2deg(pupilPoint.getPoint().getX()*0.015)
-            ccdOffsets['DELTA_DEC'][i] = np.rad2deg(pupilPoint.getPoint().getY())
-
-            corners = detector.getCorners(afwCameraGeom.FOCAL_PLANE)
-
-            pupilC0 = camera.transform(afwCameraGeom.CameraPoint(corners[0],
-                                                                 point.getCameraSys()),
-                                       afwCameraGeom.PUPIL)
-            pupilC1 = camera.transform(afwCameraGeom.CameraPoint(corners[1],
-                                                                 point.getCameraSys()),
-                                       afwCameraGeom.PUPIL)
-            pupilC2 = camera.transform(afwCameraGeom.CameraPoint(corners[2],
-                                                                 point.getCameraSys()),
-                                       afwCameraGeom.PUPIL)
-            pupilC3 = camera.transform(afwCameraGeom.CameraPoint(corners[3],
-                                                                 point.getCameraSys()),
-                                       afwCameraGeom.PUPIL)
-            ra0 = np.rad2deg(pupilC0.getPoint().getX())
-            dec0 = np.rad2deg(pupilC0.getPoint().getY())
-            ra1 = np.rad2deg(pupilC1.getPoint().getX())
-            dec1 = np.rad2deg(pupilC1.getPoint().getY())
-            ra2 = np.rad2deg(pupilC2.getPoint().getX())
-            dec2 = np.rad2deg(pupilC2.getPoint().getY())
-            ra3 = np.rad2deg(pupilC3.getPoint().getX())
-            dec3 = np.rad2deg(pupilC3.getPoint().getY())
-
-
-
-
+            ccdOffsets['DELTA_RA'][i] = point.getPoint().getX() * self.config.pixelScale / 3600.0
+            ccdOffsets['DELTA_DEC'][i] = point.getPoint().getY() * self.config.pixelScale / 3600.0
+            ccdOffsets['RA_SIZE'][i] = bbox.getMaxX() * self.config.pixelScale / 3600.0
+            ccdOffsets['DEC_SIZE'][i] = bbox.getMaxY() * self.config.pixelScale / 3600.0
 
 
         noFitsDict = {'lutIndex': lutIndexVals,
                       'lutStd': lutStd,
                       'expInfo': fgcmExpInfo,
-                      'ccdOffsets': BLAH}
+                      'ccdOffsets': ccdOffsets}
 
         # set up the fitter object
         fgcmFitCycle = fgcm.FgcmFitCycle(configDict, useFits=False,
