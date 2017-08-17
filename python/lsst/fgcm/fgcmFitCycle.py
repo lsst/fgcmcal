@@ -159,13 +159,8 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=int,
         default=None,
         )
-    sedFitBandFudgeFactors = pexConfig.ListField(
-        doc="Fudge factors for computing linear SED from colors for fit bands",
-        dtype=float,
-        default=(0,),
-        )
-    sedExtraBandFudgeFactors = pexConfig.ListField(
-        doc="Fudge factors for computing linear SED from colors for extra bands",
+    sedFudgeFactors = pexConfig.ListField(
+        doc="Fudge factors for computing linear SED from colors",
         dtype=float,
         default=(0,),
         )
@@ -435,8 +430,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'illegalValue': self.config.illegalValue,
                       'starColorCuts': starColorCutList,
                       'aperCorrFitNBins': self.config.aperCorrFitNBins,
-                      'sedFitBandFudgeFactors': np.array(self.config.sedFitBandFudgeFactors)[fitFlag],
-                      'sedExtraBandFudgeFactors': np.array(self.config.sedExtraBandFudgeFactors)[~fitFlag],
+                      'sedFitBandFudgeFactors': np.array(self.config.sedFudgeFactors)[fitFlag],
+                      'sedExtraBandFudgeFactors': np.array(self.config.sedFudgeFactors)[~fitFlag],
                       'sigFgcmMaxErr': self.config.sigFgcmMaxErr,
                       'sigFgcmMaxEGray': self.config.sigFgcmMaxEGray,
                       'ccdGrayMaxStarErr': self.config.ccdGrayMaxStarErr,
