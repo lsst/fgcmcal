@@ -89,6 +89,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=None,
         )
+    pixelScale = pexConfig.Field(
+        doc="Pixel scale (arcsec/pixel) (temporary)",
+        dtype=float,
+        default=None,
+        )
     brightObsGrayMax = pexConfig.Field(
         doc="Maximum gray extinction to be considered bright observation",
         dtype=float,
@@ -164,7 +169,6 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=(0,),
         )
-    #starColorCuts
     sigFgcmMaxErr = pexConfig.Field(
         doc="Maximum mag error for fitting sigma_FGCM",
         dtype=float,
@@ -214,6 +218,21 @@ class FgcmFitCycleConfig(pexConfig.Config):
         doc="Minimum number of bands with variability to be flagged as variable",
         dtype=int,
         default=2,
+        )
+    cameraGain = pexConfig.Field(
+        doc="Gain value for the typical CCD",
+        dtype=float,
+        default=None,
+        )
+    outfileBase = pexConfig.Field(
+        doc="Filename start for plot output files",
+        dtype=str,
+        default=None,
+        )
+    starColorCuts = pexConfig.ListField(
+        doc="Encoded star-color cuts (to be cleaned up)",
+        dtype=str,
+        default=("NO_DATA",),
         )
 
     def setDefaults(self):
@@ -365,9 +384,16 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         camera = butler.get('camera')
 
+        # process the starColorCuts
+        starColorCutList = []
+        for ccut in self.config.starColorCuts:
+            parts = ccut.split(',')
+            starColorCutList.append([parts[0],parts[1],float(parts[2]),float(parts[3])])
+
 
         # create a configuration dictionary for fgcmFitCycle
-        configDict = {'exposureFile': None,
+        configDict = {'outfileBase': self.config.outfileBase,
+                      'exposureFile': None,
                       'obsFile': None,
                       'indexFile': None,
                       'lutFile': None,
@@ -375,6 +401,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'pwvFile': None,
                       'tauFile': None,
                       'mirrorArea': np.pi*(camera.telescopeDiameter/2.)**2.,
+                      'cameraGain': self.config.cameraGain,
                       'ccdStartIndex': camera[0].getId(),
                       'expField': 'VISIT',
                       'ccdField': 'CCD',
@@ -406,6 +433,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'expVarGrayPhotometricCut': self.config.expVarGrayPhotometricCut,
                       'expGrayErrRecoverCut': self.config.expGrayErrRecoverCut,
                       'illegalValue': self.config.illegalValue,
+                      'starColorCuts': starColorCutList,
                       'aperCorrFitNBins': self.config.aperCorrFitNBins,
                       'sedFitBandFudgeFactors': np.array(self.config.sedFitBandFudgeFactors)[fitFlag],
                       'sedExtraBandFudgeFactors': np.array(self.config.sedExtraBandFudgeFactors)[~fitFlag],
@@ -421,11 +449,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'varMinBand': self.config.varMinBand,
                       'useSedLUT': False,
                       'resetParameters': True}
-
-        # FIXME:  add starColorCuts ???
-        # FIXME:  add outfileBase
-        # FIXME:  add cameraGain  ???
-
 
         # set up the look-up-table
         lutCat = butler.get('fgcmLookUpTable')
@@ -778,7 +801,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmFitCycle.finishSetup()
 
         # and run
-        fgcmFitCycle.run()
+        print("here I would run...")
+        return
+        #fgcmFitCycle.run()
 
         ##################
         ### Persistance
