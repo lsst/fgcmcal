@@ -131,7 +131,7 @@ class FgcmFitCycleConfig(pexConfig.Config):
         )
     expGrayPhotometricCut = pexConfig.ListField(
         doc="Maximum exposure gray for photometric selection",
-        dtype=float
+        dtype=float,
         default=(0.0,),
         )
     expGrayRecoverCut = pexConfig.Field(
