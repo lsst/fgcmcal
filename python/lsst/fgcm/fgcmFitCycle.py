@@ -393,8 +393,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'indexFile': None,
                       'lutFile': None,
                       'ccdOffsetFile': None,
-                      'pwvFile': None,
-                      'tauFile': None,
                       'mirrorArea': np.pi*(camera.telescopeDiameter/2.)**2.,
                       'cameraGain': self.config.cameraGain,
                       'ccdStartIndex': camera[0].getId(),
