@@ -152,11 +152,13 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
             targetList = self.getTargetList(parsedCmd)
             # make sure that we only get 1
             #resultList = self(targetList[0])
+            print(len(targetList))
             print(targetList)
 
 
         #return resultList
-        return (parsedCmd.butler, [])
+        #return (parsedCmd.butler, [])
+        return targetList
 
     # and override getTargetList ... want just one?
     #@staticmethod
