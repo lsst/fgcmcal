@@ -97,6 +97,7 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
     # only need a single butler instance to run on
     @staticmethod
     def getTargetList(parsedCmd):
+        print("Somebody called FgcmBuildStarsRunner.getTargetList()")
         #refListDict = {}
         #for ref in parsedCmd.id.refList:
         #    blah
@@ -106,9 +107,11 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         return [parsedCmd.butler]
 
     def precall(self, parsedCmd):
+        print("Somebody called FgcmBuildStarsRunner.precall()")
         return True
 
     def __call__(self, butler):
+        print("Somebody called FgcmBuildStarsRunner()")
         task = self.TaskClass(config=self.config, log=self.log)
         if self.doRaise:
             results = task.run(butler)
@@ -128,6 +131,7 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
     def run(self, parsedCmd):
         """ runs the task, but doesn't do multiprocessing"""
+        print("Somebody called FgcmBuildStarsRunner.run()")
 
         resultList = []
 
