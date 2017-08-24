@@ -332,17 +332,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         """
         """
 
-        # we need...
-        #  to confirm that the visit info exists
-        #  to confirm that the star observations exist
-        #  to confirm that the look-up table exists
-        #
-        #  make an FGCM fit cycle object
-        #  load the configuration
-        #  load the visit info
-        #  load the observations
-        #  load the look-up table
-        #  run the fit cycle
+        ## FIXME:
+        ##   bands need to be matched to LUT
+        ##   more sensible configuration options related to bands/fitbands
+        ##   check that array lengths are matched
 
         #  TBD:
         #   updating configuration at the end for next cycle?
@@ -451,6 +444,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         # first we need the lutIndexVals
         lutBands = np.array(lutCat[0]['bands'].split(','))
+
+        ## FIXME: check that lutBands equal listed bands!
 
         lutIndexVals = np.zeros(1, dtype=[('BANDS', 'a2', lutBands.size),
                                           ('PMB', 'f8', lutCat[0]['pmb'].size),
