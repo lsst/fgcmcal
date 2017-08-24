@@ -97,23 +97,16 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
     # only need a single butler instance to run on
     @staticmethod
     def getTargetList(parsedCmd):
-        print("Somebody called FgcmBuildStarsRunner.getTargetList()")
-        #refListDict = {}
-        #for ref in parsedCmd.id.refList:
-        #    blah
-
-        #raise ValueError("Cutting out here")
-
-        #return [parsedCmd.butler]
-        #return (parsedCmd.butler, parsedCmd.id.refList)
-        return [(parsedCmd.butler, [])]
+        #print("Somebody called FgcmBuildStarsRunner.getTargetList()")
+        # we want to combine the butler with any (or no!) dataRefs
+        return [(parsedCmd.butler, parsedCmd.id.refList)]
 
     def precall(self, parsedCmd):
-        print("Somebody called FgcmBuildStarsRunner.precall()")
+        #print("Somebody called FgcmBuildStarsRunner.precall()")
         return True
 
     def __call__(self, args):
-        print("Somebody called FgcmBuildStarsRunner()")
+        #print("Somebody called FgcmBuildStarsRunner()")
         butler, dataRefList = args
 
         task = self.TaskClass(config=self.config, log=self.log)
@@ -142,26 +135,13 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         if self.precall(parsedCmd):
             profileName = parsedCmd.profile if hasattr(parsedCmd, "profile") else None
             log = parsedCmd.log
-            #targetList = self.getTargetList(parsedCmd)
-            # I think targetList should just have 1 entry?
-            #if len(targetList) > 0:
-            #    with profile(profileName, log):
-            #        resultList = list(map(self, targetList))
-            #else:
-            #    log.warn("not running the task because there is no data to process")
             targetList = self.getTargetList(parsedCmd)
-            # make sure that we only get 1
+            # And call the runner on the first (and only) item in the list,
+            #  which is a tuple of the butler and any dataRefs
             resultList = self(targetList[0])
-            #print(len(targetList))
-            #print(targetList)
 
 
         return resultList
-        #return (parsedCmd.butler, [])
-        #return targetList
-
-    # and override getTargetList ... want just one?
-    #@staticmethod
 
 class FgcmBuildStarsTask(pipeBase.CmdLineTask):
     """
@@ -220,9 +200,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             (others)
         """
 
-        #if len(dataRefs) == 0:
-        #    raise ValueError("Need a list of data references!")
-
         print("Using bands: ")
         print(self.config.bands)
         print("Required Flag: ")
@@ -232,14 +209,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         raise ValueError("Kick out here")
 
-
         # make the visit catalog if necessary
         #  question: what's the propper clobber interface?
+        #  we also need to know the way of checking the matched config?
         if (butler.datasetExists('fgcmVisitCatalog')):
             visitCat = butler.get('fgcmVisitCatalog')
         else:
             # we need to build visitCat
-            visitCat = self._fgcmMakeVisitCatalog(butler)
+            visitCat = self._fgcmMakeVisitCatalog(butler, dataRefs)
+
+        raise ValueError("Kick out here")
 
         # and compile all the stars
         #  this will put this dataset out.
@@ -260,7 +239,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         return None
 
-    def _fgcmMakeVisitCatalog(self,butler):
+    def _fgcmMakeVisitCatalog(self, butler, dataRefs):
         """
         """
 
