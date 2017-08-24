@@ -106,7 +106,7 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         #return [parsedCmd.butler]
         #return (parsedCmd.butler, parsedCmd.id.refList)
-        return (parsedCmd.butler, [])
+        return [(parsedCmd.butler, [])]
 
     def precall(self, parsedCmd):
         print("Somebody called FgcmBuildStarsRunner.precall()")
@@ -152,7 +152,8 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
             targetList = self.getTargetList(parsedCmd)
             # make sure that we only get 1
             #resultList = self(targetList[0])
-            
+            print(targetList)
+
 
         #return resultList
         return (parsedCmd.butler, [])
