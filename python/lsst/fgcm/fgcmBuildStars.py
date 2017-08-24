@@ -104,7 +104,9 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         #raise ValueError("Cutting out here")
 
-        return [parsedCmd.butler]
+        #return [parsedCmd.butler]
+        #return (parsedCmd.butler, parsedCmd.id.refList)
+        return (parsedCmd.butler, [])
 
     def precall(self, parsedCmd):
         print("Somebody called FgcmBuildStarsRunner.precall()")
@@ -223,6 +225,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         print(self.config.requiredFlag)
         print("Number of dataRefs: ", len(dataRefs))
         print("Got a butler? ", isinstance(butler, lsst.daf.persistence.butler.Butler))
+
+        raise ValueError("Kick out here")
 
 
         # make the visit catalog if necessary
