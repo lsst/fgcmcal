@@ -151,14 +151,14 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
             #    log.warn("not running the task because there is no data to process")
             targetList = self.getTargetList(parsedCmd)
             # make sure that we only get 1
-            #resultList = self(targetList[0])
-            print(len(targetList))
-            print(targetList)
+            resultList = self(targetList[0])
+            #print(len(targetList))
+            #print(targetList)
 
 
-        #return resultList
+        return resultList
         #return (parsedCmd.butler, [])
-        return targetList
+        #return targetList
 
     # and override getTargetList ... want just one?
     #@staticmethod
