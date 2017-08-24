@@ -110,14 +110,16 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         print("Somebody called FgcmBuildStarsRunner.precall()")
         return True
 
-    def __call__(self, butler):
+    def __call__(self, args):
         print("Somebody called FgcmBuildStarsRunner()")
+        butler, dataRefList = args
+
         task = self.TaskClass(config=self.config, log=self.log)
         if self.doRaise:
-            results = task.run(butler)
+            results = task.run(butler, dataRefList)
         else:
             try:
-                results = task.run(butler)
+                results = task.run(butler, dataRefList)
             except Exception as e:
                 task.log.fatal("Failed: %s" % e)
                 if not isinstance(e, pipeBase.TaskError):
