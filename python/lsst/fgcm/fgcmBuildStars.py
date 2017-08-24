@@ -15,6 +15,8 @@ import lsst.afw.table as afwTable
 from lsst.daf.base.dateTime import DateTime
 import lsst.afw.geom as afwGeom
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
+import lsst.daf.persistence
+
 
 import time
 
@@ -95,6 +97,12 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
     # only need a single butler instance to run on
     @staticmethod
     def getTargetList(parsedCmd):
+        #refListDict = {}
+        #for ref in parsedCmd.id.refList:
+        #    blah
+
+        #raise ValueError("Cutting out here")
+
         return [parsedCmd.butler]
 
     def precall(self, parsedCmd):
@@ -137,7 +145,8 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
             # make sure that we only get 1
             resultList = self(targetList[0])
 
-        return resultList
+        #return resultList
+        return (parsedCmd.butler, [])
 
     # and override getTargetList ... want just one?
     #@staticmethod
@@ -168,6 +177,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         """Create an argument parser"""
 
         parser = pipeBase.ArgumentParser(name=cls._DefaultName)
+        parser.add_id_argument("--id", "calexp", help="Data ID, e.g. --id visit=6789 (optional)")
 
         return parser
 
@@ -180,7 +190,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         return None
 
     @pipeBase.timeMethod
-    def run(self, butler):
+    def run(self, butler, dataRefs):
         """
         Cross-match and make star list for FGCM
 
@@ -205,6 +215,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         print(self.config.bands)
         print("Required Flag: ")
         print(self.config.requiredFlag)
+        print("Number of dataRefs: ", len(dataRefs))
+        print("Got a butler? ", isinstance(butler, lsst.daf.persistence.butler.Butler))
 
 
         # make the visit catalog if necessary
