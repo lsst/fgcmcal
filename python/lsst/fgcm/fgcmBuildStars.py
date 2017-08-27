@@ -207,8 +207,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         print("Number of dataRefs: ", len(dataRefs))
         print("Got a butler? ", isinstance(butler, lsst.daf.persistence.butler.Butler))
 
-        raise ValueError("Kick out here")
-
         # make the visit catalog if necessary
         #  question: what's the propper clobber interface?
         #  we also need to know the way of checking the matched config?
@@ -217,8 +215,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         else:
             # we need to build visitCat
             visitCat = self._fgcmMakeVisitCatalog(butler, dataRefs)
-
-        raise ValueError("Kick out here")
 
         # and compile all the stars
         #  this will put this dataset out.
