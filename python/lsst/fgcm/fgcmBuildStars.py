@@ -243,20 +243,25 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         """
         """
 
-        # check to see if this already exists...
         startTime = time.time()
 
-        allVisits = butler.queryMetadata('src',
-                                         format=['visit','filter'],
-                                         dataId={'CCD':self.config.referenceCCD})
+        if len(dataRefs) == 0:
+            # We did not specify any datarefs, so find all of them
+            allVisits = butler.queryMetadata('src',
+                                             format=['visit','filter'],
+                                             dataId={'CCD':self.config.referenceCCD})
 
-        srcVisits = []
-        for dataset in allVisits:
-            if (butler.datasetExists('src', dataId={'visit':dataset[0],
-                                                    'ccd':self.config.referenceCCD})):
-                srcVisits.append(dataset[0])
+            srcVisits = []
+            for dataset in allVisits:
+                if (butler.datasetExists('src', dataId={'visit':dataset[0],
+                                                        'ccd':self.config.referenceCCD})):
+                    srcVisits.append(dataset[0])
+        else:
+            # get the visits from the datarefs, only for referenceCCD
+            srcVisits = [d.dataId['visit'] for d in dataRefs if
+                         d.dataId['ccd'] == self.config.referenceCCD]
 
-        print("Found all visits in %.2f s" % (time.time()-startTime))
+        print("Found %d visits in %.2f s" % (srcVisits.size, time.time()-startTime))
 
         schema = afwTable.Schema()
         schema.addField('visit', type=np.int32, doc="Visit number")
