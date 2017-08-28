@@ -257,7 +257,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             srcVisits = [d.dataId['visit'] for d in dataRefs if
                          d.dataId['ccd'] == self.config.referenceCCD]
 
-        print("Found %d visits in %.2f s" % (srcVisits.size, time.time()-startTime))
+        print("Found %d visits in %.2f s" % (len(srcVisits), time.time()-startTime))
 
         schema = afwTable.Schema()
         schema.addField('visit', type=np.int32, doc="Visit number")
