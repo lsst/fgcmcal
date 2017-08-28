@@ -363,22 +363,39 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 # general flag, child/parent/etc cuts
                 # will want to make magErr range configurable.
-                gdFlag = np.logical_and.reduce([~sources['base_PixelFlags_flag_saturatedCenter'],
-                                     ~sources['base_PixelFlags_flag_interpolatedCenter'],
-                                     ~sources['base_PixelFlags_flag_edge'],
-                                     ~sources['base_PixelFlags_flag_crCenter'],
-                                     ~sources['base_PixelFlags_flag_bad'],
-                                     ~sources['base_PixelFlags_flag_interpolated'],
-                                     ~sources['slot_Centroid_flag'],
-                                     ~sources['slot_Centroid_flag_edge'],
-                                     ~sources['slot_ApFlux_flag'],
-                                     ~sources['base_ClassificationExtendedness_flag'],
-                                     sources['deblend_nChild'] == 0,
-                                     sources['parent'] == 0,
-                                     sources['base_ClassificationExtendedness_value'] < 0.5,
-                                     np.isfinite(magErr),
-                                     magErr > 0.001,
-                                     magErr < 0.1])
+                #gdFlag = np.logical_and.reduce([~sources['base_PixelFlags_flag_saturatedCenter'],
+                #                     ~sources['base_PixelFlags_flag_interpolatedCenter'],
+                #                     ~sources['base_PixelFlags_flag_edge'],
+                #                     ~sources['base_PixelFlags_flag_crCenter'],
+                #                     ~sources['base_PixelFlags_flag_bad'],
+                #                     ~sources['base_PixelFlags_flag_interpolated'],
+                #                     ~sources['slot_Centroid_flag'],
+                #                     ~sources['slot_Centroid_flag_edge'],
+                #                     ~sources['slot_ApFlux_flag'],
+                #                     ~sources['base_ClassificationExtendedness_flag'],
+                #                     sources['deblend_nChild'] == 0,
+                #                     sources['parent'] == 0,
+                #                     sources['base_ClassificationExtendedness_value'] < 0.5,
+                #                     np.isfinite(magErr),
+                #                     magErr > 0.001,
+                #                     magErr < 0.1])
+                # first convert to astropy table, access is much faster (?!)
+                sourcesAp = sources.asAstropy()
+                gdFlag = np.logical_and.reduce([~sourcesAp['flag_pixel_saturated_center'],
+                                                 ~sourcesAp['flag_pixel_interpolated_center'],
+                                                 ~sourcesAp['flag_pixel_edge'],
+                                                 ~sourcesAp['flag_pixel_cr_center'],
+                                                 ~sourcesAp['flag_pixel_bad'],
+                                                 ~sourcesAp['flag_pixel_interpolated_any'],
+                                                 ~sourcesAp['slot_Centroid_flag'],
+                                                 ~sourcesAp['slot_ApFlux_flag'],
+                                                 sourcesAp['deblend_nchild'] == 0,
+                                                 sourcesAp['parent'] == 0,
+                                                 sourcesAp['classification_extendedness'] < 0.5,
+                                                 np.isfinite(magErr),
+                                                 magErr > 0.001,
+                                                 magErr < 0.1])
+
 
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
                 tempCat.table.preallocate(gdFlag.sum())
