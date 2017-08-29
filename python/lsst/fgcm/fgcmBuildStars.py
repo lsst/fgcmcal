@@ -356,6 +356,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     # this ccd does not exist.  That's fine.
                     continue
 
+                print("Read %d sources from ccd %d" % (len(sources), int(ccdId)))
                 # based on ApFlux.  Maybe make this configurable
                 magErr = (2.5/np.log(10.)) * (sources['slot_ApFlux_fluxSigma'] /
                                               sources['slot_ApFlux_flux'])
