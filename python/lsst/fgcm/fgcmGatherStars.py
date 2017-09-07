@@ -46,7 +46,8 @@ class FgcmGatherStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         result = [refListDict[visit] for visit in sorted(refListDict.keys())]
 
         for r in result:
-            self.log.info("Number of thingies is %d" % (len(r)))
+            #self.log.info("Number of thingies is %d" % (len(r)))
+            print("Number of thingies is %d" % (len(r)))
         return result
 
     def __call__(self, args):
