@@ -91,8 +91,8 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
         return parser
 
     # no saving of the config for now
-    #def _getConfigName(self):
-    #    return None
+    def _getConfigName(self):
+        return None
 
     # no saving of metadata for now
     def _getMetadataName(self):
