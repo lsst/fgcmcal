@@ -33,7 +33,7 @@ class FgcmGatherStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
     """
     @staticmethod
-    def getTargetList(parsedCmd):
+    def getTargetList(parsedCmd, **kwargs):
         """
         Return a list of tuples per visit, each containing dataRefs
 
@@ -43,20 +43,22 @@ class FgcmGatherStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         for ref in parsedCmd.id.refList:
             refListDict.setdefault(ref.dataId['visit'], []).append(ref)
 
-        result = [refListDict[visit] for visit in sorted(refListDict.keys())]
+        result = [(refListDict[visit], kwargs) for visit in sorted(refListDict.keys())]
 
         for r in result:
             #self.log.info("Number of thingies is %d" % (len(r)))
-            print("Number of thingies is %d" % (len(r)))
+            print("Number of thingies is %d" % (len(r[0])))
         return result
 
     def __call__(self, args):
         """
         """
         self.log.info("Called taskrunner")
-        raise ValueError("kick out here")
         dataRefList, kwargs = args
+        self.log.info("Number of thingies is now %d" % (len(dataRefList)))
         butler = kwargs.pop('butler')
+        print(kwargs.keys())
+        raise ValueError("kick out here; got butler")
         task = self.TaskClass(config=self.config, butler=butler)
         result = task.run(butler, dataRefList)
 
