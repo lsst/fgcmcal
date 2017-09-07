@@ -47,17 +47,12 @@ class FgcmGatherStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         result = [(refListDict[visit], kwargs) for visit in sorted(refListDict.keys())]
 
-        for r in result:
-            #self.log.info("Number of thingies is %d" % (len(r)))
-            print("Number of thingies is %d" % (len(r[0])))
         return result
 
     def __call__(self, args):
         """
         """
-        self.log.info("Called taskrunner")
         dataRefList, kwargs = args
-        self.log.info("Number of thingies is now %d" % (len(dataRefList)))
         butler = kwargs.pop('butler')
         task = self.TaskClass(config=self.config, butler=butler)
         result = task.run(butler, dataRefList)
@@ -112,8 +107,6 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
         visit=dataRefs[0].dataId['visit']
 
         self.log.info("Working on visit %d with %d ccds" % (visit, len(dataRefs)))
-        raise ValueError("Kick out here")
-
         if (butler.datasetExists('fgcmVisitObservations',visit=visit)):
             # We already have this, and are done
             return
@@ -144,8 +137,8 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
         started=False
 
         for dataRef in dataRefs:
-            print("Reading sources from visit %d/ccd %d" %
-                  (visit, dataRef.dataId['ccd']))
+            self.log.info("Reading sources from visit %d/ccd %d" %
+                          (visit, dataRef.dataId['ccd']))
 
             sources = ref.get('src',
                               flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
@@ -198,8 +191,8 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
 
             fullCatalog.extend(tempCat)
 
-        print("Found %d good star observations for visit %d in %.2f s" %
-              (len(fullCatalog), time.time() - startTime))
+        self.log.info("Found %d good star observations for visit %d in %.2f s" %
+                      (len(fullCatalog), time.time() - startTime))
 
         butler.put(fullCatalog, 'fgcmVisitObservations',visit=visit)
 
