@@ -185,7 +185,7 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
             tempCat.table.preallocate(gdFlag.sum())
             tempCat.extend(sources[gdFlag], mapper=sourceMapper)
             tempCat['visit'][:] = visit
-            tempCat['ccd'][:] = ccdId
+            tempCat['ccd'][:] = dataRef.dataId['ccd']
             tempCat['mag'][:] = 25.0 - 2.5*np.log10(sources[fluxKey][gdFlag])
             tempCat['magerr'][:] = magErr[gdFlag]
 
