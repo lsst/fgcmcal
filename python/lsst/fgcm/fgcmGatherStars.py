@@ -191,8 +191,9 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
 
             fullCatalog.extend(tempCat)
 
-        self.log.info("Found %d good star observations for visit %d in %.2f s" %
-                      (len(fullCatalog), time.time() - startTime))
-
         butler.put(fullCatalog, 'fgcmVisitObservations',visit=visit)
+
+        self.log.info("Found %d good star observations for visit %d in %.2f s" %
+                      (len(fullCatalog), visit, time.time() - startTime))
+
 
