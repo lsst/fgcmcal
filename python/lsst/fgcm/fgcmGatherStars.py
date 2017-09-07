@@ -45,7 +45,20 @@ class FgcmGatherStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         result = [refListDict[visit] for visit in sorted(refListDict.keys())]
 
+        for r in result:
+            sys.log.info("Number of thingies is %d" % (len(r)))
         return result
+
+    def __call__(self, args):
+        """
+        """
+        self.log.info("Called taskrunner")
+        raise ValueError("kick out here")
+        dataRefList, kwargs = args
+        butler = kwargs.pop('butler')
+        task = self.TaskClass(config=self.config, butler=butler)
+        result = task.run(butler, dataRefList)
+
 
 class FgcmGatherStarsTask(pipeBase.CmdLineTask):
     """
