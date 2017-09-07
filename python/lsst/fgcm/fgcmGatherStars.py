@@ -39,7 +39,7 @@ class FgcmGatherStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         """
         kwargs['butler'] = parsedCmd.butler
-        
+
         ## check that this works.
         refListDict = {}
         for ref in parsedCmd.id.refList:
@@ -59,8 +59,6 @@ class FgcmGatherStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         dataRefList, kwargs = args
         self.log.info("Number of thingies is now %d" % (len(dataRefList)))
         butler = kwargs.pop('butler')
-        print(kwargs.keys())
-        raise ValueError("kick out here; got butler")
         task = self.TaskClass(config=self.config, butler=butler)
         result = task.run(butler, dataRefList)
 
@@ -112,6 +110,9 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
         startTime=time.time()
 
         visit=dataRefs[0].dataId['visit']
+
+        self.log.info("Working on visit %d with %d ccds" % (visit, len(dataRefs)))
+        raise ValueError("Kick out here")
 
         if (butler.datasetExists('fgcmVisitObservations',visit=visit)):
             # We already have this, and are done
