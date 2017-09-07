@@ -38,6 +38,8 @@ class FgcmGatherStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         Return a list of tuples per visit, each containing dataRefs
 
         """
+        kwargs['butler'] = parsedCmd.butler
+        
         ## check that this works.
         refListDict = {}
         for ref in parsedCmd.id.refList:
