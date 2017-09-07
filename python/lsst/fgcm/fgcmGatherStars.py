@@ -140,8 +140,8 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
             self.log.info("Reading sources from visit %d/ccd %d" %
                           (visit, dataRef.dataId['ccd']))
 
-            sources = ref.get('src',
-                              flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
+            sources = dataRef.get('src',
+                                  flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
 
             if not started:
                 # get the keys for quicker look-up
