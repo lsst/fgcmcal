@@ -134,7 +134,8 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
         # create the stub of the full catalog
         fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
 
-        started=False
+        #started=False
+        starsSelector = FgcmGatherStarsSelector()
 
         for dataRef in dataRefs:
             self.log.info("Reading sources from visit %d/ccd %d" %
@@ -143,51 +144,62 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
             sources = dataRef.get('src',
                                   flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
 
-            if not started:
+            cutSources = starsSelector.selectSources(sources)
+
+            #if not started:
                 # get the keys for quicker look-up
 
-                fluxKey = sources.getApFluxKey()
-                fluxErrKey = sources.getApFluxErrKey()
-                satCenterKey = sources.schema.find('flag_pixel_saturated_center').key
-                intCenterKey = sources.schema.find('flag_pixel_interpolated_center').key
-                pixEdgeKey = sources.schema.find('flag_pixel_edge').key
-                pixCrCenterKey = sources.schema.find('flag_pixel_cr_center').key
-                pixBadKey = sources.schema.find('flag_pixel_bad').key
-                pixInterpAnyKey = sources.schema.find('flag_pixel_interpolated_any').key
-                centroidFlagKey = sources.schema.find('slot_Centroid_flag').key
-                apFluxFlagKey = sources.schema.find('slot_ApFlux_flag').key
-                deblendNchildKey = sources.schema.find('deblend_nchild').key
-                parentKey = sources.schema.find('parent').key
-                extKey = sources.schema.find('classification_extendedness').key
+            #    fluxKey = sources.getApFluxKey()
+            #    fluxErrKey = sources.getApFluxErrKey()
+            #    satCenterKey = sources.schema.find('flag_pixel_saturated_center').key
+            #    intCenterKey = sources.schema.find('flag_pixel_interpolated_center').key
+            #    pixEdgeKey = sources.schema.find('flag_pixel_edge').key
+            #    pixCrCenterKey = sources.schema.find('flag_pixel_cr_center').key
+            #    pixBadKey = sources.schema.find('flag_pixel_bad').key
+            #    pixInterpAnyKey = sources.schema.find('flag_pixel_interpolated_any').key
+            #    centroidFlagKey = sources.schema.find('slot_Centroid_flag').key
+            #    apFluxFlagKey = sources.schema.find('slot_ApFlux_flag').key
+            #    deblendNchildKey = sources.schema.find('deblend_nchild').key
+            #    parentKey = sources.schema.find('parent').key
+            #    extKey = sources.schema.find('classification_extendedness').key
 
-                started=True
+            #    started=True
 
-            magErr = (2.5/np.log(10.)) * (sources[fluxKey] /
-                                          sources[fluxErrKey])
-            magErr = np.nan_to_num(magErr)
+            #magErr = (2.5/np.log(10.)) * (sources[fluxErrKey] /
+            #                              sources[fluxKey])
+            #magErr = np.nan_to_num(magErr)
 
-            gdFlag = np.logical_and.reduce([~sources[satCenterKey],
-                                             ~sources[intCenterKey],
-                                             ~sources[pixEdgeKey],
-                                             ~sources[pixCrCenterKey],
-                                             ~sources[pixBadKey],
-                                             ~sources[pixInterpAnyKey],
-                                             ~sources[centroidFlagKey],
-                                             ~sources[apFluxFlagKey],
-                                             sources[deblendNchildKey] == 0,
-                                             sources[parentKey] == 0,
-                                             sources[extKey] < 0.5,
-                                             np.isfinite(magErr),
-                                             magErr > 0.001,
-                                             magErr < 0.1])
+            #gdFlag = np.logical_and.reduce([~sources[satCenterKey],
+            #                                 ~sources[intCenterKey],
+            #                                 ~sources[pixEdgeKey],
+            #                                 ~sources[pixCrCenterKey],
+            #                                 ~sources[pixBadKey],
+            #                                 ~sources[pixInterpAnyKey],
+            #                                 ~sources[centroidFlagKey],
+            #                                 ~sources[apFluxFlagKey],
+            #                                 sources[deblendNchildKey] == 0,
+            #                                 sources[parentKey] == 0,
+            #                                 sources[extKey] < 0.5,
+            #                                 np.isfinite(magErr),
+            #                                 magErr > 0.001,
+            #                                 magErr < 0.1])
+
+            #tempCat = afwTable.BaseCatalog(fullCatalog.schema)
+            #tempCat.table.preallocate(gdFlag.sum())
+            #tempCat.extend(sources[gdFlag], mapper=sourceMapper)
+            #tempCat['visit'][:] = visit
+            #tempCat['ccd'][:] = dataRef.dataId['ccd']
+            #tempCat['mag'][:] = 25.0 - 2.5*np.log10(sources[fluxKey][gdFlag])
+            #tempCat['magerr'][:] = magErr[gdFlag]
 
             tempCat = afwTable.BaseCatalog(fullCatalog.schema)
-            tempCat.table.preallocate(gdFlag.sum())
-            tempCat.extend(sources[gdFlag], mapper=sourceMapper)
+            tempCat.table.preallocate(len(cutSources))
+            tempCat.extend(cutSources, mapper=sourceMapper)
             tempCat['visit'][:] = visit
             tempCat['ccd'][:] = dataRef.dataId['ccd']
-            tempCat['mag'][:] = 25.0 - 2.5*np.log10(sources[fluxKey][gdFlag])
-            tempCat['magerr'][:] = magErr[gdFlag]
+            tempCat['mag'][:] = 25.0 - 2.5*np.log10(cutSources.getApFlux())
+            tempCat['magerr'][:] = (2.5/np.log(10.)) * (cutSources.getApFluxErr() /
+                                                        cutSources.getApFlux())
 
             fullCatalog.extend(tempCat)
 
@@ -197,3 +209,41 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
                       (len(fullCatalog), visit, time.time() - startTime))
 
 
+class FgcmGatherStarsSelector(object):
+    """
+    """
+
+    def __init__(self):
+        self.badFlags = ['flag_pixel_saturated_center',
+                         'flag_pixel_interpolated_center',
+                         'flag_pixel_edge',
+                         'flag_pixel_cr_center',
+                         'flag_pixel_bad',
+                         'flag_pixel_interpolated_any',
+                         'slot_Centroid_flag',
+                         'slot_ApFlux_flag']
+        self.magConst = (2.5/np.log(10.))
+        # will want to make these configurable
+        self.minMagErr = 0.001
+        self.maxMagErr = 0.1
+
+    def _isBad(self, source):
+        return any(source.get(flag) for flag in self.badFlags)
+
+    def selectSources(self, sourceCat):
+        result = afwTable.SourceCatalog(sourceCat.table)
+
+        for source in sourceCat:
+            magErr = self.magConst * (source.getApFluxErr() /
+                                      source.getApFlux())
+
+            if (not self._isBad(source) and
+                source['deblend_nchild'] == 0 and
+                source['parent'] == 0 and
+                source['classification_extendedness'] < 0.5 and
+                np.isfinite(magErr) and
+                magErr > 0.001 and
+                magErr < 0.1):
+                result.append(source)
+        # return a copy for contiguous access
+        return result.copy(deep=True)
