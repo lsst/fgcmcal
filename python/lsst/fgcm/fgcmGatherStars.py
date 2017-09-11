@@ -242,7 +242,7 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
 
 
             tempCat = afwTable.BaseCatalog(fullCatalog.schema)
-            tempCat.table.preallocate(gdFlag.sum)
+            tempCat.table.preallocate(gdFlag.sum())
             tempCat.extend(sources[gdFlag], mapper=sourceMapper)
             tempCat.get('visit')[:] = visit
             tempCat.get('ccd')[:] = dataRef.dataId['ccd']
