@@ -6,6 +6,7 @@ import sys
 import traceback
 
 import numpy as np
+import healpy as hp
 
 import lsst.utils
 import lsst.pex.config as pexConfig
@@ -16,6 +17,7 @@ from lsst.daf.base.dateTime import DateTime
 import lsst.afw.geom as afwGeom
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
 import lsst.daf.persistence
+import lsst.afw.image as afwImage
 
 
 import time
@@ -24,6 +26,12 @@ __all__ = ['FgcmGatherStarsConfig', 'FgcmGatherStarsTask']
 
 class FgcmGatherStarsConfig(pexConfig.Config):
     """Config for FgcmGatherStarsTask"""
+
+    nSide = pexConfig.Field(
+        doc="healpix nside to group observations",
+        dtype=int
+        default=8,
+        )
 
     def setDefaults(self):
         pass
@@ -42,10 +50,22 @@ class FgcmGatherStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         ## check that this works.
         refListDict = {}
-        for ref in parsedCmd.id.refList:
-            refListDict.setdefault(ref.dataId['visit'], []).append(ref)
+        #for ref in parsedCmd.id.refList:
+        #    refListDict.setdefault(ref.dataId['visit'], []).append(ref)
 
-        result = [(refListDict[visit], kwargs) for visit in sorted(refListDict.keys())]
+        #result = [(refListDict[visit], kwargs) for visit in sorted(refListDict.keys())]
+
+        for ref in parsedCmd.id.refList:
+            md = dataRef.get("calexp_md", immediate=True)
+            wcs = afwImage.makeWcs(md)
+            center = wcs.pixelToSky(md.get("NAXIS1")/2., md.get("NAXIS2")/2.)
+            theta = np.pi/2. - center.getDec().asRadians()
+            phi = center.getRa().asRadians()
+            ipring = hp.ang2pix(self.config.nside, theta, phi)
+
+            refListDict.setdefault(ipring, []).append(ref)
+
+        result = [(refListDict[ipring], kwargs) for ipring in sorted(refListDict.keys())]
 
         return result
 
@@ -135,7 +155,7 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
         fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
 
         #started=False
-        starsSelector = FgcmGatherStarsSelector()
+        #starsSelector = FgcmGatherStarsSelector()
 
         for dataRef in dataRefs:
             self.log.info("Reading sources from visit %d/ccd %d" %
@@ -144,7 +164,7 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
             sources = dataRef.get('src',
                                   flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
 
-            cutSources = starsSelector.selectSources(sources)
+            #cutSources = starsSelector.selectSources(sources)
 
             #if not started:
                 # get the keys for quicker look-up
@@ -192,14 +212,42 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
             #tempCat['mag'][:] = 25.0 - 2.5*np.log10(sources[fluxKey][gdFlag])
             #tempCat['magerr'][:] = magErr[gdFlag]
 
+            #tempCat = afwTable.BaseCatalog(fullCatalog.schema)
+            #tempCat.table.preallocate(len(cutSources))
+            #tempCat.extend(cutSources, mapper=sourceMapper)
+            #tempCat['visit'][:] = visit
+            #tempCat['ccd'][:] = dataRef.dataId['ccd']
+            #tempCat['mag'][:] = 25.0 - 2.5*np.log10(cutSources.getApFlux())
+            #tempCat['magerr'][:] = (2.5/np.log(10.)) * (cutSources.getApFluxErr() /
+            #                                            cutSources.getApFlux())
+
+            magErr = (2.5/np.log(10.)) * (sources.getApFluxErr() /
+                                          sources.getApFlux())
+            magErr = np.nan_to_num(magErr)
+
+            gdFlag = np.logical_and.reduce([~sources.get('flag_pixel_saturated_center'),
+                                             ~sources.get('flag_pixel_interpolated_center'),
+                                             ~sources.get('flag_pixel_edge'),
+                                             ~sources.get('flag_pixel_cr_center'),
+                                             ~sources.get('flag_pixel_bad'),
+                                             ~sources.get('flag_pixel_interpolated_any'),
+                                             ~sources.get('slot_Centroid_flag'),
+                                             ~sources.get('slot_ApFlux_flag'),
+                                             sources.get('deblend_nchild') == 0,
+                                             sources.get('parent') == 0,
+                                             sources.get('classification_extendedness') < 0.5,
+                                             np.isfinite(magErr),
+                                             magErr > 0.001,
+                                             magErr < 0.1])
+
+
             tempCat = afwTable.BaseCatalog(fullCatalog.schema)
-            tempCat.table.preallocate(len(cutSources))
-            tempCat.extend(cutSources, mapper=sourceMapper)
-            tempCat['visit'][:] = visit
-            tempCat['ccd'][:] = dataRef.dataId['ccd']
-            tempCat['mag'][:] = 25.0 - 2.5*np.log10(cutSources.getApFlux())
-            tempCat['magerr'][:] = (2.5/np.log(10.)) * (cutSources.getApFluxErr() /
-                                                        cutSources.getApFlux())
+            tempCat.table.preallocate(gdFlag.sum)
+            tempCat.extend(sources[gdFlag], mapper=sourceMapper)
+            tempCat.get('visit')[:] = visit
+            tempCat.get('ccd')[:] = dataRef.dataId['ccd']
+            tempCat.get('mag')[:] = 25.0 - 2.5*np.log10(sources.getApFlux())
+            tempCat.get('magerr')[:] = magErr[gdFlag]
 
             fullCatalog.extend(tempCat)
 
