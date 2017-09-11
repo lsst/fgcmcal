@@ -29,7 +29,7 @@ class FgcmGatherStarsConfig(pexConfig.Config):
 
     nSide = pexConfig.Field(
         doc="healpix nside to group observations",
-        dtype=int
+        dtype=int,
         default=8,
         )
 
@@ -50,22 +50,22 @@ class FgcmGatherStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         ## check that this works.
         refListDict = {}
-        #for ref in parsedCmd.id.refList:
-        #    refListDict.setdefault(ref.dataId['visit'], []).append(ref)
-
-        #result = [(refListDict[visit], kwargs) for visit in sorted(refListDict.keys())]
-
         for ref in parsedCmd.id.refList:
-            md = dataRef.get("calexp_md", immediate=True)
-            wcs = afwImage.makeWcs(md)
-            center = wcs.pixelToSky(md.get("NAXIS1")/2., md.get("NAXIS2")/2.)
-            theta = np.pi/2. - center.getDec().asRadians()
-            phi = center.getRa().asRadians()
-            ipring = hp.ang2pix(self.config.nside, theta, phi)
+            refListDict.setdefault(ref.dataId['visit'], []).append(ref)
 
-            refListDict.setdefault(ipring, []).append(ref)
+        result = [(refListDict[visit], kwargs) for visit in sorted(refListDict.keys())]
 
-        result = [(refListDict[ipring], kwargs) for ipring in sorted(refListDict.keys())]
+        #for ref in parsedCmd.id.refList:
+        #    md = dataRef.get("calexp_md", immediate=True)
+        #    wcs = afwImage.makeWcs(md)
+        #    center = wcs.pixelToSky(md.get("NAXIS1")/2., md.get("NAXIS2")/2.)
+        #    theta = np.pi/2. - center.getDec().asRadians()
+        #    phi = center.getRa().asRadians()
+        #    ipring = hp.ang2pix(self.config.nside, theta, phi)
+
+        #    refListDict.setdefault(ipring, []).append(ref)
+
+        #result = [(refListDict[ipring], kwargs) for ipring in sorted(refListDict.keys())]
 
         return result
 
