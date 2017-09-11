@@ -155,6 +155,7 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
         fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
 
         started=False
+        outputStarted=False
         #starsSelector = FgcmGatherStarsSelector()
 
         for dataRef in dataRefs:
@@ -183,11 +184,11 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
                 parentKey = sources.schema.find('parent').key
                 extKey = sources.schema.find('classification_extendedness').key
 
-                outputSchema = sourceMapper.getOutputSchema()
-                visitKey = outputSchema.find('visit')
-                ccdKey = outputSchema.find('ccd')
-                magKey = outputSchema.find('mag')
-                magErrKey = outputSchema.find('magerr')
+                #outputSchema = sourceMapper.getOutputSchema()
+                #visitKey = outputSchema.find('visit')
+                #ccdKey = outputSchema.find('ccd')
+                #magKey = outputSchema.find('mag')
+                #magErrKey = outputSchema.find('magerr')
 
                 started=True
 
@@ -236,6 +237,15 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
             #tempCat.get('ccd')[:] = dataRef.dataId['ccd']
             #tempCat.get('mag')[:] = 25.0 - 2.5*np.log10(sources.getApFlux()[gdFlag])
             #tempCat.get('magerr')[:] = magErr[gdFlag]
+
+            if (not outputStarted):
+                visitKey = tempCat.schema.find('visit')
+                ccdKey = tempCat.schema.find('ccd')
+                magKey = tempCat.schema.find('mag')
+                magErrKey = tempCat.schema.find('magerr')
+
+                outputStarted = True
+
             tempCat.get(visitKey)[:] = visit
             tempCat.get(ccdKey)[:] = dataRef.dataId['ccd']
             tempCat.get(magKey)[:] = 25.0 - 2.5*np.log10(sources.getApFlux()[gdFlag])
