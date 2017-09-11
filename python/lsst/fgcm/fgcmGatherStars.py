@@ -246,7 +246,7 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
             tempCat.extend(sources[gdFlag], mapper=sourceMapper)
             tempCat.get('visit')[:] = visit
             tempCat.get('ccd')[:] = dataRef.dataId['ccd']
-            tempCat.get('mag')[:] = 25.0 - 2.5*np.log10(sources.getApFlux())
+            tempCat.get('mag')[:] = 25.0 - 2.5*np.log10(sources.getApFlux()[gdFlag])
             tempCat.get('magerr')[:] = magErr[gdFlag]
 
             fullCatalog.extend(tempCat)
