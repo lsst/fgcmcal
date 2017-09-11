@@ -183,11 +183,12 @@ class FgcmGatherStarsTask(pipeBase.CmdLineTask):
                 parentKey = sources.schema.find('parent').key
                 extKey = sources.schema.find('classification_extendedness').key
 
-                visitKey = fullCatalog.schema.find('visit')
-                ccdKey = fullCatalog.schema.find('ccd')
-                magKey = fullCatalog.schema.find('mag')
-                magErrKey = fullCatalog.schema.find('magerr')
-                
+                outputSchema = sourceMapper.getOutputSchema()
+                visitKey = outputSchema.find('visit')
+                ccdKey = outputSchema.find('ccd')
+                magKey = outputSchema.find('mag')
+                magErrKey = outputSchema.find('magerr')
+
                 started=True
 
             #magErr = (2.5/np.log(10.)) * (sources.getApFluxErr() /
