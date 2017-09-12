@@ -128,7 +128,6 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
     def run(self, parsedCmd):
         """ runs the task, but doesn't do multiprocessing"""
-        print("Somebody called FgcmBuildStarsRunner.run()")
 
         resultList = []
 
@@ -200,12 +199,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             (others)
         """
 
-        print("Using bands: ")
-        print(self.config.bands)
-        print("Required Flag: ")
-        print(self.config.requiredFlag)
-        print("Number of dataRefs: ", len(dataRefs))
-        print("Got a butler? ", isinstance(butler, lsst.daf.persistence.butler.Butler))
+        #print("Using bands: ")
+        #print(self.config.bands)
+        #print("Required Flag: ")
+        #print(self.config.requiredFlag)
+        #print("Number of dataRefs: ", len(dataRefs))
+        #print("Got a butler? ", isinstance(butler, lsst.daf.persistence.butler.Butler))
 
         # make the visit catalog if necessary
         #  question: what's the propper clobber interface?
@@ -257,7 +256,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             srcVisits = [d.dataId['visit'] for d in dataRefs if
                          d.dataId['ccd'] == self.config.referenceCCD]
 
-        print("Found %d visits in %.2f s" % (len(srcVisits), time.time()-startTime))
+        self.log.info("Found %d visits in %.2f s" %
+                      (len(srcVisits), time.time()-startTime))
 
         schema = afwTable.Schema()
         schema.addField('visit', type=np.int32, doc="Visit number")
@@ -300,7 +300,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             rec['fwhm'] = 0.0
             rec['deepflag'] = 0
 
-        print("Found all VisitInfo in %.2f s" % (time.time() - startTime))
+        self.log.info("Found all VisitInfo in %.2f s" % (time.time() - startTime))
 
         # and now persist it
         butler.put(visitCat, 'fgcmVisitCatalog')
@@ -339,9 +339,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # we need to know the ccds...
         camera = butler.get('camera')
 
+        started = False
+
         # loop over visits
         for visit in visitCat:
-            print("Reading sources from visit %d" % (visit['visit']))
+            self.log.info("Reading sources from visit %d" % (visit['visit']))
+
+            nStarInVisit = 0
+
             # loop over CCDs
             for detector in camera:
                 ccdId = detector.getId()
@@ -356,10 +361,35 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     # this ccd does not exist.  That's fine.
                     continue
 
-                print("Read %d sources from ccd %d" % (len(sources), int(ccdId)))
-                # based on ApFlux.  Maybe make this configurable
-                magErr = (2.5/np.log(10.)) * (sources['slot_ApFlux_fluxSigma'] /
-                                              sources['slot_ApFlux_flux'])
+                if not started:
+                    # get the keys for quicker look-up
+
+                    # based pm ApFlux.  Maybe make configurable?
+                    fluxKey = sources.getApFluxKey()
+                    fluxErrKey = sources.getApFluxErrKey()
+                    satCenterKey = sources.schema.find('flag_pixel_saturated_center').key
+                    intCenterKey = sources.schema.find('flag_pixel_interpolated_center').key
+                    pixEdgeKey = sources.schema.find('flag_pixel_edge').key
+                    pixCrCenterKey = sources.schema.find('flag_pixel_cr_center').key
+                    pixBadKey = sources.schema.find('flag_pixel_bad').key
+                    pixInterpAnyKey = sources.schema.find('flag_pixel_interpolated_any').key
+                    centroidFlagKey = sources.schema.find('slot_Centroid_flag').key
+                    apFluxFlagKey = sources.schema.find('slot_ApFlux_flag').key
+                    deblendNchildKey = sources.schema.find('deblend_nchild').key
+                    parentKey = sources.schema.find('parent').key
+                    extKey = sources.schema.find('classification_extendedness').key
+
+                    outputSchema = sourceMapper.getOutputSchema()
+                    visitKey = outputSchema.find('visit').key
+                    ccdKey = outputSchema.find('ccd').key
+                    magKey = outputSchema.find('mag').key
+                    magErrKey = outputSchema.find('magerr').key
+
+                    started=True
+
+
+                magErr = (2.5/np.log(10.)) * (sources[fluxKey] /
+                                              sources[fluxErrKey])
                 magErr = np.nan_to_num(magErr)
 
                 # general flag, child/parent/etc cuts
@@ -380,19 +410,22 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 #                     np.isfinite(magErr),
                 #                     magErr > 0.001,
                 #                     magErr < 0.1])
-                # first convert to astropy table, access is much faster (?!)
-                sourcesAp = sources.asAstropy()
-                gdFlag = np.logical_and.reduce([~sourcesAp['flag_pixel_saturated_center'],
-                                                 ~sourcesAp['flag_pixel_interpolated_center'],
-                                                 ~sourcesAp['flag_pixel_edge'],
-                                                 ~sourcesAp['flag_pixel_cr_center'],
-                                                 ~sourcesAp['flag_pixel_bad'],
-                                                 ~sourcesAp['flag_pixel_interpolated_any'],
-                                                 ~sourcesAp['slot_Centroid_flag'],
-                                                 ~sourcesAp['slot_ApFlux_flag'],
-                                                 sourcesAp['deblend_nchild'] == 0,
-                                                 sourcesAp['parent'] == 0,
-                                                 sourcesAp['classification_extendedness'] < 0.5,
+
+                magErr = (2.5/np.log(10.)) * (sources[fluxKey] /
+                                              sources[fluxErrKey])
+                magErr = np.nan_to_num(magErr)
+
+                gdFlag = np.logical_and.reduce([~sources[satCenterKey],
+                                                 ~sources[intCenterKey],
+                                                 ~sources[pixEdgeKey],
+                                                 ~sources[pixCrCenterKey],
+                                                 ~sources[pixBadKey],
+                                                 ~sources[pixInterpAnyKey],
+                                                 ~sources[centroidFlagKey],
+                                                 ~sources[apFluxFlagKey],
+                                                 sources[deblendNchildKey] == 0,
+                                                 sources[parentKey] == 0,
+                                                 sources[extKey] < 0.5,
                                                  np.isfinite(magErr),
                                                  magErr > 0.001,
                                                  magErr < 0.1])
@@ -401,20 +434,25 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
                 tempCat.table.preallocate(gdFlag.sum())
                 tempCat.extend(sources[gdFlag], mapper=sourceMapper)
-                tempCat['visit'][:] = visit['visit']
-                tempCat['ccd'][:] = ccdId
-                tempCat['mag'][:] = 25.0 - 2.5*np.log10(sources['slot_ApFlux_flux'][gdFlag])
-                tempCat['magerr'][:] = magErr[gdFlag]
+                tempCat[visitKey][:] = visit['visit']
+                tempCat[ccdKey][:] = ccdId
+                tempCat[magKey][:] = 25.0 - 2.5*np.log10(sources[fluxKey][gdFlag])
+                tempCat[magErrKey][:] = magErr[gdFlag]
 
                 fullCatalog.extend(tempCat)
 
-        print("Found all good star observations in %.2f s" %
-              (time.time() - startTime))
+                nStarInVisit += len(tempCat)
+
+            self.log.info("  Found %d good stars in visit %d" %
+                          (nStarInVisit, visit))
+
+        self.log.info("Found all good star observations in %.2f s" %
+                      (time.time() - startTime))
 
         butler.put(fullCatalog, 'fgcmStarObservations')
 
-        print("Done with all stars in %.2f s" %
-              (time.time() - startTime))
+        self.log.info("Done with all stars in %.2f s" %
+                      (time.time() - startTime))
 
     def _fgcmMatchStars(self, butler, visitCat):
         """
@@ -434,7 +472,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         obsBands = visitBands[visitIndex]
 
         # make the fgcm starConfig dict
-        ## FIXME: make the fgcm configuration dict
 
         starConfig = {'bands': np.array(self.config.bands),
                       'requiredFlag': np.array(self.config.requiredFlag),
