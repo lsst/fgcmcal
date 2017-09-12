@@ -444,7 +444,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 nStarInVisit += len(tempCat)
 
             self.log.info("  Found %d good stars in visit %d" %
-                          (nStarInVisit, visit))
+                          (nStarInVisit, visit['visit']))
 
         self.log.info("Found all good star observations in %.2f s" %
                       (time.time() - startTime))
