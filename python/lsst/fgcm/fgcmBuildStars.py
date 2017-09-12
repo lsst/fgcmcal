@@ -411,8 +411,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 #                     magErr > 0.001,
                 #                     magErr < 0.1])
 
-                magErr = (2.5/np.log(10.)) * (sources[fluxKey] /
-                                              sources[fluxErrKey])
+                magErr = (2.5/np.log(10.)) * (sources[fluxErrKey] /
+                                              sources[fluxKey])
                 magErr = np.nan_to_num(magErr)
 
                 gdFlag = np.logical_and.reduce([~sources[satCenterKey],
