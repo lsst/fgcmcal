@@ -280,15 +280,19 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # now loop over visits and get the information
         for srcVisit in srcVisits:
-            calexp = butler.get('calexp_sub', dataId={'visit':srcVisit,
-                                                      'ccd':self.config.referenceCCD},
-                                bbox=bbox)
+            #calexp = butler.get('calexp_sub', dataId={'visit':srcVisit,
+            #                                          'ccd':self.config.referenceCCD},
+            #                    bbox=bbox)
+            raw = butler.get('raw', dataId={'visit':srcVisit,
+                                            'ccd':self.config.referenceCCD})
 
-            visitInfo = calexp.getInfo().getVisitInfo()
+            ##visitInfo = calexp.getInfo().getVisitInfo()
+            visitInfo = raw.getInfo().getVisitInfo()
 
             rec=visitCat.addNew()
             rec['visit'] = srcVisit
-            rec['band'] = calexp.getInfo().getFilter().getName()
+            ##rec['band'] = calexp.getInfo().getFilter().getName()
+            rec['band'] = raw.getInfo().getFilter().getName()
             radec = visitInfo.getBoresightRaDec()
             rec['telra'] = radec.getRa().asDegrees()
             rec['teldec'] = radec.getDec().asDegrees()
