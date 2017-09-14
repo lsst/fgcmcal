@@ -370,8 +370,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         bands = np.array(self.config.bands)
         fitFlag = np.array(self.config.fitFlag,dtype=np.bool)
 
-        print('Using bands: ',bands)
-        print('fitFlag: ',fitFlag)
+        #print('Using bands: ',bands)
+        #print('fitFlag: ',fitFlag)
 
         camera = butler.get('camera')
 
@@ -761,9 +761,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmFitCycle.finishSetup()
 
         # and run
-        print("here I would run...")
-        return
-        #fgcmFitCycle.run()
+        fgcmFitCycle.run()
 
         ##################
         ### Persistance
