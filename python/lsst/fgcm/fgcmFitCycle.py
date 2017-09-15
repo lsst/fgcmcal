@@ -610,7 +610,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # create the parameter object
         if (fgcmFitCycle.initialCycle):
             # cycle = 0, initial cycle
-            fgcmPars = fgcm.FgcmPars.newParsWithArrays(fgcmFitCycle.fgcmConfig,
+            fgcmPars = fgcm.FgcmParameters.newParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                        fgcmLut,
                                                        fgcmExpInfo)
 
