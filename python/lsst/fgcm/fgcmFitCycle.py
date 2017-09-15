@@ -779,9 +779,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema = afwTable.Schema()
 
         comma=','
-        bandString = comma.join(parInfo['BANDS'])
-        fitBandString = comma.join(parInfo['FITBANDS'])
-        extraBandString = comma.join(parInfo['EXTRABANDS'])
+        bandString = comma.join(parInfo['BANDS'][0])
+        fitBandString = comma.join(parInfo['FITBANDS'][0])
+        extraBandString = comma.join(parInfo['EXTRABANDS'][0])
 
         # parameter info section
         parSchema.addField('nccd', type=np.int32, doc='Number of CCDs')
