@@ -610,9 +610,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # create the parameter object
         if (fgcmFitCycle.initialCycle):
             # cycle = 0, initial cycle
-            fgcmPars = fgcm.FgcmParameters.newParsWithArrays(fgcmFitCycle.fgcmConfig,
-                                                             fgcmLut,
-                                                             fgcmExpInfo)
+            fgcmPars = fgcm.FgcmPars.newParsWithArrays(fgcmFitCycle.fgcmConfig,
+                                                       fgcmLut,
+                                                       fgcmExpInfo)
 
         else:
             parCat = butler.get('fgcmFitParameters', fgcmcycle=self.config.cycleNumber-1)
@@ -774,7 +774,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         ##################
 
         # parameters
-        parInfo, pars = fgcmFitCycle.fgcmParameters.parsToArrays()
+        parInfo, pars = fgcmFitCycle.fgcmPars.parsToArrays()
 
         parSchema = afwTable.Schema()
 
@@ -842,7 +842,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('superstarsize', type='ArrayI', doc='Superstar matrix size',
                            size=3)
         parSchema.addField('superstar', type='ArrayD', doc='Superstar matrix (flattened)',
-                           size=fgcmFitCycle.fgcmParameters.parSuperStarFlat.size)
+                           size=fgcmFitCycle.fgcmPars.parSuperStarFlat.size)
 
 
         parCat = afwTable.BaseCatalog(parSchema)
@@ -886,8 +886,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['compsigfgcm'][:] = pars['COMPSIGFGCM'][0,:]
 
         # superstar section
-        rec['superstarsize'][:] = fgcmFitCycle.fgcmParameters.parSuperStarFlat.shape
-        rec['superstar'][:] = fgcmFitCycle.fgcmParameters.parSuperStarFlat.flatten()
+        rec['superstarsize'][:] = fgcmFitCycle.fgcmPars.parSuperStarFlat.shape
+        rec['superstar'][:] = fgcmFitCycle.fgcmPars.parSuperStarFlat.flatten()
 
         butler.put(parCat, 'fgcmFitParameters', fgcmcycle=self.config.cycleNumber)
 
