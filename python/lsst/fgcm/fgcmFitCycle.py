@@ -826,7 +826,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('compapercorrslope', type='ArrayD', doc='Aperture correction slope',
                            size=pars['COMPAPERCORRSLOPE'].size)
         parSchema.addField('compapercorrslopeerr', type='ArrayD', doc='Aperture correction slope error',
-                           size=pars['COMPAPERCORRSLOPEER'].size)
+                           size=pars['COMPAPERCORRSLOPEERR'].size)
         parSchema.addField('compapercorrrange', type='ArrayD', doc='Aperture correction range',
                            size=pars['COMPAPERCORRRANGE'].size)
         parSchema.addField('compexpgray', type='ArrayD', doc='Computed exposure gray',
