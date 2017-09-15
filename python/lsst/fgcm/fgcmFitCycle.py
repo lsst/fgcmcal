@@ -54,6 +54,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=0.1,
         )
+    freezeStdAtmosphere = pexConfig.Field(
+        doc="Freeze atmosphere parameters to standard (for testing)",
+        dtype=bool,
+        default=False,
+        )
     cycleNumber = pexConfig.Field(
         doc="Fit Cycle Number",
         dtype=int,
@@ -403,6 +408,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'nStarPerRun': self.config.nStarPerRun,
                       'nExpPerRun': self.config.nExpPerRun,
                       'reserveFraction': self.config.reserveFraction,
+                      'freezeStdAtmosphere': self.config.freezeStdAtmosphere,
                       'cycleNumber': self.config.cycleNumber,
                       'maxIter': self.config.maxIter,
                       'UTBoundary': self.config.utBoundary,
