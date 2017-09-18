@@ -59,6 +59,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=bool,
         default=False,
         )
+    precomputeSuperStarInitialCycle = pexConfig.Field(
+        doc="Precompute superstar flat for initial cycle",
+        dtype=bool,
+        default=False,
+        )
     cycleNumber = pexConfig.Field(
         doc="Fit Cycle Number",
         dtype=int,
@@ -409,6 +414,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'nExpPerRun': self.config.nExpPerRun,
                       'reserveFraction': self.config.reserveFraction,
                       'freezeStdAtmosphere': self.config.freezeStdAtmosphere,
+                      'precomputeSuperStarInitialCycle': self.config.precomputeSuperStarInitialCycle,
                       'cycleNumber': self.config.cycleNumber,
                       'maxIter': self.config.maxIter,
                       'UTBoundary': self.config.utBoundary,
@@ -890,5 +896,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['superstar'][:] = fgcmFitCycle.fgcmPars.parSuperStarFlat.flatten()
 
         butler.put(parCat, 'fgcmFitParameters', fgcmcycle=self.config.cycleNumber)
+
+        ## FIXME: need to save atmosphere parameters and zeropoints also!
 
         # tear down and clear memory
