@@ -755,8 +755,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # grab the flagged stars if available
         if butler.datasetExists('fgcmFlaggedStars', fgcmcycle=lastCycle):
             flaggedStars = butler.get('fgcmFlaggedStars', fgcmcycle=lastCycle)
-            flagId = flaggedStars['id'][:]
-            flagFlag = flaggedStars['flag'][:]
+            flagId = flaggedStars['objid'][:]
+            flagFlag = flaggedStars['objflag'][:]
         else:
             flagId = None
             flagFlag = None
