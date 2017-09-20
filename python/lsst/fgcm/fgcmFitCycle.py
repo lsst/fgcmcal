@@ -905,7 +905,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         zptSchema.addField('visit', type=np.int32, doc='Visit number')
         zptSchema.addField('ccd', type=np.int32, doc='CCD number')
-        zptSchema.addField('fgcmflag', type=np.int16, doc='FGCM flag value')
+        zptSchema.addField('fgcmflag', type=np.int32, doc='FGCM flag value')
         zptSchema.addField('fgcmzpt', type=np.float32, doc='FGCM zeropoint')
         zptSchema.addField('fgcmzpterr', type=np.float32, doc='Error on zeropoint, estimated from repeatability + number of obs')
         zptSchema.addField('fgcmi0', type=np.float32, doc='Integral of the passband')
