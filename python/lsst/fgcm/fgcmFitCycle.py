@@ -591,16 +591,42 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                           ('DEC_SIZE','f8')])
 
         camera=butler.get('camera')
+
+        extent=afwGeom.Extent2D(self.config.pixelScale,self.config.pixelScale)
+
         for i,detector in enumerate(camera):
-            point = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
+            # new version, using proper rotations
+            #  but I worry this only works with HSC, as there's a unit inconsistency
+
+            camPoint = detector.getCenter(afwCameraGeom.PIXELS)
             bbox = detector.getBBox()
+            orient = detector.getOrientation()
+
+            ccdOffsets['CCDNUM'][i] = detector.getId()
+
+            xform = orient.makePixelFpTransform(extent)
+            pointXform = xform.applyForward(camPoint.getPoint())
+            # this requires a pixelScale
+            ccdOffsets['DELTA_RA'][i] = pointXform.getX() * pixelScale / 3600.0
+            ccdOffsets['DELTA_DEC'][i] = pointXform.getY() * pixelScale / 3600.0
+
+            # but this does not (for the delta)
+            boxXform = xform.applyForward(afwGeom.Point2D(bbox.getMaxX(),bbox.getMaxY()))
+            ccdOffsets['RA_SIZE'][i] = 2. * np.abs(boxXform.getX() -
+                                                   pointXform.getX()) / 3600.0
+            ccdOffsets['DEC_SIZE'][i] = 2. * np.abs(boxXform.getY() -
+                                                    pointXform.getY()) / 3600.0
+
+            # old version below
+            #point = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
+            #bbox = detector.getBBox()
 
             ## FIXME: is this orientation correct?
-            ccdOffsets['CCDNUM'][i] = detector.getId()
-            ccdOffsets['DELTA_RA'][i] = point.getPoint().getX() * self.config.pixelScale / 3600.0
-            ccdOffsets['DELTA_DEC'][i] = point.getPoint().getY() * self.config.pixelScale / 3600.0
-            ccdOffsets['RA_SIZE'][i] = bbox.getMaxX() * self.config.pixelScale / 3600.0
-            ccdOffsets['DEC_SIZE'][i] = bbox.getMaxY() * self.config.pixelScale / 3600.0
+            #ccdOffsets['CCDNUM'][i] = detector.getId()
+            #ccdOffsets['DELTA_RA'][i] = point.getPoint().getX() * self.config.pixelScale / 3600.0
+            #ccdOffsets['DELTA_DEC'][i] = point.getPoint().getY() * self.config.pixelScale / 3600.0
+            #ccdOffsets['RA_SIZE'][i] = bbox.getMaxX() * self.config.pixelScale / 3600.0
+            #ccdOffsets['DEC_SIZE'][i] = bbox.getMaxY() * self.config.pixelScale / 3600.0
 
 
         noFitsDict = {'lutIndex': lutIndexVals,
