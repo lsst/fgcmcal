@@ -608,8 +608,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             xform = orient.makePixelFpTransform(extent)
             pointXform = xform.applyForward(camPoint.getPoint())
             # this requires a pixelScale
-            ccdOffsets['DELTA_RA'][i] = pointXform.getX() * pixelScale / 3600.0
-            ccdOffsets['DELTA_DEC'][i] = pointXform.getY() * pixelScale / 3600.0
+            ccdOffsets['DELTA_RA'][i] = pointXform.getX() * self.config.pixelScale / 3600.0
+            ccdOffsets['DELTA_DEC'][i] = pointXform.getY() * self.config.pixelScale / 3600.0
 
             # but this does not (for the delta)
             boxXform = xform.applyForward(afwGeom.Point2D(bbox.getMaxX(),bbox.getMaxY()))
