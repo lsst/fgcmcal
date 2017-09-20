@@ -897,6 +897,85 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         butler.put(parCat, 'fgcmFitParameters', fgcmcycle=self.config.cycleNumber)
 
-        ## FIXME: need to save atmosphere parameters and zeropoints also!
+        # Save zeropoints
+        zptSchema = afwTable.Schema()
+
+        zptSchema.addField('visit', type=np.int32, doc='Visit number')
+        zptSchema.addField('ccd', type=np.int32, doc='CCD number')
+        zptSchema.addField('fgcmflag', type=np.int8, doc='FGCM flag value')
+        zptSchema.addField('fgcmzpt', type=np.float32, doc='FGCM zeropoint')
+        zptSchema.addField('fgcmzpterr', type=np.float32, doc='Error on zeropoint, estimated from repeatability + number of obs')
+        zptSchema.addField('fgcmi0', type=np.float32, doc='Integral of the passband')
+        zptSchema.addField('fgcmi10', type=np.float32, doc='Normalized chromatic integral')
+        zptSchema.addField('fgcmr0', type=np.float32, doc='Retrieved i0 integral, estimated from stars (only for flag 1)')
+        zptSchema.addField('fgcmr10', type=np.float32, doc='Retrieved i10 integral, estimated from stars (only for flag 1)')
+        zptSchema.addField('fgcmgry', type=np.float32, doc='Estimated gray extinction relative to atmospheric solution; only for flag <= 4')
+        zptSchema.addField('fgcmzptvar', type=np.float32, doc='Variance of zeropoint over ccd')
+        zptSchema.addField('fgcmtilings', type=np.float32, doc='Number of photometric tilings used for solution for ccd')
+        zptSchema.addField('fgcmfpgry', type=np.float32, doc='Average gray extinction over the full focal plane (same for all ccds in a visit)')
+        zptSchema.addField('fgcmfpvar', type=np.float32, doc='Variance of gray extinction over the full focal plane (same for all ccds in a visit)')
+        zptSchema.addField('fgcmdust', type=np.float32, doc='Gray dust extinction from the primary/corrector at the time of the exposure')
+        zptSchema.addField('fgcmflat', type=np.float32, doc='Superstarflat illumination correction')
+        zptSchema.addField('fgcmapercorr', type=np.float32, doc='Aperture correction estimated by fgcm')
+        zptSchema.addField('exptime', type=np.float32, doc='Exposure time')
+        zptSchema.addField('band', type=str, size=2, doc='Filter band')
+
+        zptCat = afwTable.BaseCatalog(zptSchema)
+        zptCat.table.preallocate(fgcmFitCycle.fgcmZpts.zpStruct.size)
+        for band in fgcmFitCycle.fgcmZpts.zpStruct['BAND']:
+            rec=zptCat.addNew()
+            rec['band'] = band
+
+        zptCat = zptCat.copy(deep=True)
+
+        zptCat['visit'][:] = fgcmFitCycle.fgcmZpts.zpStruct['VISIT']
+        zptCat['ccd'][:] = fgcmFitCycle.fgcmZpts.zpStruct['CCD']
+        zptCat['fgcmflag'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FLAG']
+        zptCat['fgcmzpt'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_ZPT']
+        zptCat['fgcmzpterr'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_ZPTERR']
+        zptCat['fgcmi0'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_I0']
+        zptCat['fgcmi10'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_I10']
+        zptCat['fgcmr0'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_R0']
+        zptCat['fgcmr10'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_R10']
+        zptCat['fgcmgry'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_GRY']
+        zptCat['fgcmzptvar'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_ZPTVAR']
+        zptCat['fgcmtilings'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_TILINGS']
+        zptCat['fgcmfpgry'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FPGRY']
+        zptCat['fgcmfpvar'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FPVAR']
+        zptCat['fgcmdust'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_DUST']
+        zptCat['fgcmflat'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FLAT']
+        zptCat['fgcmapercorr'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_APERCORR']
+        zptCat['exptime'][:] = fgcmFitCycle.fgcmZpts.zpStruct['EXPTIME']
+
+        butler.put(zptCat, 'fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
+
+        # Save atmosphere values
+
+        atmSchema = afwTable.Schema()
+
+        atmSchema.addField('visit', type=np.int32, doc='Visit number')
+        atmSchema.addField('pmb', type=np.float64, doc='Barometric pressure (mb)')
+        atmSchema.addField('pwv', type=np.float64, doc='Water vapor (mm)')
+        atmSchema.addField('tau', type=np.float64, doc='Aerosol optical depth')
+        atmSchema.addField('alpha', type=np.float64, doc='Aerosol slope')
+        atmSchema.addField('o3', type=np.float64, doc='Ozone (dobson)')
+        atmSchema.addField('seczenith', type=np.float64, doc='Secant(zenith) (~ airmass)')
+
+        atmCat = afwTable.BaseCatalog(atmSchema)
+        atmCat.table.preallocate(fgcmFitCycle.fgcmZpts.atmStruct.size)
+        for i in xrange(fgcmFitCycle.fgcmZpts.atmStruct.size):
+            rec=atmCat.addNew()
+
+        atmCat = atmCat.copy(deep=True)
+
+        atmCat['visit'][:] = fgcmFitCycle.fgcmZpts.atmStruct['VISIT']
+        atmCat['pmb'][:] = fgcmFitCycle.fgcmZpts.atmStruct['PMB']
+        atmCat['pwv'][:] = fgcmFitCycle.fgcmZpts.atmStruct['PWV']
+        atmCat['tau'][:] = fgcmFitCycle.fgcmZpts.atmStruct['TAU']
+        atmCat['alpha'][:] = fgcmFitCycle.fgcmZpts.atmStruct['ALPHA']
+        atmCat['o3'][:] = fgcmFitCycle.fgcmZpts.atmStruct['O3']
+        atmCat['seczenith'][:] = fgcmFitCycle.fgcmZpts.atmStruct['SECZENITH']
+
+        butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
 
         # tear down and clear memory
