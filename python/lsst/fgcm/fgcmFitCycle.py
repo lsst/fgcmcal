@@ -621,10 +621,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                        fgcmExpInfo)
 
         else:
-            try:
-                parCat = butler.get('fgcmFitParameters', fgcmcycle=self.config.cycleNumber-1)
-            except:
-                raise ValueError("Could not find parameters from cycle %d in repository" % (self.config.cycleNumber-1))
+            # note that we already checked that this is available
+            parCat = butler.get('fgcmFitParameters', fgcmcycle=self.config.cycleNumber-1)
 
             parBands = np.array(parCat[0]['bands'].split(','))
             parFitBands = np.array(parCat[0]['fitbands'].split(','))
@@ -899,6 +897,25 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['superstar'][:] = fgcmFitCycle.fgcmPars.parSuperStarFlat.flatten()
 
         butler.put(parCat, 'fgcmFitParameters', fgcmcycle=self.config.cycleNumber)
+
+        # Save the flagged stars
+        flagStarSchema = afwTable.Schema()
+
+        flagStarSchema.addField('objid', type=np.int32, doc='FGCM object id')
+        flagStarSchema.addField('objflag', type=np.int32, doc='FGCM object flag')
+
+        flagStarCat = afwTable.BaseCatalog(flagStarSchema)
+        flagStarStruct = fgcmFitCycle.fgcmStars.getFlagStarIndices()
+        flagStarCat.table.preallocate(flagStarStruct.size)
+        for i in xrange(flagStarStruct.size):
+            rec=flagObjCat.addNew()
+
+        flagObjCat = flagObjCat.copy(deep=True)
+
+        flagObjCat['objid'][:] = flagStarStruct['OBJID']
+        flagObjCat['objflag'][:] = flagStarStruct['OBJFLAG']
+
+        butler.put(flagObjCat, 'fgcmFlaggedStars', fgcmcycle=self.config.cycleNumber)
 
         # Save zeropoints
         zptSchema = afwTable.Schema()
