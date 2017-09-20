@@ -908,14 +908,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         flagStarStruct = fgcmFitCycle.fgcmStars.getFlagStarIndices()
         flagStarCat.table.preallocate(flagStarStruct.size)
         for i in xrange(flagStarStruct.size):
-            rec=flagObjCat.addNew()
+            rec=flagStarCat.addNew()
 
-        flagObjCat = flagObjCat.copy(deep=True)
+        flagStarCat = flagStarCat.copy(deep=True)
 
-        flagObjCat['objid'][:] = flagStarStruct['OBJID']
-        flagObjCat['objflag'][:] = flagStarStruct['OBJFLAG']
+        flagStarCat['objid'][:] = flagStarStruct['OBJID']
+        flagStarCat['objflag'][:] = flagStarStruct['OBJFLAG']
 
-        butler.put(flagObjCat, 'fgcmFlaggedStars', fgcmcycle=self.config.cycleNumber)
+        butler.put(flagStarCat, 'fgcmFlaggedStars', fgcmcycle=self.config.cycleNumber)
 
         # Save zeropoints
         zptSchema = afwTable.Schema()
