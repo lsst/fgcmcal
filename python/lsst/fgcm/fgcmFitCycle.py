@@ -735,7 +735,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             inParams['COMPSIGFGCM'][:] = parCat['compsigfgcm'][0,:]
 
             inSuperStar = np.zeros(parCat['superstarsize'][0,:], dtype='f8')
-            inSuperStar[:,:,:] = parCat['superstar'][0,:].reshape(inSuperStar.size)
+            inSuperStar[:,:,:] = parCat['superstar'][0,:].reshape(inSuperStar.shape)
 
             fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                               fgcmExpInfo,
