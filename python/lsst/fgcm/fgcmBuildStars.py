@@ -63,15 +63,16 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=float,
         default=25.0,
         )
-    bands = pexConfig.ListField(
-        doc="Bands to run calibration",
-        dtype=str,
-        default=("NO_DATA",),
+    filterToBand = pexConfig.DictField(
+        doc="filterName to band mapping",
+        keytype=str,
+        itemtype=str,
+        default={},
         )
-    requiredFlag = pexConfig.ListField(
-        doc="Flag for required bands",
-        dtype=int,
-        default=(0,),
+    requiredBands = pexConfig.ListField(
+        doc="Bands required for each star",
+        dtype=str,
+        default=(),
         )
     referenceBand = pexConfig.Field(
         doc="Reference band for primary matches",
@@ -255,6 +256,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # get the visits from the datarefs, only for referenceCCD
             srcVisits = [d.dataId['visit'] for d in dataRefs if
                          d.dataId['ccd'] == self.config.referenceCCD]
+
+            # still need to check that these exist!
+            ## FIXME
 
         self.log.info("Found %d visits in %.2f s" %
                       (len(srcVisits), time.time()-startTime))
@@ -477,8 +481,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # make the fgcm starConfig dict
 
-        starConfig = {'bands': np.array(self.config.bands),
-                      'requiredFlag': np.array(self.config.requiredFlag),
+        starConfig = {'filterToBand': self.config.filterToBand,
+                      'requiredBands': self.config.requiredBands,
                       'minPerBand': self.config.minPerBand,
                       'matchRadius': self.config.matchRadius,
                       'isolationRadius': self.config.isolationRadius,
