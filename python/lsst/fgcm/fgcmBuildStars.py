@@ -493,7 +493,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         fgcmMakeStars.makeReferenceStars(np.rad2deg(obsCat['ra']),
                                          np.rad2deg(obsCat['dec']),
                                          filterNameArray = obsFilterNames,
-                                         filterToBand = self.config.filterToBand,
                                          bandSelected = False)
 
         # and match all the stars
