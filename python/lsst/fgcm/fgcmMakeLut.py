@@ -332,7 +332,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
             tDict['LAMBDA'] = throughputLambda
             for ccdIndex,detector in enumerate(camera):
                 # make sure we convert the calling units from A to nm
-                tDict[ccdIndex] = tput.getThroughputDetector(detector, filterNames,
+                tDict[ccdIndex] = tput.getThroughputDetector(detector, filterName,
                                                              throughputLambda/10.)
             throughputDict[filterName] = tDict
 
