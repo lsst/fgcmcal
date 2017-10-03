@@ -7,15 +7,15 @@ import traceback
 
 import numpy as np
 
-import lsst.utils
+# import lsst.utils
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.pex.exceptions as pexExceptions
+# import lsst.pex.exceptions as pexExceptions
 import lsst.afw.table as afwTable
 from lsst.daf.base.dateTime import DateTime
-import lsst.afw.geom as afwGeom
+# import lsst.afw.geom as afwGeom
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
-import lsst.daf.persistence
+# import lsst.daf.persistence
 
 
 import time
@@ -23,7 +23,8 @@ import time
 import fgcm
 
 
-__all__ = ['FgcmBuildStarsConfig','FgcmBuildStarsTask']
+__all__ = ['FgcmBuildStarsConfig', 'FgcmBuildStarsTask']
+
 
 class FgcmBuildStarsConfig(pexConfig.Config):
     """Config for FgcmBuildStarsTask"""
@@ -32,61 +33,62 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         doc="Minimum observations per band",
         dtype=int,
         default=2,
-        )
+    )
     matchRadius = pexConfig.Field(
         doc="Match radius (arcseconds)",
         dtype=float,
         default=1.0,
-        )
+    )
     isolationRadius = pexConfig.Field(
         doc="Isolation radius (arcseconds)",
         dtype=float,
         default=2.0,
-        )
+    )
     densityCutNside = pexConfig.Field(
         doc="Density cut healpix nside",
         dtype=int,
         default=128,
-        )
+    )
     densityCutMaxPerPixel = pexConfig.Field(
         doc="Density cut number of stars per pixel",
         dtype=int,
         default=1000,
-        )
+    )
     matchNside = pexConfig.Field(
         doc="Healpix Nside for matching",
         dtype=int,
         default=4096,
-        )
+    )
     zeropointDefault = pexConfig.Field(
         doc="Zeropoint default (arbitrary?)",
         dtype=float,
         default=25.0,
-        )
+    )
     filterToBand = pexConfig.DictField(
         doc="filterName to band mapping",
         keytype=str,
         itemtype=str,
         default={},
-        )
+    )
     requiredBands = pexConfig.ListField(
         doc="Bands required for each star",
         dtype=str,
         default=(),
-        )
+    )
     referenceBand = pexConfig.Field(
         doc="Reference band for primary matches",
         dtype=str,
         default=None
-        )
+    )
     referenceCCD = pexConfig.Field(
         doc="Reference CCD for scanning visits",
         dtype=int,
         default=13,
-        )
+    )
 
     def setDefaults(self):
         pass
+
 
 class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmBuildStarsTask
@@ -101,7 +103,7 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
     """
 
-    #TaskClass = FgcmBuildStarsTask
+    # TaskClass = FgcmBuildStarsTask
 
     # only need a single butler instance to run on
     @staticmethod
@@ -159,15 +161,15 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         resultList = []
 
         if self.precall(parsedCmd):
-            profileName = parsedCmd.profile if hasattr(parsedCmd, "profile") else None
-            log = parsedCmd.log
+            # profileName = parsedCmd.profile if hasattr(parsedCmd, "profile") else None
+            # log = parsedCmd.log
             targetList = self.getTargetList(parsedCmd)
             # And call the runner on the first (and only) item in the list,
             #  which is a tuple of the butler and any dataRefs
             resultList = self(targetList[0])
 
-
         return resultList
+
 
 class FgcmBuildStarsTask(pipeBase.CmdLineTask):
     """
@@ -199,8 +201,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         return parser
 
     # no saving of the config for now
-    #def _getConfigName(self):
-    #    return None
+    # def _getConfigName(self):
+    #     return None
 
     # no saving of metadata for now
     def _getMetadataName(self):
@@ -244,11 +246,11 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             self._fgcmMakeAllStarObservations(butler, visitCat)
 
         if (not butler.datasetExists('fgcmStarIds') or
-            not butler.datasetExists('fgcmStarIndices')):
+           not butler.datasetExists('fgcmStarIndices')):
             self._fgcmMatchStars(butler, visitCat)
 
-        ## FIXME: probably need list of dataRefs actually used?
-        ##        What is this used for?
+        # FIXME: probably need list of dataRefs actually used?
+        #        What is this used for?
         return pipeBase.Struct(dataRefs=dataRefs)
 
     def _fgcmMakeVisitCatalog(self, butler, dataRefs):
@@ -276,28 +278,25 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         if len(dataRefs) == 0:
             # We did not specify any datarefs, so find all of them
             allVisits = butler.queryMetadata('src',
-                                             format=['visit','filter'],
-                                             dataId={'CCD':self.config.referenceCCD})
+                                             format=['visit', 'filter'],
+                                             dataId={'CCD': self.config.referenceCCD})
 
             srcVisits = []
             for dataset in allVisits:
-                if (butler.datasetExists('src', dataId={'visit':dataset[0],
-                                                        'ccd':self.config.referenceCCD})):
+                if (butler.datasetExists('src', dataId={'visit': dataset[0],
+                                                        'ccd': self.config.referenceCCD})):
                     srcVisits.append(dataset[0])
         else:
             # get the visits from the datarefs, only for referenceCCD
             srcVisits = [d.dataId['visit'] for d in dataRefs if
                          d.dataId['ccd'] == self.config.referenceCCD]
 
-            # still need to check that these exist!
-            ## FIXME
-
         self.log.info("Found %d visits in %.2f s" %
                       (len(srcVisits), time.time()-startTime))
 
         schema = afwTable.Schema()
         schema.addField('visit', type=np.int32, doc="Visit number")
-        schema.addField('filtername', type=str,size=2, doc="Filter name")
+        schema.addField('filtername', type=str, size=2, doc="Filter name")
         schema.addField('telra', type=np.float64, doc="Pointing RA (deg)")
         schema.addField('teldec', type=np.float64, doc="Pointing Dec (deg)")
         schema.addField('telha', type=np.float64, doc="Pointing Hour Angle (deg)")
@@ -312,23 +311,23 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         startTime = time.time()
         # reading in a small bbox is marginally faster in the scan
-        bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
+        # bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
 
         # now loop over visits and get the information
         for srcVisit in srcVisits:
             # Note that I found the raw access to be more reliable and faster
             #   than calexp_sub to get visitInfo().  This may not be the same
             #   for all repos and processing.
-            #calexp = butler.get('calexp_sub', dataId={'visit':srcVisit,
+            # calexp = butler.get('calexp_sub', dataId={'visit':srcVisit,
             #                                          'ccd':self.config.referenceCCD},
             #                    bbox=bbox)
-            raw = butler.get('raw', dataId={'visit':srcVisit,
-                                            'ccd':self.config.referenceCCD})
+            raw = butler.get('raw', dataId={'visit': srcVisit,
+                                            'ccd': self.config.referenceCCD})
 
-            ##visitInfo = calexp.getInfo().getVisitInfo()
+            # visitInfo = calexp.getInfo().getVisitInfo()
             visitInfo = raw.getInfo().getVisitInfo()
 
-            rec=visitCat.addNew()
+            rec = visitCat.addNew()
             rec['visit'] = srcVisit
             rec['filtername'] = raw.getInfo().getFilter().getName()
             radec = visitInfo.getBoresightRaDec()
@@ -364,7 +363,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         None
         """
 
-        startTime=time.time()
+        startTime = time.time()
 
         # create our source schema
         sourceSchema = butler.get('src_schema', immediate=True).schema
@@ -405,8 +404,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 ccdId = detector.getId()
 
                 # get the dataref -- can't be numpy int
-                ref = butler.dataRef('raw', dataId={'visit':int(visit['visit']),
-                                                    'ccd':ccdId})
+                ref = butler.dataRef('raw', dataId={'visit': int(visit['visit']),
+                                                    'ccd': ccdId})
                 try:
                     sources = ref.get('src',
                                       flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
@@ -440,8 +439,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     magKey = outputSchema.find('mag').key
                     magErrKey = outputSchema.find('magerr').key
 
-                    started=True
-
+                    started = True
 
                 magErr = (2.5/np.log(10.)) * (sources[fluxKey] /
                                               sources[fluxErrKey])
@@ -450,20 +448,19 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 # This selection method is fastest and works
                 #  with afwTable (patched Sept. 2017)
                 gdFlag = np.logical_and.reduce([~sources[satCenterKey],
-                                                 ~sources[intCenterKey],
-                                                 ~sources[pixEdgeKey],
-                                                 ~sources[pixCrCenterKey],
-                                                 ~sources[pixBadKey],
-                                                 ~sources[pixInterpAnyKey],
-                                                 ~sources[centroidFlagKey],
-                                                 ~sources[apFluxFlagKey],
-                                                 sources[deblendNchildKey] == 0,
-                                                 sources[parentKey] == 0,
-                                                 sources[extKey] < 0.5,
-                                                 np.isfinite(magErr),
-                                                 magErr > 0.001,
-                                                 magErr < 0.1])
-
+                                                ~sources[intCenterKey],
+                                                ~sources[pixEdgeKey],
+                                                ~sources[pixCrCenterKey],
+                                                ~sources[pixBadKey],
+                                                ~sources[pixInterpAnyKey],
+                                                ~sources[centroidFlagKey],
+                                                ~sources[apFluxFlagKey],
+                                                sources[deblendNchildKey] == 0,
+                                                sources[parentKey] == 0,
+                                                sources[extKey] < 0.5,
+                                                np.isfinite(magErr),
+                                                magErr > 0.001,
+                                                magErr < 0.1])
 
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
                 tempCat.table.preallocate(gdFlag.sum())
@@ -525,7 +522,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                       'minPerBand': self.config.minPerBand,
                       'matchRadius': self.config.matchRadius,
                       'isolationRadius': self.config.isolationRadius,
-                      'matchNSide' : self.config.matchNside,
+                      'matchNSide': self.config.matchNside,
                       'densNSide': self.config.densityCutNside,
                       'densMaxPerPixel': self.config.densityCutMaxPerPixel,
                       'referenceBand': self.config.referenceBand,
@@ -538,8 +535,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         #  note that the ra/dec native Angle format is radians
         fgcmMakeStars.makeReferenceStars(np.rad2deg(obsCat['ra']),
                                          np.rad2deg(obsCat['dec']),
-                                         filterNameArray = obsFilterNames,
-                                         bandSelected = False)
+                                         filterNameArray=obsFilterNames,
+                                         bandSelected=False)
 
         # and match all the stars
         fgcmMakeStars.makeMatchedStars(np.rad2deg(obsCat['ra']),
@@ -551,7 +548,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # afwTable for objects
         objSchema = afwTable.Schema()
         objSchema.addField('fgcm_id', type=np.int32, doc='FGCM Unique ID')
-        ## FIXME: should be angle?
+        # FIXME: should be angle?
         objSchema.addField('ra', type=np.float64, doc='Mean object RA')
         objSchema.addField('dec', type=np.float64, doc='Mean object Dec')
         objSchema.addField('obsarrindex', type=np.int32,
