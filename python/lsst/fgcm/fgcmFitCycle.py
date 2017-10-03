@@ -7,21 +7,22 @@ import traceback
 
 import numpy as np
 
-import lsst.utils
+# import lsst.utils
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.pex.exceptions as pexExceptions
+# import lsst.pex.exceptions as pexExceptions
 import lsst.afw.table as afwTable
 import lsst.afw.geom as afwGeom
 import lsst.afw.cameraGeom as afwCameraGeom
-from lsst.daf.base.dateTime import DateTime
-import lsst.daf.persistence.butlerExceptions as butlerExceptions
+# from lsst.daf.base.dateTime import DateTime
+# import lsst.daf.persistence.butlerExceptions as butlerExceptions
 
-import time
+# import time
 
 import fgcm
 
 __all__ = ['FgcmFitCycleConfig', 'FgcmFitCycleTask']
+
 
 class FgcmFitCycleConfig(pexConfig.Config):
     """Config for FgcmFitCycle"""
@@ -30,232 +31,233 @@ class FgcmFitCycleConfig(pexConfig.Config):
         doc="Bands to run calibration (in wavelength order)",
         dtype=str,
         default=("NO_DATA",),
-        )
+    )
     fitFlag = pexConfig.ListField(
         doc="Flag for bands to fit",
         dtype=int,
         default=(0,),
-        )
+    )
     filterToBand = pexConfig.DictField(
         doc="filterName to band mapping",
         keytype=str,
         itemtype=str,
         default={},
-        )
+    )
     bandToStdFilter = pexConfig.DictField(
         doc="Band to *standard* filter mapping",
         keytype=str,
         itemtype=str,
         default={},
-        )
+    )
     nCore = pexConfig.Field(
         doc="Number of cores to use",
         dtype=int,
         default=4,
-        )
+    )
     nStarPerRun = pexConfig.Field(
         doc="Number of stars to run in each chunk",
         dtype=int,
         default=200000,
-        )
+    )
     nExpPerRun = pexConfig.Field(
         doc="Number of exposures to run in each chunk",
         dtype=int,
         default=1000,
-        )
+    )
     reserveFraction = pexConfig.Field(
         doc="Fraction of stars to reserve for testing",
         dtype=float,
         default=0.1,
-        )
+    )
     freezeStdAtmosphere = pexConfig.Field(
         doc="Freeze atmosphere parameters to standard (for testing)",
         dtype=bool,
         default=False,
-        )
+    )
     precomputeSuperStarInitialCycle = pexConfig.Field(
         doc="Precompute superstar flat for initial cycle",
         dtype=bool,
         default=False,
-        )
+    )
     cycleNumber = pexConfig.Field(
         doc="Fit Cycle Number",
         dtype=int,
         default=None,
-        )
+    )
     maxIter = pexConfig.Field(
         doc="Max iterations",
         dtype=int,
         default=100,
-        )
+    )
     utBoundary = pexConfig.Field(
         doc="Boundary (in UTC) from day-to-day",
         dtype=float,
         default=None,
-        )
+    )
     washMjds = pexConfig.ListField(
         doc="Mirror wash MJDs",
         dtype=float,
         default=(0.0,),
-        )
+    )
     epochMjds = pexConfig.ListField(
         doc="Epoch boundaries in MJD",
         dtype=float,
         default=(0.0,),
-        )
+    )
     minObsPerBand = pexConfig.Field(
         doc="Minimum good observations per band",
         dtype=int,
         default=2,
-        )
+    )
     latitude = pexConfig.Field(
         doc="Observatory latitude",
         dtype=float,
         default=None,
-        )
+    )
     pixelScale = pexConfig.Field(
         doc="Pixel scale (arcsec/pixel) (temporary)",
         dtype=float,
         default=None,
-        )
+    )
     brightObsGrayMax = pexConfig.Field(
         doc="Maximum gray extinction to be considered bright observation",
         dtype=float,
         default=0.15,
-        )
+    )
     minStarPerCcd = pexConfig.Field(
         doc="Minimum number of good stars per CCD for calibration",
         dtype=int,
         default=5,
-        )
+    )
     minCcdPerExp = pexConfig.Field(
         doc="Minimum number of good CCDs per exposure",
         dtype=int,
         default=5,
-        )
+    )
     maxCcdGrayErr = pexConfig.Field(
         doc="Maximum error on CCD gray offset to be considered good",
         dtype=float,
         default=0.05,
-        )
+    )
     minStarPerExp = pexConfig.Field(
         doc="Minimum number of good stars per exposure to be considered good",
         dtype=int,
         default=600,
-        )
+    )
     minExpPerNight = pexConfig.Field(
         doc="Minimum number of good exposures to consider a good night",
         dtype=int,
         default=10,
-        )
+    )
     expGrayInitialCut = pexConfig.Field(
         doc="Maximum exposure gray value for initial cut",
         dtype=float,
         default=-0.25,
-        )
+    )
     expGrayPhotometricCut = pexConfig.ListField(
         doc="Maximum exposure gray for photometric selection",
         dtype=float,
         default=(0.0,),
-        )
+    )
     expGrayRecoverCut = pexConfig.Field(
         doc="Maximum exposure gray to be able to recover bad ccds",
         dtype=float,
         default=-1.0,
-        )
+    )
     expVarGrayPhotometricCut = pexConfig.Field(
         doc="Maximum exposure variance to be considered possibly photometric",
         dtype=float,
         default=0.0005,
-        )
+    )
     expGrayErrRecoverCut = pexConfig.Field(
         doc="Maximum exposure gray error to be able to recover bad ccds",
         dtype=float,
         default=0.05,
-        )
+    )
     illegalValue = pexConfig.Field(
         doc="Sentinal value for no-values",
         dtype=float,
         default=-9999.0,
-        )
+    )
     aperCorrFitNBins = pexConfig.Field(
         doc="Aperture correction number of bins",
         dtype=int,
         default=None,
-        )
+    )
     sedFudgeFactors = pexConfig.ListField(
         doc="Fudge factors for computing linear SED from colors",
         dtype=float,
         default=(0,),
-        )
+    )
     sigFgcmMaxErr = pexConfig.Field(
         doc="Maximum mag error for fitting sigma_FGCM",
         dtype=float,
         default=0.01,
-        )
+    )
     sigFgcmMaxEGray = pexConfig.Field(
         doc="Maximum (absolute) gray value for observation in sigma_FGCM",
         dtype=float,
         default=0.05,
-        )
+    )
     ccdGrayMaxStarErr = pexConfig.Field(
         doc="Maximum error on a star observation to use in ccd gray computation",
         dtype=float,
         default=0.10,
-        )
+    )
     approxThroughput = pexConfig.Field(
         doc="Approximate overall throughput at start of calibration observations",
         dtype=float,
         default=1.0,
-        )
+    )
     sigma0Cal = pexConfig.Field(
         doc="Systematic error floor for all observations",
         dtype=float,
         default=0.003,
-        )
+    )
     sigma0Phot = pexConfig.Field(
         doc="Systematic error floor for all zeropoints",
         dtype=float,
         default=0.003,
-        )
+    )
     mapLongitudeRef = pexConfig.Field(
         doc="Reference longitude for plotting maps",
         dtype=float,
         default=0.0,
-        )
+    )
     mapNSide = pexConfig.Field(
         doc="Healpix nside for plotting maps",
         dtype=int,
         default=256,
-        )
+    )
     varNSig = pexConfig.Field(
         doc="Number of sigma to be tested as a variable",
         dtype=float,
         default=4.0,
-        )
+    )
     varMinBand = pexConfig.Field(
         doc="Minimum number of bands with variability to be flagged as variable",
         dtype=int,
         default=2,
-        )
+    )
     cameraGain = pexConfig.Field(
         doc="Gain value for the typical CCD",
         dtype=float,
         default=None,
-        )
+    )
     outfileBase = pexConfig.Field(
         doc="Filename start for plot output files",
         dtype=str,
         default=None,
-        )
+    )
     starColorCuts = pexConfig.ListField(
         doc="Encoded star-color cuts (to be cleaned up)",
         dtype=str,
         default=("NO_DATA",),
-        )
+    )
 
     def setDefaults(self):
         pass
+
 
 class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmFitCycleTask
@@ -318,13 +320,14 @@ class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
         resultList = []
 
         if self.precall(parsedCmd):
-            profileName = parsedCmd.profile if hasattr(parsedCmd, "profile") else None
-            log = parsedCmd.log
+            # profileName = parsedCmd.profile if hasattr(parsedCmd, "profile") else None
+            # log = parsedCmd.log
             targetList = self.getTargetList(parsedCmd)
             # make sure that we only get 1
             resultList = self(targetList[0])
 
         return resultList
+
 
 class FgcmFitCycleTask(pipeBase.CmdLineTask):
     """
@@ -387,12 +390,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         """
 
-        ## FIXME:
-        ##   more sensible configuration options related to bands/fitbands
-        ##   check that array lengths are matched
+        # FIXME:
+        #   more sensible configuration options related to bands/fitbands
+        #   check that array lengths are matched
 
-        ## FIXME:
-        ##   Need to be able to turn off plots if desired
+        # FIXME:
+        #   Need to be able to turn off plots if desired
 
         #  TBD:
         #   updating configuration at the end for next cycle?
@@ -420,12 +423,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                 raise ValueError("Could not find fgcmFlaggedStars for previous cycle (%d) in repo!" %
                                  (self.config.cycleNumber-1))
 
-
-        ## FIXME:
-        ##  check config variables for valid ranges
+        # FIXME:
+        #  check config variables for valid ranges
 
         bands = np.array(self.config.bands)
-        fitFlag = np.array(self.config.fitFlag,dtype=np.bool)
+        fitFlag = np.array(self.config.fitFlag, dtype=np.bool)
 
         camera = butler.get('camera')
 
@@ -433,8 +435,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         starColorCutList = []
         for ccut in self.config.starColorCuts:
             parts = ccut.split(',')
-            starColorCutList.append([parts[0],parts[1],float(parts[2]),float(parts[3])])
-
+            starColorCutList.append([parts[0], parts[1], float(parts[2]), float(parts[3])])
 
         # create a configuration dictionary for fgcmFitCycle
         configDict = {'outfileBase': self.config.outfileBase,
@@ -456,7 +457,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'extraBands': bands[~fitFlag],
                       'filterToBand': self.config.filterToBand,
                       'bandToStdFilter': self.config.bandToStdFilter,
-                      'logLevel': 'INFO',  ## FIXME
+                      'logLevel': 'INFO',  # FIXME
                       'nCore': self.config.nCore,
                       'nStarPerRun': self.config.nStarPerRun,
                       'nExpPerRun': self.config.nExpPerRun,
@@ -505,7 +506,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # first we need the lutIndexVals
         lutFilterNames = np.array(lutCat[0]['filternames'].split(','))
 
-        ## FIXME: check that lutBands equal listed bands!
+        # FIXME: check that lutBands equal listed bands!
 
         lutIndexVals = np.zeros(1, dtype=[('FILTERNAMES', 'a2', lutFilterNames.size),
                                           ('PMB', 'f8', lutCat[0]['pmb'].size),
@@ -531,21 +532,21 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         lutIndexVals['NCCD'] = lutCat[0]['nccd']
 
         # now we need the Standard Values
-        lutStd = np.zeros(1,dtype=[('PMBSTD', 'f8'),
-                                   ('PWVSTD', 'f8'),
-                                   ('O3STD', 'f8'),
-                                   ('TAUSTD', 'f8'),
-                                   ('ALPHASTD', 'f8'),
-                                   ('ZENITHSTD', 'f8'),
-                                   ('LAMBDARANGE', 'f8', 2),
-                                   ('LAMBDASTEP', 'f8'),
-                                   ('LAMBDASTD', 'f8', lutFilterNames.size),
-                                   ('I0STD', 'f8', lutFilterNames.size),
-                                   ('I1STD', 'f8', lutFilterNames.size),
-                                   ('I10STD', 'f8', lutFilterNames.size),
-                                   ('LAMBDAB', 'f8', lutFilterNames.size),
-                                   ('ATMLAMBDA', 'f8', lutCat[0]['atmlambda'].size),
-                                   ('ATMSTDTRANS', 'f8', lutCat[0]['atmstdtrans'].size)])
+        lutStd = np.zeros(1, dtype=[('PMBSTD', 'f8'),
+                                    ('PWVSTD', 'f8'),
+                                    ('O3STD', 'f8'),
+                                    ('TAUSTD', 'f8'),
+                                    ('ALPHASTD', 'f8'),
+                                    ('ZENITHSTD', 'f8'),
+                                    ('LAMBDARANGE', 'f8', 2),
+                                    ('LAMBDASTEP', 'f8'),
+                                    ('LAMBDASTD', 'f8', lutFilterNames.size),
+                                    ('I0STD', 'f8', lutFilterNames.size),
+                                    ('I1STD', 'f8', lutFilterNames.size),
+                                    ('I10STD', 'f8', lutFilterNames.size),
+                                    ('LAMBDAB', 'f8', lutFilterNames.size),
+                                    ('ATMLAMBDA', 'f8', lutCat[0]['atmlambda'].size),
+                                    ('ATMSTDTRANS', 'f8', lutCat[0]['atmstdtrans'].size)])
         lutStd['PMBSTD'] = lutCat[0]['pmbstd']
         lutStd['PWVSTD'] = lutCat[0]['pwvstd']
         lutStd['O3STD'] = lutCat[0]['o3std']
@@ -607,16 +608,16 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # next we need the exposure/visit information
         visitCat = butler.get('fgcmVisitCatalog')
 
-        fgcmExpInfo = np.zeros(len(visitCat),dtype=[('VISIT','i8'),
-                                                    ('MJD','f8'),
-                                                    ('EXPTIME','f8'),
-                                                    ('SEEING','f8'),
-                                                    ('DEEPFLAG','i2'),
-                                                    ('TELHA','f8'),
-                                                    ('TELRA','f8'),
-                                                    ('TELDEC','f8'),
-                                                    ('PMB','f8'),
-                                                    ('FILTERNAME','a2')])
+        fgcmExpInfo = np.zeros(len(visitCat), dtype=[('VISIT', 'i8'),
+                                                     ('MJD', 'f8'),
+                                                     ('EXPTIME', 'f8'),
+                                                     ('SEEING', 'f8'),
+                                                     ('DEEPFLAG', 'i2'),
+                                                     ('TELHA', 'f8'),
+                                                     ('TELRA', 'f8'),
+                                                     ('TELDEC', 'f8'),
+                                                     ('PMB', 'f8'),
+                                                     ('FILTERNAME', 'a2')])
         fgcmExpInfo['VISIT'][:] = visitCat['visit']
         fgcmExpInfo['MJD'][:] = visitCat['mjd']
         fgcmExpInfo['EXPTIME'][:] = visitCat['exptime']
@@ -631,17 +632,17 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmExpInfo['FILTERNAME'][:] = visitCat.asAstropy()['filtername']
 
         # and we need to know the ccd offsets from the camera geometry
-        ccdOffsets = np.zeros(lutIndexVals['NCCD'],dtype=[('CCDNUM','i4'),
-                                                          ('DELTA_RA','f8'),
-                                                          ('DELTA_DEC','f8'),
-                                                          ('RA_SIZE','f8'),
-                                                          ('DEC_SIZE','f8')])
+        ccdOffsets = np.zeros(lutIndexVals['NCCD'], dtype=[('CCDNUM', 'i4'),
+                                                           ('DELTA_RA', 'f8'),
+                                                           ('DELTA_DEC', 'f8'),
+                                                           ('RA_SIZE', 'f8'),
+                                                           ('DEC_SIZE', 'f8')])
 
-        camera=butler.get('camera')
+        camera = butler.get('camera')
 
-        extent=afwGeom.Extent2D(self.config.pixelScale,self.config.pixelScale)
+        extent = afwGeom.Extent2D(self.config.pixelScale, self.config.pixelScale)
 
-        for i,detector in enumerate(camera):
+        for i, detector in enumerate(camera):
             # new version, using proper rotations
             #  but I worry this only works with HSC, as there's a unit inconsistency
 
@@ -658,23 +659,15 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             ccdOffsets['DELTA_DEC'][i] = pointXform.getY() * self.config.pixelScale / 3600.0
 
             # but this does not (for the delta)
-            boxXform = xform.applyForward(afwGeom.Point2D(bbox.getMaxX(),bbox.getMaxY()))
+            boxXform = xform.applyForward(afwGeom.Point2D(bbox.getMaxX(), bbox.getMaxY()))
             ccdOffsets['RA_SIZE'][i] = 2. * np.abs(boxXform.getX() -
                                                    pointXform.getX()) / 3600.0
             ccdOffsets['DEC_SIZE'][i] = 2. * np.abs(boxXform.getY() -
                                                     pointXform.getY()) / 3600.0
 
             # old version below
-            #point = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
-            #bbox = detector.getBBox()
-
-            ## FIXME: is this orientation correct?
-            #ccdOffsets['CCDNUM'][i] = detector.getId()
-            #ccdOffsets['DELTA_RA'][i] = point.getPoint().getX() * self.config.pixelScale / 3600.0
-            #ccdOffsets['DELTA_DEC'][i] = point.getPoint().getY() * self.config.pixelScale / 3600.0
-            #ccdOffsets['RA_SIZE'][i] = bbox.getMaxX() * self.config.pixelScale / 3600.0
-            #ccdOffsets['DEC_SIZE'][i] = bbox.getMaxY() * self.config.pixelScale / 3600.0
-
+            # point = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
+            # bbox = detector.getBBox()
 
         noFitsDict = {'lutIndex': lutIndexVals,
                       'lutStd': lutStd,
@@ -685,14 +678,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmFitCycle = fgcm.FgcmFitCycle(configDict, useFits=False,
                                          noFitsDict=noFitsDict)
 
-
         # create the parameter object
         if (fgcmFitCycle.initialCycle):
             # cycle = 0, initial cycle
             fgcmPars = fgcm.FgcmParameters.newParsWithArrays(fgcmFitCycle.fgcmConfig,
-                                                       fgcmLut,
-                                                       fgcmExpInfo)
-
+                                                             fgcmLut,
+                                                             fgcmExpInfo)
         else:
             # note that we already checked that this is available
             parCat = butler.get('fgcmFitParameters', fgcmcycle=self.config.cycleNumber-1)
@@ -763,25 +754,24 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                           ('COMPSIGFGCM', 'f8',
                                            parCat['compsigfgcm'].size)])
 
+            inParams['PARALPHA'][:] = parCat['paralpha'][0, :]
+            inParams['PARO3'][:] = parCat['paro3'][0, :]
+            inParams['PARTAUINTERCEPT'][:] = parCat['partauintercept'][0, :]
+            inParams['PARTAUPERSLOPE'][:] = parCat['partauperslope'][0, :]
+            inParams['PARPWVINTERCEPT'][:] = parCat['parpwvintercept'][0, :]
+            inParams['PARQESYSINTERCEPT'][:] = parCat['parqesysintercept'][0, :]
+            inParams['PARQESYSSLOPE'][:] = parCat['parqesysslope'][0, :]
+            inParams['COMPAPERCORRPIVOT'][:] = parCat['compapercorrpivot'][0, :]
+            inParams['COMPAPERCORRSLOPE'][:] = parCat['compapercorrslope'][0, :]
+            inParams['COMPAPERCORRSLOPEERR'][:] = parCat['compapercorrslopeerr'][0, :]
+            inParams['COMPAPERCORRRANGE'][:] = parCat['compapercorrrange'][0, :]
+            inParams['COMPEXPGRAY'][:] = parCat['compexpgray'][0, :]
+            inParams['COMPVARGRAY'][:] = parCat['compvargray'][0, :]
+            inParams['COMPNGOODSTARPEREXP'][:] = parCat['compngoodstarperexp'][0, :]
+            inParams['COMPSIGFGCM'][:] = parCat['compsigfgcm'][0, :]
 
-            inParams['PARALPHA'][:] = parCat['paralpha'][0,:]
-            inParams['PARO3'][:] = parCat['paro3'][0,:]
-            inParams['PARTAUINTERCEPT'][:] = parCat['partauintercept'][0,:]
-            inParams['PARTAUPERSLOPE'][:] = parCat['partauperslope'][0,:]
-            inParams['PARPWVINTERCEPT'][:] = parCat['parpwvintercept'][0,:]
-            inParams['PARQESYSINTERCEPT'][:] = parCat['parqesysintercept'][0,:]
-            inParams['PARQESYSSLOPE'][:] = parCat['parqesysslope'][0,:]
-            inParams['COMPAPERCORRPIVOT'][:] = parCat['compapercorrpivot'][0,:]
-            inParams['COMPAPERCORRSLOPE'][:] = parCat['compapercorrslope'][0,:]
-            inParams['COMPAPERCORRSLOPEERR'][:] = parCat['compapercorrslopeerr'][0,:]
-            inParams['COMPAPERCORRRANGE'][:] = parCat['compapercorrrange'][0,:]
-            inParams['COMPEXPGRAY'][:] = parCat['compexpgray'][0,:]
-            inParams['COMPVARGRAY'][:] = parCat['compvargray'][0,:]
-            inParams['COMPNGOODSTARPEREXP'][:] = parCat['compngoodstarperexp'][0,:]
-            inParams['COMPSIGFGCM'][:] = parCat['compsigfgcm'][0,:]
-
-            inSuperStar = np.zeros(parCat['superstarsize'][0,:], dtype='f8')
-            inSuperStar[:,:,:] = parCat['superstar'][0,:].reshape(inSuperStar.shape)
+            inSuperStar = np.zeros(parCat['superstarsize'][0, :], dtype='f8')
+            inSuperStar[:, :, :] = parCat['superstar'][0, :].reshape(inSuperStar.shape)
 
             fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                               fgcmExpInfo,
@@ -807,8 +797,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             flagId = None
             flagFlag = None
 
-        # assemble the band strings...
-        #obsFilterName = np.zeros(starIndices['obsindex'].size, dtype='a2')
+        # match star observations to visits
         visitIndex = np.searchsorted(fgcmExpInfo['VISIT'], starObs['visit'][starIndices['obsindex']])
 
         # note that we only need the star observations from specific indices
@@ -850,7 +839,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmFitCycle.run()
 
         ##################
-        ### Persistance
+        # Persistance
         ##################
 
         # parameters
@@ -858,7 +847,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         parSchema = afwTable.Schema()
 
-        comma=','
+        comma = ','
         lutFilterNameString = comma.join(parInfo['LUTFILTERNAMES'][0])
         fitBandString = comma.join(parInfo['FITBANDS'][0])
         extraBandString = comma.join(parInfo['EXTRABANDS'][0])
@@ -913,7 +902,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['COMPEXPGRAY'].size)
         parSchema.addField('compvargray', type='ArrayD', doc='Computed exposure variance',
                            size=pars['COMPVARGRAY'].size)
-        parSchema.addField('compngoodstarperexp', type='ArrayI', doc='Computed number of good stars per exposure',
+        parSchema.addField('compngoodstarperexp', type='ArrayI',
+                           doc='Computed number of good stars per exposure',
                            size=pars['COMPNGOODSTARPEREXP'].size)
         parSchema.addField('compsigfgcm', type='ArrayD', doc='Computed sigma_fgcm',
                            size=pars['COMPSIGFGCM'].size)
@@ -924,11 +914,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('superstar', type='ArrayD', doc='Superstar matrix (flattened)',
                            size=fgcmFitCycle.fgcmPars.parSuperStarFlat.size)
 
-
         parCat = afwTable.BaseCatalog(parSchema)
         parCat.table.preallocate(1)
 
-        rec=parCat.addNew()
+        rec = parCat.addNew()
 
         # info section
         rec['nccd'] = parInfo['NCCD']
@@ -948,22 +937,22 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['hasexternaltau'] = 0
 
         # parameter section
-        rec['paralpha'][:] = pars['PARALPHA'][0,:]
-        rec['paro3'][:] = pars['PARO3'][0,:]
-        rec['partauintercept'][:] = pars['PARTAUINTERCEPT'][0,:]
-        rec['partauperslope'][:] = pars['PARTAUPERSLOPE'][0,:]
-        rec['parpwvintercept'][:] = pars['PARPWVINTERCEPT'][0,:]
-        rec['parpwvperslope'][:] = pars['PARPWVPERSLOPE'][0,:]
-        rec['parqesysintercept'][:] = pars['PARQESYSINTERCEPT'][0,:]
-        rec['parqesysslope'][:] = pars['PARQESYSSLOPE'][0,:]
-        rec['compapercorrpivot'][:] = pars['COMPAPERCORRPIVOT'][0,:]
-        rec['compapercorrslope'][:] = pars['COMPAPERCORRSLOPE'][0,:]
-        rec['compapercorrslopeerr'][:] = pars['COMPAPERCORRSLOPEERR'][0,:]
-        rec['compapercorrrange'][:] = pars['COMPAPERCORRRANGE'][0,:]
-        rec['compexpgray'][:] = pars['COMPEXPGRAY'][0,:]
-        rec['compvargray'][:] = pars['COMPVARGRAY'][0,:]
-        rec['compngoodstarperexp'][:] = pars['COMPNGOODSTARPEREXP'][0,:]
-        rec['compsigfgcm'][:] = pars['COMPSIGFGCM'][0,:]
+        rec['paralpha'][:] = pars['PARALPHA'][0, :]
+        rec['paro3'][:] = pars['PARO3'][0, :]
+        rec['partauintercept'][:] = pars['PARTAUINTERCEPT'][0, :]
+        rec['partauperslope'][:] = pars['PARTAUPERSLOPE'][0, :]
+        rec['parpwvintercept'][:] = pars['PARPWVINTERCEPT'][0, :]
+        rec['parpwvperslope'][:] = pars['PARPWVPERSLOPE'][0, :]
+        rec['parqesysintercept'][:] = pars['PARQESYSINTERCEPT'][0, :]
+        rec['parqesysslope'][:] = pars['PARQESYSSLOPE'][0, :]
+        rec['compapercorrpivot'][:] = pars['COMPAPERCORRPIVOT'][0, :]
+        rec['compapercorrslope'][:] = pars['COMPAPERCORRSLOPE'][0, :]
+        rec['compapercorrslopeerr'][:] = pars['COMPAPERCORRSLOPEERR'][0, :]
+        rec['compapercorrrange'][:] = pars['COMPAPERCORRRANGE'][0, :]
+        rec['compexpgray'][:] = pars['COMPEXPGRAY'][0, :]
+        rec['compvargray'][:] = pars['COMPVARGRAY'][0, :]
+        rec['compngoodstarperexp'][:] = pars['COMPNGOODSTARPEREXP'][0, :]
+        rec['compsigfgcm'][:] = pars['COMPSIGFGCM'][0, :]
 
         # superstar section
         rec['superstarsize'][:] = fgcmFitCycle.fgcmPars.parSuperStarFlat.shape
@@ -981,7 +970,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         flagStarStruct = fgcmFitCycle.fgcmStars.getFlagStarIndices()
         flagStarCat.table.preallocate(flagStarStruct.size)
         for i in xrange(flagStarStruct.size):
-            rec=flagStarCat.addNew()
+            rec = flagStarCat.addNew()
 
         flagStarCat = flagStarCat.copy(deep=True)
 
@@ -997,17 +986,29 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         zptSchema.addField('ccd', type=np.int32, doc='CCD number')
         zptSchema.addField('fgcmflag', type=np.int32, doc='FGCM flag value')
         zptSchema.addField('fgcmzpt', type=np.float32, doc='FGCM zeropoint')
-        zptSchema.addField('fgcmzpterr', type=np.float32, doc='Error on zeropoint, estimated from repeatability + number of obs')
+        zptSchema.addField('fgcmzpterr', type=np.float32,
+                           doc='Error on zeropoint, estimated from repeatability + number of obs')
         zptSchema.addField('fgcmi0', type=np.float32, doc='Integral of the passband')
         zptSchema.addField('fgcmi10', type=np.float32, doc='Normalized chromatic integral')
-        zptSchema.addField('fgcmr0', type=np.float32, doc='Retrieved i0 integral, estimated from stars (only for flag 1)')
-        zptSchema.addField('fgcmr10', type=np.float32, doc='Retrieved i10 integral, estimated from stars (only for flag 1)')
-        zptSchema.addField('fgcmgry', type=np.float32, doc='Estimated gray extinction relative to atmospheric solution; only for flag <= 4')
+        zptSchema.addField('fgcmr0', type=np.float32,
+                           doc='Retrieved i0 integral, estimated from stars (only for flag 1)')
+        zptSchema.addField('fgcmr10', type=np.float32,
+                           doc='Retrieved i10 integral, estimated from stars (only for flag 1)')
+        zptSchema.addField('fgcmgry', type=np.float32,
+                           doc='Estimated gray extinction relative to atmospheric solution; '
+                           'only for flag <= 4')
         zptSchema.addField('fgcmzptvar', type=np.float32, doc='Variance of zeropoint over ccd')
-        zptSchema.addField('fgcmtilings', type=np.float32, doc='Number of photometric tilings used for solution for ccd')
-        zptSchema.addField('fgcmfpgry', type=np.float32, doc='Average gray extinction over the full focal plane (same for all ccds in a visit)')
-        zptSchema.addField('fgcmfpvar', type=np.float32, doc='Variance of gray extinction over the full focal plane (same for all ccds in a visit)')
-        zptSchema.addField('fgcmdust', type=np.float32, doc='Gray dust extinction from the primary/corrector at the time of the exposure')
+        zptSchema.addField('fgcmtilings', type=np.float32,
+                           doc='Number of photometric tilings used for solution for ccd')
+        zptSchema.addField('fgcmfpgry', type=np.float32,
+                           doc='Average gray extinction over the full focal plane '
+                           '(same for all ccds in a visit)')
+        zptSchema.addField('fgcmfpvar', type=np.float32,
+                           doc='Variance of gray extinction over the full focal plane '
+                           '(same for all ccds in a visit)')
+        zptSchema.addField('fgcmdust', type=np.float32,
+                           doc='Gray dust extinction from the primary/corrector'
+                           'at the time of the exposure')
         zptSchema.addField('fgcmflat', type=np.float32, doc='Superstarflat illumination correction')
         zptSchema.addField('fgcmapercorr', type=np.float32, doc='Aperture correction estimated by fgcm')
         zptSchema.addField('exptime', type=np.float32, doc='Exposure time')
@@ -1016,7 +1017,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         zptCat = afwTable.BaseCatalog(zptSchema)
         zptCat.table.preallocate(fgcmFitCycle.fgcmZpts.zpStruct.size)
         for filterName in fgcmFitCycle.fgcmZpts.zpStruct['FILTERNAME']:
-            rec=zptCat.addNew()
+            rec = zptCat.addNew()
             rec['filtername'] = filterName
 
         zptCat = zptCat.copy(deep=True)
@@ -1057,7 +1058,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         atmCat = afwTable.BaseCatalog(atmSchema)
         atmCat.table.preallocate(fgcmFitCycle.fgcmZpts.atmStruct.size)
         for i in xrange(fgcmFitCycle.fgcmZpts.atmStruct.size):
-            rec=atmCat.addNew()
+            rec = atmCat.addNew()
 
         atmCat = atmCat.copy(deep=True)
 
