@@ -149,16 +149,32 @@ class FgcmMakeLutConfig(pexConfig.Config):
 class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmMakeLutTask
 
+    fgcmMakeLutTask.run() takes one argument, the butler, and
+    does not run on any data in the repository.
+    This runner does not use any parallelization.
     """
 
     @staticmethod
     def getTargetList(parsedCmd):
+        """
+        Return a list with one element, the butler.
+        """
         return [parsedCmd.butler]
 
     def precall(self, parsedCmd):
         return True
 
     def __call__(self, butler):
+        """
+        Parameters
+        ----------
+        butler: lsst.daf.persistence.Butler
+
+        Returns
+        -------
+        None if self.doReturnResults is False
+        An empty list if self.doReturnResults is True
+        """
         task = self.TaskClass(config=self.config, log=self.log)
         if self.doRaise:
             results = task.run(butler)
@@ -177,7 +193,13 @@ class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
     # turn off any multiprocessing
 
     def run(self, parsedCmd):
-        """ runs the task, but doesn't do multiprocessing"""
+        """
+        Run the task, with no multiprocessing
+
+        Parameters
+        ----------
+        parsedCmd: ArgumentParser parsed command line
+        """
 
         resultList = []
 
@@ -206,7 +228,6 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         Parameters
         ----------
         butler : lsst.daf.persistence.Butler
-          Something about the butler
         """
 
         pipeBase.CmdLineTask.__init__(self, **kwargs)
@@ -230,20 +251,26 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler:  a butler.
+        butler:  lsst.daf.persistence.Butler
 
         Returns
         -------
-        nothing?
+        Empty list
         """
 
         if (not butler.datasetExists('fgcmLookUpTable')):
             self._fgcmMakeLut(butler)
 
-        return None
+        return []
 
     def _fgcmMakeLut(self, butler):
         """
+        Make a FGCM Look-up Table
+
+        Parameters
+        ----------
+        butler: lsst.daf.persistence.Butler
+           (used for mapper information)
         """
 
         # need the camera for the detectors
