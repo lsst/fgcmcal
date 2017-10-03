@@ -7,22 +7,23 @@ import traceback
 
 import numpy as np
 
-import lsst.utils
+# import lsst.utils
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.pex.exceptions as pexExceptions
+# import lsst.pex.exceptions as pexExceptions
 import lsst.afw.table as afwTable
-from lsst.daf.base.dateTime import DateTime
-import lsst.afw.geom as afwGeom
-import lsst.daf.persistence.butlerExceptions as butlerExceptions
+# from lsst.daf.base.dateTime import DateTime
+# import lsst.afw.geom as afwGeom
+# import lsst.daf.persistence.butlerExceptions as butlerExceptions
 
 from .detectorThroughput import DetectorThroughput
 
-import time
+# import time
 
 import fgcm
 
 __all__ = ['FgcmMakeLutConfig', 'FgcmMakeLutTask']
+
 
 class FgcmMakeLutConfig(pexConfig.Config):
     """Config for FgcmMakeLutTask"""
@@ -31,120 +32,121 @@ class FgcmMakeLutConfig(pexConfig.Config):
         doc="Filter names to build LUT",
         dtype=str,
         default=("NO_DATA",),
-        )
+    )
     elevation = pexConfig.Field(
         doc="Telescope elevation (m)",
         dtype=float,
         default=None,
-        )
+    )
     pmbRange = pexConfig.ListField(
         doc="Barometric Pressure range (millibar)",
         dtype=float,
-        default=(770.0,790.0,),
-        )
+        default=(770.0, 790.0,),
+    )
     pmbSteps = pexConfig.Field(
         doc="Barometric Pressure number of steps",
         dtype=int,
         default=5,
-        )
+    )
     pwvRange = pexConfig.ListField(
         doc="Precipitable Water Vapor range (mm)",
         dtype=float,
-        default=(0.1,12.0,),
-        )
+        default=(0.1, 12.0,),
+    )
     pwvSteps = pexConfig.Field(
         doc="Precipitable Water Vapor number of steps",
         dtype=int,
         default=21,
-        )
+    )
     o3Range = pexConfig.ListField(
         doc="Ozone range (dob)",
         dtype=float,
-        default=(220.0,310.0,),
-        )
+        default=(220.0, 310.0,),
+    )
     o3Steps = pexConfig.Field(
         doc="Ozone number of steps",
         dtype=int,
         default=3,
-        )
+    )
     tauRange = pexConfig.ListField(
         doc="Aerosol Optical Depth range (unitless)",
         dtype=float,
-        default=(0.002,0.25,),
-        )
+        default=(0.002, 0.25,),
+    )
     tauSteps = pexConfig.Field(
         doc="Aerosol Optical Depth number of steps",
         dtype=int,
         default=11,
-        )
+    )
     alphaRange = pexConfig.ListField(
         doc="Aerosol alpha range (unitless)",
         dtype=float,
-        default=(0.0,2.0),
-        )
+        default=(0.0, 2.0),
+    )
     alphaSteps = pexConfig.Field(
         doc="Aerosol alpha number of steps",
         dtype=int,
         default=9,
-        )
+    )
     zenithRange = pexConfig.ListField(
         doc="Zenith angle range (degree)",
         dtype=float,
-        default=(0.0,70.0,),
-        )
+        default=(0.0, 70.0,),
+    )
     zenithSteps = pexConfig.Field(
         doc="Zenith angle number of steps",
         dtype=int,
         default=21,
-        )
+    )
     pmbStd = pexConfig.Field(
         doc="Standard Atmosphere pressure (millibar)",
         dtype=float,
         default=None,
-        )
+    )
     pwvStd = pexConfig.Field(
         doc="Standard Atmosphere PWV (mm)",
         dtype=float,
         default=None,
-        )
+    )
     o3Std = pexConfig.Field(
         doc="Standard Atmosphere O3 (dob)",
         dtype=float,
         default=None,
-        )
+    )
     tauStd = pexConfig.Field(
         doc="Standard Atmosphere aerosol optical depth",
         dtype=float,
         default=None,
-        )
+    )
     alphaStd = pexConfig.Field(
         doc="Standard Atmosphere aerosol alpha",
         dtype=float,
         default=None,
-        )
+    )
     airmassStd = pexConfig.Field(
         doc="Standard Atmosphere airmass",
         dtype=float,
         default=None,
-        )
+    )
     lambdaNorm = pexConfig.Field(
         doc="Aerosol Optical Depth normalization wavelength (A)",
         dtype=float,
         default=None,
-        )
+    )
     lambdaStep = pexConfig.Field(
         doc="Wavelength step for generating atmospheres (nm)",
         dtype=float,
         default=0.5,
-        )
+    )
     lambdaRange = pexConfig.ListField(
         doc="Wavelength range for LUT (A)",
         dtype=float,
         default=None,
-        )
+    )
 
     def setDefaults(self):
         pass
+
 
 class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmMakeLutTask
@@ -204,13 +206,14 @@ class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
         resultList = []
 
         if self.precall(parsedCmd):
-            profileName = parsedCmd.profile if hasattr(parsedCmd, "profile") else None
-            log = parsedCmd.log
+            # profileName = parsedCmd.profile if hasattr(parsedCmd, "profile") else None
+            # log = parsedCmd.log
             targetList = self.getTargetList(parsedCmd)
             # make sure that we only get 1
             resultList = self(targetList[0])
 
         return resultList
+
 
 class FgcmMakeLutTask(pipeBase.CmdLineTask):
     """
@@ -322,15 +325,16 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                                      self.config.lambdaStep*10.)
 
         self.log.info("Built throughput lambda, %.1f-%.1f, step %.2f" %
-              (throughputLambda[0], throughputLambda[-1], throughputLambda[1]-throughputLambda[0]))
+                      (throughputLambda[0], throughputLambda[-1],
+                       throughputLambda[1]-throughputLambda[0]))
 
         tput = DetectorThroughput()
 
         throughputDict = {}
-        for i,filterName in enumerate(self.config.filterNames):
+        for i, filterName in enumerate(self.config.filterNames):
             tDict = {}
             tDict['LAMBDA'] = throughputLambda
-            for ccdIndex,detector in enumerate(camera):
+            for ccdIndex, detector in enumerate(camera):
                 # make sure we convert the calling units from A to nm
                 tDict[ccdIndex] = tput.getThroughputDetector(detector, filterName,
                                                              throughputLambda/10.)
@@ -352,7 +356,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         #  is going to be insignificant overall
 
         # build the index values
-        comma=','
+        comma = ','
         filterNameString = comma.join(self.config.filterNames)
 
         lutSchema.addField('filternames', type=str, doc='filterNames in LUT',
@@ -409,7 +413,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         lutCat.table.preallocate(14)
 
         # first fill the first index
-        rec=lutCat.addNew()
+        rec = lutCat.addNew()
 
         rec['filterNames'] = filterNameString
         rec['pmb'][:] = self.fgcmLutMaker.pmb
