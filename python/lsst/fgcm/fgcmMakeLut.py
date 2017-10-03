@@ -278,10 +278,11 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
 
         # number of ccds from the length of the camera iterator
         nCcd = len(camera)
-        print("There are %d ccds" % (nCcd))
+        self.log.info("Found %d ccds for look-up table" % (nCcd))
 
         # make the config dictionary
         lutConfig = {}
+        lutConfig['logger'] = self.log
         lutConfig['elevation'] = self.config.elevation
         lutConfig['filterNames'] = self.config.filterNames
         lutConfig['nCCD'] = nCcd
@@ -308,7 +309,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         lutConfig['lambdaNorm'] = self.config.lambdaNorm
 
         # make the lut object
-        print("Making the LUT object...")
+        self.log.info("Making the LUT maker object")
         self.fgcmLutMaker = fgcm.FgcmLUTMaker(lutConfig)
 
         # generate the throughput dictionary.  Fun!
@@ -320,7 +321,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                                      self.config.lambdaRange[1]+self.config.lambdaStep*10,
                                      self.config.lambdaStep*10.)
 
-        print("Built throughput lambda, %.1f-%.1f, step %.2f" %
+        self.log.info("Built throughput lambda, %.1f-%.1f, step %.2f" %
               (throughputLambda[0], throughputLambda[-1], throughputLambda[1]-throughputLambda[0]))
 
         tput = DetectorThroughput()
@@ -336,11 +337,10 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
             throughputDict[filterName] = tDict
 
         # set the throughputs
-        print("Setting throughputs...")
         self.fgcmLutMaker.setThroughputs(throughputDict)
 
         # make the LUT
-        print("Making LUT...")
+        self.log.info("Making LUT")
         self.fgcmLutMaker.makeLUT()
 
         # and save the LUT
