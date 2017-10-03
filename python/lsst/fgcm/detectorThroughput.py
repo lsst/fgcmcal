@@ -10,12 +10,20 @@ import lsst.afw.cameraGeom as afwCameraGeom
 
 class DetectorThroughput(object):
     """
+    Simple python class to hold detector throughput as a function of position
 
-    units are nanometers
+    This is intended as a placeholder until something more flexible can
+    be implemented.
+
+    This version is for HSC.
 
     """
 
     def __init__(self):
+        """
+        Create a DetectorThroughput instance.
+        """
+
         self._setFilterData()
         self._setQEData()
         self._setMirrorData()
@@ -23,6 +31,17 @@ class DetectorThroughput(object):
 
     def getThroughputDetector(self, detector, band, lam):
         """
+        Get the throughput at the central pixel of a camera detector
+
+        Parameters
+        ----------
+        detector: lsst.afw.cameraGeom.Detector
+        band: filter name (short name)
+        lam: np.array() with wavelengths (units of nanometers)
+
+        Returns
+        -------
+        throughput: np.array() with throughput at each lam
         """
 
         c=detector.getCenter(afwCameraGeom.FOCAL_PLANE)
@@ -33,6 +52,18 @@ class DetectorThroughput(object):
 
     def getThroughputXY(self, band, x, y, lam):
         """
+        Get the throughput at an arbitrary x/y on the focal plane
+
+        Parameters
+        ----------
+        band: filter name (short name)
+        x: x position (pixels) in focal plane coordinates
+        y: y position (pixels) in focal plane coordinates
+        lam: np.array() with wavelengths (units of nanometers)
+
+        Returns
+        -------
+        throughput: np.array() with throughput at each lam
         """
 
         # convert radius to pixels
