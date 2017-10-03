@@ -25,6 +25,7 @@ __all__ = ['FgcmFitCycleConfig', 'FgcmFitCycleTask']
 
 class FgcmFitCycleConfig(pexConfig.Config):
     """Config for FgcmFitCycle"""
+
     bands = pexConfig.ListField(
         doc="Bands to run calibration",
         dtype=str,
@@ -247,16 +248,35 @@ class FgcmFitCycleConfig(pexConfig.Config):
 class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmFitCycleTask
 
+    fgcmFitCycleTask.run() takes one argument, the butler, and uses
+    stars and visits previously extracted from dataRefs by
+    fgcmBuildStars.
+    This runner does not use any parallelization, although the
+    FGCM code uses multiprocessing
     """
 
     @staticmethod
     def getTargetList(parsedCmd):
+        """
+        Return a list with one element, the butler.
+        """
         return [parsedCmd.butler]
 
     def precall(self, parsedCmd):
         return True
 
     def __call__(self, butler):
+        """
+        Parameters
+        ----------
+        butler: lsst.daf.persistence.Butler
+
+        Returns
+        -------
+        None if self.doReturnResults is False
+        An empty list if self.doReturnResults is True
+        """
+
         task = self.TaskClass(config=self.config, log=self.log)
         if self.doRaise:
             results = task.run(butler)
@@ -275,7 +295,13 @@ class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
     # turn off any multiprocessing
 
     def run(self, parsedCmd):
-        """ runs the task, but doesn't do multiprocessing"""
+        """
+        Run the task, with no multiprocessing
+
+        Parameters
+        ----------
+        parsedCmd: ArgumentParser parsed command line
+        """
 
         resultList = []
 
@@ -304,7 +330,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         Parameters
         ----------
         butler : lsst.daf.persistence.Butler
-          Something about the butler
         """
 
         pipeBase.CmdLineTask.__init__(self, **kwargs)
@@ -324,23 +349,30 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
     @pipeBase.timeMethod
     def run(self, butler):
         """
-        Make a Look-Up Table for FGCM
+        Run a single fit cycle for FGCM
 
         Parameters
         ----------
-        butler:  a butler.
+        butler:  lsst.daf.persistence.Butler
 
         Returns
         -------
-        nothing?
+        Empty list
         """
 
         self._fgcmFitCycle(butler)
 
-        return None
+        return []
 
     def _fgcmFitCycle(self, butler):
         """
+        Run the fit cycle
+        
+        Parameters
+        ----------
+        butler: lsst.daf.persistence.Butler
+           (used for mapper information)
+
         """
 
         ## FIXME:
@@ -394,6 +426,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
 
         # create a configuration dictionary for fgcmFitCycle
+        ## FIXME: add logger
         configDict = {'outfileBase': self.config.outfileBase,
                       'exposureFile': None,
                       'obsFile': None,
