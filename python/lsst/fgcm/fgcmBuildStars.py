@@ -200,13 +200,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             (others)
         """
 
-        #print("Using bands: ")
-        #print(self.config.bands)
-        #print("Required Flag: ")
-        #print(self.config.requiredFlag)
-        #print("Number of dataRefs: ", len(dataRefs))
-        #print("Got a butler? ", isinstance(butler, lsst.daf.persistence.butler.Butler))
-
         # make the visit catalog if necessary
         #  question: what's the propper clobber interface?
         #  we also need to know the way of checking the matched config?
@@ -265,7 +258,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         schema = afwTable.Schema()
         schema.addField('visit', type=np.int32, doc="Visit number")
-        schema.addField('band', type=str,size=2, doc="Filter band")
+        schema.addField('filtername', type=str,size=2, doc="Filter name")
         schema.addField('telra', type=np.float64, doc="Pointing RA (deg)")
         schema.addField('teldec', type=np.float64, doc="Pointing Dec (deg)")
         schema.addField('telha', type=np.float64, doc="Pointing Hour Angle (deg)")
@@ -295,8 +288,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
             rec=visitCat.addNew()
             rec['visit'] = srcVisit
-            ##rec['band'] = calexp.getInfo().getFilter().getName()
-            rec['band'] = raw.getInfo().getFilter().getName()
+            rec['filtername'] = raw.getInfo().getFilter().getName()
             radec = visitInfo.getBoresightRaDec()
             rec['telra'] = radec.getRa().asDegrees()
             rec['teldec'] = radec.getDec().asDegrees()
@@ -468,16 +460,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         obsCat = butler.get('fgcmStarObservations')
 
-        # get bands into a numpy array...
-        visitBands = np.zeros(len(visitCat), dtype='a2')
+        # get filter names into a numpy array...
+        visitFilterNames = np.zeros(len(visitCat), dtype='a2')
         for i in xrange(len(visitCat)):
-            visitBands[i] = visitCat[i]['band']
+            visitFilterNames[i] = visitCat[i]['filtername']
 
-        # match to put bands with observations
+        # match to put filterNames with observations
         visitIndex = np.searchsorted(visitCat['visit'],
                                      obsCat['visit'])
 
-        obsBands = visitBands[visitIndex]
+        obsFilterNames = visitFilterNames[visitIndex]
 
         # make the fgcm starConfig dict
 
@@ -500,13 +492,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         #  note that the ra/dec native Angle format is radians
         fgcmMakeStars.makeReferenceStars(np.rad2deg(obsCat['ra']),
                                          np.rad2deg(obsCat['dec']),
-                                         bandArray = obsBands,
+                                         filterNameArray = obsFilterNames,
+                                         filterToBand = self.config.filterToBand,
                                          bandSelected = False)
 
         # and match all the stars
         fgcmMakeStars.makeMatchedStars(np.rad2deg(obsCat['ra']),
                                        np.rad2deg(obsCat['dec']),
-                                       obsBands)
+                                       obsFilterNames)
 
         # now persist
 
