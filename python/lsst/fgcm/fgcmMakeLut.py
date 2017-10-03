@@ -27,8 +27,8 @@ __all__ = ['FgcmMakeLutConfig', 'FgcmMakeLutTask']
 class FgcmMakeLutConfig(pexConfig.Config):
     """Config for FgcmMakeLutTask"""
 
-    bands = pexConfig.ListField(
-        doc="Bands to build LUT",
+    filterNames = pexConfig.ListField(
+        doc="Filter names to build LUT",
         dtype=str,
         default=("NO_DATA",),
         )
@@ -283,7 +283,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         # make the config dictionary
         lutConfig = {}
         lutConfig['elevation'] = self.config.elevation
-        lutConfig['bands'] = self.config.bands
+        lutConfig['filterNames'] = self.config.filterNames
         lutConfig['nCCD'] = nCcd
         lutConfig['pmbRange'] = self.config.pmbRange
         lutConfig['pmbSteps'] = self.config.pmbSteps
@@ -326,14 +326,14 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         tput = DetectorThroughput()
 
         throughputDict = {}
-        for i,band in enumerate(self.config.bands):
+        for i,filterName in enumerate(self.config.filterNames):
             tDict = {}
             tDict['LAMBDA'] = throughputLambda
             for ccdIndex,detector in enumerate(camera):
                 # make sure we convert the calling units from A to nm
-                tDict[ccdIndex] = tput.getThroughputDetector(detector, band,
+                tDict[ccdIndex] = tput.getThroughputDetector(detector, filterNames,
                                                              throughputLambda/10.)
-            throughputDict[band] = tDict
+            throughputDict[filterName] = tDict
 
         # set the throughputs
         print("Setting throughputs...")
@@ -353,9 +353,10 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
 
         # build the index values
         comma=','
-        bandString = comma.join(self.config.bands)
+        filterNameString = comma.join(self.config.filterNames)
 
-        lutSchema.addField('bands', type=str, doc='Bands in LUT', size=len(bandString))
+        lutSchema.addField('filternames', type=str, doc='filterNames in LUT',
+                           size=len(filterNameString))
         lutSchema.addField('pmb', type='ArrayD', doc='Barometric Pressure',
                            size=self.fgcmLutMaker.pmb.size)
         lutSchema.addField('pmbfactor', type='ArrayD', doc='PMB scaling factor',
@@ -385,15 +386,15 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                            size=2)
         lutSchema.addField('lambdastep', type=np.float64, doc='Wavelength step')
         lutSchema.addField('lambdastd', type='ArrayD', doc='Standard Wavelength',
-                           size=self.fgcmLutMaker.bands.size)
+                           size=self.fgcmLutMaker.filterNames.size)
         lutSchema.addField('i0std', type='ArrayD', doc='I0 Standard',
-                           size=self.fgcmLutMaker.bands.size)
+                           size=self.fgcmLutMaker.filterNames.size)
         lutSchema.addField('i1std', type='ArrayD', doc='I1 Standard',
-                           size=self.fgcmLutMaker.bands.size)
+                           size=self.fgcmLutMaker.filterNames.size)
         lutSchema.addField('i10std', type='ArrayD', doc='I10 Standard',
-                           size=self.fgcmLutMaker.bands.size)
+                           size=self.fgcmLutMaker.filterNames.size)
         lutSchema.addField('lambdab', type='ArrayD', doc='Wavelength for passband (no atm)',
-                           size=self.fgcmLutMaker.bands.size)
+                           size=self.fgcmLutMaker.filterNames.size)
         lutSchema.addField('atmlambda', type='ArrayD', doc='Atmosphere wavelengths',
                            size=self.fgcmLutMaker.atmLambda.size)
         lutSchema.addField('atmstdtrans', type='ArrayD', doc='Standard Atmosphere Throughput',
@@ -410,7 +411,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         # first fill the first index
         rec=lutCat.addNew()
 
-        rec['bands'] = bandString
+        rec['filterNames'] = filterNameString
         rec['pmb'][:] = self.fgcmLutMaker.pmb
         rec['pmbfactor'][:] = self.fgcmLutMaker.pmbFactor
         rec['pmbelevation'] = self.fgcmLutMaker.pmbElevation
