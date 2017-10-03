@@ -29,14 +29,14 @@ class DetectorThroughput(object):
         self._setMirrorData()
         self._pixelScale = 15e-3
 
-    def getThroughputDetector(self, detector, band, lam):
+    def getThroughputDetector(self, detector, filterName, lam):
         """
         Get the throughput at the central pixel of a camera detector
 
         Parameters
         ----------
         detector: lsst.afw.cameraGeom.Detector
-        band: filter name (short name)
+        filterName: filter name (short name)
         lam: np.array() with wavelengths (units of nanometers)
 
         Returns
@@ -46,17 +46,17 @@ class DetectorThroughput(object):
 
         c=detector.getCenter(afwCameraGeom.FOCAL_PLANE)
 
-        return self.getThroughputXY(band,
+        return self.getThroughputXY(filterName,
                                     c.getPoint().getX(), c.getPoint().getY(),
                                     lam)
 
-    def getThroughputXY(self, band, x, y, lam):
+    def getThroughputXY(self, filterName, x, y, lam):
         """
         Get the throughput at an arbitrary x/y on the focal plane
 
         Parameters
         ----------
-        band: filter name (short name)
+        filterName: filter name (short name)
         x: x position (pixels) in focal plane coordinates
         y: y position (pixels) in focal plane coordinates
         lam: np.array() with wavelengths (units of nanometers)
@@ -67,7 +67,7 @@ class DetectorThroughput(object):
         """
 
         # convert radius to pixels
-        filterRad = self.filterData[band]['radius'] / self._pixelScale
+        filterRad = self.filterData[filterName]['radius'] / self._pixelScale
 
         # keep within range.  Not sure what to do about extrapolation
         #radius = np.sqrt(x**2. + y**2.)
@@ -85,12 +85,12 @@ class DetectorThroughput(object):
                 continue
 
             interpolator = self.makeEvenSplineInterpolator(filterRad,
-                                                           self.filterData[band][key])
+                                                           self.filterData[filterName][key])
             xvec[i] = interpolator(radius)
 
         # and the Tavg value
         interpolator = self.makeEvenSplineInterpolator(filterRad,
-                                                       self.filterData[band]['Tavg'])
+                                                       self.filterData[filterName]['Tavg'])
         yvec[4] = interpolator(radius)
         yvec[5] = interpolator(radius)
 
@@ -315,6 +315,20 @@ class DetectorThroughput(object):
                    Tmin=np.array([92.99, 92.59, 92.41, 91.99, 91.93, 92.10, 91.07]),
                    Tmax=np.array([95.33, 94.91, 95.00, 94.56, 94.36, 94.57, 93.66]),
                    Tavg=np.array([94.25, 94.02, 93.93, 93.68, 93.62, 93.68, 92.69])),
+            ## FIXME: this is a placeholder until I have i2, and is just the middle of the i and flat
+            i2=dict(radius=np.array([0.00, 50.00, 100.00, 150.00, 200.00, 250.00, 270.00]), # mm
+                    EW=np.array([144.59, 144.59, 144.59, 144.59, 144.59, 144.59, 144.59]),
+                    lambda_bar=np.array([770.18, 770.18, 770.18, 770.18, 770.18, 770.18, 770.18]),
+                    peak=np.array([94.81, 94.81, 94.81, 94.81, 94.81, 94.81, 94.81]),
+                    on50=np.array([693.52, 693.52, 693.52, 693.52, 693.52, 693.52, 693.52]),
+                    off50=np.array([845.46, 845.46, 845.46, 845.46, 845.46, 845.46, 845.46]),
+                    on10=np.array([685.46, 685.46, 685.46, 685.46, 685.46, 685.46, 685.46]),
+                    off10=np.array([857.77, 857.77, 857.77, 857.77, 857.77, 857.77, 857.77]),
+                    on80=np.array([697.96, 697.96, 697.96, 697.96, 697.96, 697.96, 697.96]),
+                    off80=np.array([840.85, 840.85, 840.85, 840.85, 840.85, 840.85, 840.85]),
+                    Tmin=np.array([91.99, 91.99, 91.99, 91.99, 91.99, 91.99, 91.99]),
+                    Tmax=np.array([94.56, 94.56, 94.56, 94.56, 94.56, 94.56, 94.56]),
+                    Tavg=np.array([93.68, 93.68, 93.68, 93.68, 93.68, 93.68, 93.68])),
             z=dict(radius=np.array([0.00, 50.00, 100.00, 150.00, 200.00, 250.00, 270.00]), # mm
                    EW=np.array([80.01, 80.12, 80.14, 79.37, 78.82, 80.41, 80.26]),
                    lambda_bar=np.array([892.63, 892.33, 892.18, 891.72, 891.99, 891.25, 891.45]),
