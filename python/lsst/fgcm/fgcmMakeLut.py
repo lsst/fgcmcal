@@ -415,7 +415,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         # first fill the first index
         rec = lutCat.addNew()
 
-        rec['filterNames'] = filterNameString
+        rec['filternames'] = filterNameString
         rec['pmb'][:] = self.fgcmLutMaker.pmb
         rec['pmbfactor'][:] = self.fgcmLutMaker.pmbFactor
         rec['pmbelevation'] = self.fgcmLutMaker.pmbElevation
