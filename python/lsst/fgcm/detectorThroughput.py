@@ -7,6 +7,8 @@ import scipy.interpolate
 
 import lsst.afw.cameraGeom as afwCameraGeom
 
+from hscFilterDict import filterData
+
 
 class DetectorThroughput(object):
     """
@@ -65,6 +67,46 @@ class DetectorThroughput(object):
         -------
         throughput: np.array() with throughput at each lam
         """
+
+        # Convert the filterData radius in pixels
+        filterRadPix = filterData[filterName]['radius'] / self._pixelScale
+
+        # Compute the radius, clipping to bounds
+        #  Make sure that we keep within the boundaries by some small epsilon
+        radius = np.clip(np.sqrt(x**2. + y**2.), filterRadPix[0] + 1e-7,
+                         filterRadPix[-1] - 1e-7)
+
+        # Which input wavelengths are non-zero
+        inRange, = np.where((lam > filterData[filterName]['lam'][0]) &
+                            (lam < filterData[filterName]['lam'][-1]))
+
+        # set up 2d interpolation (bilinear)
+        interpolator = scipy.interpolate.interp2d(filterRadPix,
+                                                  filterData[filterName]['lam'],
+                                                  filterData[filterName]['T'],
+                                                  kind='linear', fill_value=0.0)
+
+
+        # run interpolator
+        # note that we need to flatten the nx1 array
+        throughput = interpolator(radius, lam).flatten()
+
+        # now multiply by average CCD QE (unless we had ccd-by-ccd QE)
+        interpolator = scipy.interpolate.interp1d(self.qeLambda, self.qeQe)
+        # values outside the range are set to zero
+        qe = interpolator(lam, fill_value=0.0)
+
+        throughput *= qe
+
+        # now multiply by mirror reflectivity
+        interpolator = scipy.interpolate.interp1d(self.mirrorLambda,
+                                                  self.mirrorReflectivity)
+        throughput *= interpolator(lam, fill_value=0.0)
+
+        return throughput
+
+    def getThroughputXYOld(self, filterName, x, y, lam):
+        # leave this here temporarily
 
         # convert radius to pixels
         filterRad = self.filterData[filterName]['radius'] / self._pixelScale
