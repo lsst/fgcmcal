@@ -472,7 +472,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 # Compute magnitude by scaling flux with exposure time,
                 # and arbitrary zeropoint that needs to be investigated.
                 tempCat[magKey][:] = (25.0 - 2.5*np.log10(sources[fluxKey][gdFlag]) +
-                                      2.5*np.log10(exptime))
+                                      2.5*np.log10(expTime))
                 tempCat[magErrKey][:] = magErr[gdFlag]
 
                 fullCatalog.extend(tempCat)
