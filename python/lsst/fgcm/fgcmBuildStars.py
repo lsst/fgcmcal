@@ -443,8 +443,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                     started = True
 
-                magErr = (2.5/np.log(10.)) * (sources[fluxKey] /
-                                              sources[fluxErrKey])
+                magErr = (2.5/np.log(10.)) * (sources[fluxErrKey] /
+                                              sources[fluxKey])
                 magErr = np.nan_to_num(magErr)
 
                 # This selection method is fastest and works
