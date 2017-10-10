@@ -397,6 +397,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         for visit in visitCat:
             self.log.info("Reading sources from visit %d" % (visit['visit']))
 
+            expTime = visit['exptime']
+
             nStarInVisit = 0
 
             # loop over CCDs
@@ -467,7 +469,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat.extend(sources[gdFlag], mapper=sourceMapper)
                 tempCat[visitKey][:] = visit['visit']
                 tempCat[ccdKey][:] = ccdId
-                tempCat[magKey][:] = 25.0 - 2.5*np.log10(sources[fluxKey][gdFlag])
+                # Compute magnitude by scaling flux with exposure time,
+                # and arbitrary zeropoint that needs to be investigated.
+                tempCat[magKey][:] = (25.0 - 2.5*np.log10(sources[fluxKey][gdFlag]) +
+                                      2.5*np.log10(exptime))
                 tempCat[magErrKey][:] = magErr[gdFlag]
 
                 fullCatalog.extend(tempCat)
