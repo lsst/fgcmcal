@@ -7,7 +7,7 @@ import scipy.interpolate
 
 import lsst.afw.cameraGeom as afwCameraGeom
 
-from hscFilterDict import filterData
+from .hscFilterDict import filterData
 
 
 class DetectorThroughput(object):
