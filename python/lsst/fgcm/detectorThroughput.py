@@ -77,14 +77,15 @@ class DetectorThroughput(object):
                          filterRadPix[-1] - 1e-7)
 
         # Which input wavelengths are non-zero
-        inRange, = np.where((lam > filterData[filterName]['lam'][0]) &
-                            (lam < filterData[filterName]['lam'][-1]))
+        # inRange, = np.where((lam > filterData[filterName]['lam'][0]) &
+        #                    (lam < filterData[filterName]['lam'][-1]))
 
         # set up 2d interpolation (bilinear)
         interpolator = scipy.interpolate.interp2d(filterRadPix,
                                                   filterData[filterName]['lam'],
                                                   filterData[filterName]['T'],
-                                                  kind='linear', fill_value=0.0)
+                                                  kind='linear', fill_value=0.0,
+                                                  bounds_error=False)
 
 
         # run interpolator
@@ -93,13 +94,14 @@ class DetectorThroughput(object):
 
         # now multiply by average CCD QE (unless we had ccd-by-ccd QE)
         # values outside the range are set to 0
-        interpolator = scipy.interpolate.interp1d(self.qeLambda, self.qeQe, fill_value=0.0)
+        interpolator = scipy.interpolate.interp1d(self.qeLambda, self.qeQe,
+                                                  fill_value=0.0, bounds_error=False)
         throughput *= interpolator(lam)
 
         # now multiply by mirror reflectivity
         interpolator = scipy.interpolate.interp1d(self.mirrorLambda,
                                                   self.mirrorReflectivity,
-                                                  fill_value=0.0)
+                                                  fill_value=0.0, bounds_error=False)
         throughput *= interpolator(lam)
 
         return throughput
