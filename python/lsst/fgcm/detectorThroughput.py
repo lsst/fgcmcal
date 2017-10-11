@@ -92,16 +92,15 @@ class DetectorThroughput(object):
         throughput = interpolator(radius, lam).flatten()
 
         # now multiply by average CCD QE (unless we had ccd-by-ccd QE)
-        interpolator = scipy.interpolate.interp1d(self.qeLambda, self.qeQe)
-        # values outside the range are set to zero
-        qe = interpolator(lam, fill_value=0.0)
-
-        throughput *= qe
+        # values outside the range are set to 0
+        interpolator = scipy.interpolate.interp1d(self.qeLambda, self.qeQe, fill_value=0.0)
+        throughput *= interpolator(lam)
 
         # now multiply by mirror reflectivity
         interpolator = scipy.interpolate.interp1d(self.mirrorLambda,
-                                                  self.mirrorReflectivity)
-        throughput *= interpolator(lam, fill_value=0.0)
+                                                  self.mirrorReflectivity,
+                                                  fill_value=0.0)
+        throughput *= interpolator(lam)
 
         return throughput
 
