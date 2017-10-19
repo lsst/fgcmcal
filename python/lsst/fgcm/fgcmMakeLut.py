@@ -31,7 +31,12 @@ class FgcmMakeLutConfig(pexConfig.Config):
     filterNames = pexConfig.ListField(
         doc="Filter names to build LUT",
         dtype=str,
-        default=("NO_DATA",),
+        default=(),
+    )
+    stdFilterNames = pexConfig.ListField(
+        doc="Standard filternames to match to filterNames",
+        dtype=str,
+        default=(),
     )
     elevation = pexConfig.Field(
         doc="Telescope elevation (m)",
@@ -288,6 +293,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         lutConfig['logger'] = self.log
         lutConfig['elevation'] = self.config.elevation
         lutConfig['filterNames'] = self.config.filterNames
+        lutConfig['stdFilterNames'] = self.config.stdFilterNames
         lutConfig['nCCD'] = nCcd
         lutConfig['pmbRange'] = self.config.pmbRange
         lutConfig['pmbSteps'] = self.config.pmbSteps
@@ -358,9 +364,12 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         # build the index values
         comma = ','
         filterNameString = comma.join(self.config.filterNames)
+        stdFilterNameString = comma.join(self.config.stdFilterNames)
 
         lutSchema.addField('filternames', type=str, doc='filterNames in LUT',
                            size=len(filterNameString))
+        lutSchema.addField('stdfilternames', type=str, doc='Standard filterNames in LUT',
+                           size=len(stdFilterNameString))
         lutSchema.addField('pmb', type='ArrayD', doc='Barometric Pressure',
                            size=self.fgcmLutMaker.pmb.size)
         lutSchema.addField('pmbfactor', type='ArrayD', doc='PMB scaling factor',
@@ -391,6 +400,8 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         lutSchema.addField('lambdastep', type=np.float64, doc='Wavelength step')
         lutSchema.addField('lambdastd', type='ArrayD', doc='Standard Wavelength',
                            size=self.fgcmLutMaker.filterNames.size)
+        lutSchema.addField('lambdastdfilter', type='ArrayD', doc='Standard Wavelength (raw)',
+                           size=self.fgcmLutMaker.filterNames.size)
         lutSchema.addField('i0std', type='ArrayD', doc='I0 Standard',
                            size=self.fgcmLutMaker.filterNames.size)
         lutSchema.addField('i1std', type='ArrayD', doc='I1 Standard',
@@ -416,6 +427,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         rec = lutCat.addNew()
 
         rec['filternames'] = filterNameString
+        rec['stdfilternames'] = stdFilterNameString
         rec['pmb'][:] = self.fgcmLutMaker.pmb
         rec['pmbfactor'][:] = self.fgcmLutMaker.pmbFactor
         rec['pmbelevation'] = self.fgcmLutMaker.pmbElevation
@@ -436,6 +448,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         rec['lambdarange'][:] = self.fgcmLutMaker.lambdaRange
         rec['lambdastep'] = self.fgcmLutMaker.lambdaStep
         rec['lambdastd'][:] = self.fgcmLutMaker.lambdaStd
+        rec['lambdastdfilter'][:] = self.fgcmLutMaker.lambdaStdFilter
         rec['i0std'][:] = self.fgcmLutMaker.I0Std
         rec['i1std'][:] = self.fgcmLutMaker.I1Std
         rec['i10std'][:] = self.fgcmLutMaker.I10Std
