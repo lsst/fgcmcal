@@ -43,12 +43,12 @@ class FgcmFitCycleConfig(pexConfig.Config):
         itemtype=str,
         default={},
     )
-    bandToStdFilter = pexConfig.DictField(
-        doc="Band to *standard* filter mapping",
-        keytype=str,
-        itemtype=str,
-        default={},
-    )
+    #bandToStdFilter = pexConfig.DictField(
+    #    doc="Band to *standard* filter mapping",
+    #    keytype=str,
+    #    itemtype=str,
+    #    default={},
+    #)
     nCore = pexConfig.Field(
         doc="Number of cores to use",
         dtype=int,
@@ -456,7 +456,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'fitBands': bands[fitFlag],
                       'extraBands': bands[~fitFlag],
                       'filterToBand': self.config.filterToBand,
-                      'bandToStdFilter': self.config.bandToStdFilter,
                       'logLevel': 'INFO',  # FIXME
                       'nCore': self.config.nCore,
                       'nStarPerRun': self.config.nStarPerRun,
@@ -505,10 +504,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         # first we need the lutIndexVals
         lutFilterNames = np.array(lutCat[0]['filternames'].split(','))
+        lutStdFilterNames = np.array(lutCat[0]['stdfilternames'].split(','))
 
         # FIXME: check that lutBands equal listed bands!
 
-        lutIndexVals = np.zeros(1, dtype=[('FILTERNAMES', 'a2', lutFilterNames.size),
+        lutIndexVals = np.zeros(1, dtype=[('FILTERNAMES', lutFilterNames.dtype.str, lutFilterNames.size),
+                                          ('STDFILTERNAMES', lutStdFilterNames.dtype.str, lutStdFilterNames.size),
                                           ('PMB', 'f8', lutCat[0]['pmb'].size),
                                           ('PMBFACTOR', 'f8', lutCat[0]['pmbfactor'].size),
                                           ('PMBELEVATION', 'f8'),
@@ -519,7 +520,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                           ('ALPHA', 'f8', lutCat[0]['alpha'].size),
                                           ('ZENITH', 'f8', lutCat[0]['zenith'].size),
                                           ('NCCD', 'i4')])
+
         lutIndexVals['FILTERNAMES'][:] = lutFilterNames
+        lutIndexVals['STDFILTERNAMES'][:] = lutStdFilterNames
         lutIndexVals['PMB'][:] = lutCat[0]['pmb']
         lutIndexVals['PMBFACTOR'][:] = lutCat[0]['pmbfactor']
         lutIndexVals['PMBELEVATION'] = lutCat[0]['pmbelevation']
@@ -541,6 +544,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                     ('LAMBDARANGE', 'f8', 2),
                                     ('LAMBDASTEP', 'f8'),
                                     ('LAMBDASTD', 'f8', lutFilterNames.size),
+                                    ('LAMBDASTDFILTER', 'f8', lutStdFilterNames.size),
                                     ('I0STD', 'f8', lutFilterNames.size),
                                     ('I1STD', 'f8', lutFilterNames.size),
                                     ('I10STD', 'f8', lutFilterNames.size),
@@ -556,6 +560,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         lutStd['LAMBDARANGE'][:] = lutCat[0]['lambdarange'][:]
         lutStd['LAMBDASTEP'] = lutCat[0]['lambdastep']
         lutStd['LAMBDASTD'][:] = lutCat[0]['lambdastd']
+        lutStd['LAMBDASTDFILTER'][:] = lutCat[0]['lambdastdfilter']
         lutStd['I0STD'][:] = lutCat[0]['i0std']
         lutStd['I1STD'][:] = lutCat[0]['i1std']
         lutStd['I10STD'][:] = lutCat[0]['i10std']
@@ -695,9 +700,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             # FIXME: check that these are the same as in the config, to be sure
 
             inParInfo = np.zeros(1, dtype=[('NCCD', 'i4'),
-                                           ('LUTFILTERNAMES', 'a2', parLutFilterNames.size),
-                                           ('FITBANDS', 'a2', parFitBands.size),
-                                           ('EXTRABANDS', 'a2', parExtraBands.size),
+                                           ('LUTFILTERNAMES', parLutFilterNames.dtype.str,
+                                            parLutFilterNames.size),
+                                           ('FITBANDS', parFitBands.dtype.str, parFitBands.size),
+                                           ('EXTRABANDS', parExtraBands.dtype.str, parExtraBands.size),
                                            ('TAUUNIT', 'f8'),
                                            ('TAUPERSLOPEUNIT', 'f8'),
                                            ('ALPHAUNIT', 'f8'),
