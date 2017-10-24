@@ -87,7 +87,6 @@ class DetectorThroughput(object):
                                                   kind='linear', fill_value=0.0,
                                                   bounds_error=False)
 
-
         # run interpolator
         # note that we need to flatten the nx1 array
         throughput = interpolator(radius, lam).flatten()
