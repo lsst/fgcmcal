@@ -1079,12 +1079,17 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
 
         # Output the config for the next cycle
-        self.config.cycleNumber += 1
-        self.config.precomputeSuperStarInitialCycle = False
-        self.config.freezeStdAtmosphere = False
-        configFileName = '%s_cycle%02d_config.py' % (self.config.outfileBase,
-                                                     self.config.cycleNumber)
-        self.config.save(configFileName)
+        # We need to make a copy since the input one has been frozen
+
+        outConfig = FgcmFitCycleConfig()
+        outConfig.update(**self.config.toDict())
+
+        outConfig.cycleNumber += 1
+        outConfig.precomputeSuperStarInitialCycle = False
+        outConfig.freezeStdAtmosphere = False
+        configFileName = '%s_cycle%02d_config.py' % (outConfig.outfileBase,
+                                                     outConfig.cycleNumber)
+        outConfig.save(configFileName)
 
         self.log.info("Saved config for next cycle to %s" % (configFileName))
         self.log.info("Be sure to look at:")
