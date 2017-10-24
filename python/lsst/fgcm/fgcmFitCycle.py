@@ -87,7 +87,7 @@ class FgcmFitCycleConfig(pexConfig.Config):
     maxIter = pexConfig.Field(
         doc="Max iterations",
         dtype=int,
-        default=100,
+        default=50,
     )
     utBoundary = pexConfig.Field(
         doc="Boundary (in UTC) from day-to-day",
@@ -1077,5 +1077,18 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         atmCat['seczenith'][:] = fgcmFitCycle.fgcmZpts.atmStruct['SECZENITH']
 
         butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
+
+        # Output the config for the next cycle
+        self.config.cycleNumber += 1
+        self.config.precomputeSuperStarInitialCycle = False
+        self.config.freezeStdAtmosphere = False
+        configFileName = '%s_cycle%02d_config.py' % (self.config.outfileBase,
+                                                     self.config.cycleNumber)
+        self.config.save(configFileName)
+
+        self.log.info("Saved config for next cycle to %s" % (configFileName))
+        self.log.info("Be sure to look at:")
+        self.log.info("   config.freezeStdAtmosphere")
+        self.log.info("   config.expGrayPhotometricCut")
 
         # tear down and clear memory
