@@ -43,12 +43,6 @@ class FgcmFitCycleConfig(pexConfig.Config):
         itemtype=str,
         default={},
     )
-    #bandToStdFilter = pexConfig.DictField(
-    #    doc="Band to *standard* filter mapping",
-    #    keytype=str,
-    #    itemtype=str,
-    #    default={},
-    #)
     nCore = pexConfig.Field(
         doc="Number of cores to use",
         dtype=int,
@@ -508,8 +502,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         # FIXME: check that lutBands equal listed bands!
 
-        lutIndexVals = np.zeros(1, dtype=[('FILTERNAMES', lutFilterNames.dtype.str, lutFilterNames.size),
-                                          ('STDFILTERNAMES', lutStdFilterNames.dtype.str, lutStdFilterNames.size),
+        lutIndexVals = np.zeros(1, dtype=[('FILTERNAMES', lutFilterNames.dtype.str,
+                                           lutFilterNames.size),
+                                          ('STDFILTERNAMES', lutStdFilterNames.dtype.str,
+                                           lutStdFilterNames.size),
                                           ('PMB', 'f8', lutCat[0]['pmb'].size),
                                           ('PMBFACTOR', 'f8', lutCat[0]['pmbfactor'].size),
                                           ('PMBELEVATION', 'f8'),
