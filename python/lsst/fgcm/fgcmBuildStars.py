@@ -284,7 +284,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             allVisits = butler.queryMetadata('src',
                                              format=[self.config.visitDataRefName, 'filter'],
                                              dataId={self.config.ccdDataRefName:
-                                                         self.config.referenceCCD})
+                                                     self.config.referenceCCD})
 
             srcVisits = []
             for dataset in allVisits:
@@ -414,7 +414,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 # get the dataref -- can't be numpy int
                 ref = butler.dataRef('raw', dataId={self.config.visitDataRefName:
-                                                        int(visit['visit']),
+                                                    int(visit['visit']),
                                                     self.config.ccdDataRefName: ccdId})
                 try:
                     sources = ref.get('src',
