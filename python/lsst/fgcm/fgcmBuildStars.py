@@ -7,21 +7,15 @@ import traceback
 
 import numpy as np
 
-# import lsst.utils
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-# import lsst.pex.exceptions as pexExceptions
 import lsst.afw.table as afwTable
 from lsst.daf.base.dateTime import DateTime
-# import lsst.afw.geom as afwGeom
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
-# import lsst.daf.persistence
-
 
 import time
 
 import fgcm
-
 
 __all__ = ['FgcmBuildStarsConfig', 'FgcmBuildStarsTask']
 
@@ -333,12 +327,17 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # calexp = butler.get('calexp_sub', dataId={'visit':srcVisit,
             #                                          'ccd':self.config.referenceCCD},
             #                    bbox=bbox)
-            raw = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
-                                            self.config.ccdDatRefName:
-                                                self.config.referenceCCD})
+            #raw = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
+            #                                self.config.ccdDatRefName:
+            #                                    self.config.referenceCCD})
 
             # visitInfo = calexp.getInfo().getVisitInfo()
-            visitInfo = raw.getInfo().getVisitInfo()
+            #visitInfo = raw.getInfo().getVisitInfo()
+
+            visitInfo = butler.get('raw_visitInfo', dataId={self.config.visitDataRefName:
+                                                                srcVisit,
+                                                            self.config.ccdDatRefName:
+                                                                self.config.referenceCCD})
 
             rec = visitCat.addNew()
             rec['visit'] = srcVisit
@@ -350,6 +349,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             rec['mjd'] = visitInfo.getDate().get(system=DateTime.MJD)
             rec['exptime'] = visitInfo.getExposureTime()
             # convert from Pa to millibar
+            # Note that I don't know if this unit will need to be per-camera config
             rec['pmb'] = visitInfo.getWeather().getAirPressure() / 100
             rec['fwhm'] = 0.0
             rec['deepflag'] = 0
