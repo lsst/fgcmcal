@@ -7,21 +7,15 @@ import traceback
 
 import numpy as np
 
-# import lsst.utils
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-# import lsst.pex.exceptions as pexExceptions
 import lsst.afw.table as afwTable
 from lsst.daf.base.dateTime import DateTime
-# import lsst.afw.geom as afwGeom
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
-# import lsst.daf.persistence
-
 
 import time
 
 import fgcm
-
 
 __all__ = ['FgcmBuildStarsConfig', 'FgcmBuildStarsTask']
 
@@ -84,6 +78,16 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         doc="Reference CCD for scanning visits",
         dtype=int,
         default=13,
+    )
+    visitDataRefName = pexConfig.Field(
+        doc="dataRef name for the 'visit' field",
+        dtype=str,
+        default="visit"
+    )
+    ccdDataRefName = pexConfig.Field(
+        doc="dataRef name for the 'ccd' field",
+        dtype=str,
+        default="ccd"
     )
 
     def setDefaults(self):
@@ -278,18 +282,20 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         if len(dataRefs) == 0:
             # We did not specify any datarefs, so find all of them
             allVisits = butler.queryMetadata('src',
-                                             format=['visit', 'filter'],
-                                             dataId={'CCD': self.config.referenceCCD})
+                                             format=[self.config.visitDataRefName, 'filter'],
+                                             dataId={self.config.ccdDataRefName:
+                                                     self.config.referenceCCD})
 
             srcVisits = []
             for dataset in allVisits:
-                if (butler.datasetExists('src', dataId={'visit': dataset[0],
-                                                        'ccd': self.config.referenceCCD})):
+                if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
+                                                        self.config.ccdDataRefName:
+                                                            self.config.referenceCCD})):
                     srcVisits.append(dataset[0])
         else:
             # get the visits from the datarefs, only for referenceCCD
-            srcVisits = [d.dataId['visit'] for d in dataRefs if
-                         d.dataId['ccd'] == self.config.referenceCCD]
+            srcVisits = [d.dataId[self.config.visitDataRefName] for d in dataRefs if
+                         d.dataId[self.config.ccdDataRefName] == self.config.referenceCCD]
 
         self.log.info("Found %d visits in %.2f s" %
                       (len(srcVisits), time.time()-startTime))
@@ -318,13 +324,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # Note that I found the raw access to be more reliable and faster
             #   than calexp_sub to get visitInfo().  This may not be the same
             #   for all repos and processing.
-            # calexp = butler.get('calexp_sub', dataId={'visit':srcVisit,
-            #                                          'ccd':self.config.referenceCCD},
-            #                    bbox=bbox)
-            raw = butler.get('raw', dataId={'visit': srcVisit,
-                                            'ccd': self.config.referenceCCD})
+            # At least at the moment, getting raw is faster than any other option
+            #  because it is uncompressed on disk.  This will probably change in
+            #  the future.
+            raw = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
+                                            self.config.ccdDataRefName:
+                                                self.config.referenceCCD})
 
-            # visitInfo = calexp.getInfo().getVisitInfo()
             visitInfo = raw.getInfo().getVisitInfo()
 
             rec = visitCat.addNew()
@@ -337,6 +343,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             rec['mjd'] = visitInfo.getDate().get(system=DateTime.MJD)
             rec['exptime'] = visitInfo.getExposureTime()
             # convert from Pa to millibar
+            # Note that I don't know if this unit will need to be per-camera config
             rec['pmb'] = visitInfo.getWeather().getAirPressure() / 100
             rec['fwhm'] = 0.0
             rec['deepflag'] = 0
@@ -406,8 +413,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 ccdId = detector.getId()
 
                 # get the dataref -- can't be numpy int
-                ref = butler.dataRef('raw', dataId={'visit': int(visit['visit']),
-                                                    'ccd': ccdId})
+                ref = butler.dataRef('raw', dataId={self.config.visitDataRefName:
+                                                    int(visit['visit']),
+                                                    self.config.ccdDataRefName: ccdId})
                 try:
                     sources = ref.get('src',
                                       flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
