@@ -421,7 +421,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 # get the dataref -- can't be numpy int
                 ref = butler.dataRef('raw', dataId={self.config.visitDataRefName:
                                                         int(visit['visit']),
-                                                    self.config.ccdDatRefName: ccdId})
+                                                    self.config.ccdDataRefName: ccdId})
                 try:
                     sources = ref.get('src',
                                       flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
