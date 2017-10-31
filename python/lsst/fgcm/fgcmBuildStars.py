@@ -336,7 +336,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
             visitInfo = butler.get('raw_visitInfo', dataId={self.config.visitDataRefName:
                                                                 srcVisit,
-                                                            self.config.ccdDatRefName:
+                                                            self.config.ccdDataRefName:
                                                                 self.config.referenceCCD})
 
             rec = visitCat.addNew()
