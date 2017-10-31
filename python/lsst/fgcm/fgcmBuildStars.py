@@ -328,7 +328,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             #  because it is uncompressed on disk.  This will probably change in
             #  the future.
             raw = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
-                                            self.config.ccdDatRefName:
+                                            self.config.ccdDataRefName:
                                                 self.config.referenceCCD})
 
             visitInfo = raw.getInfo().getVisitInfo()
