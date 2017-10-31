@@ -85,6 +85,16 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=int,
         default=13,
     )
+    visitDataRefName = pexConfig.Field(
+        doc="dataRef name for the 'visit' field",
+        dtype=str,
+        default="visit"
+    )
+    ccdDataRefName = pexConfig.Field(
+        doc="dataRef name for the 'ccd' field",
+        dtype=str,
+        default="ccd"
+    )
 
     def setDefaults(self):
         pass
@@ -278,18 +288,20 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         if len(dataRefs) == 0:
             # We did not specify any datarefs, so find all of them
             allVisits = butler.queryMetadata('src',
-                                             format=['visit', 'filter'],
-                                             dataId={'CCD': self.config.referenceCCD})
+                                             format=[self.config.visitDataRefName, 'filter'],
+                                             dataId={self.config.ccdDataRefName:
+                                                         self.config.referenceCCD})
 
             srcVisits = []
             for dataset in allVisits:
-                if (butler.datasetExists('src', dataId={'visit': dataset[0],
-                                                        'ccd': self.config.referenceCCD})):
+                if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
+                                                        self.config.ccdDataRefName:
+                                                            self.config.referenceCCD})):
                     srcVisits.append(dataset[0])
         else:
             # get the visits from the datarefs, only for referenceCCD
-            srcVisits = [d.dataId['visit'] for d in dataRefs if
-                         d.dataId['ccd'] == self.config.referenceCCD]
+            srcVisits = [d.dataId[self.config.visitDataRefName] for d in dataRefs if
+                         d.dataId[self.config.ccdDataRefName] == self.config.referenceCCD]
 
         self.log.info("Found %d visits in %.2f s" %
                       (len(srcVisits), time.time()-startTime))
@@ -321,8 +333,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # calexp = butler.get('calexp_sub', dataId={'visit':srcVisit,
             #                                          'ccd':self.config.referenceCCD},
             #                    bbox=bbox)
-            raw = butler.get('raw', dataId={'visit': srcVisit,
-                                            'ccd': self.config.referenceCCD})
+            raw = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
+                                            self.config.ccdDatRefName:
+                                                self.config.referenceCCD})
 
             # visitInfo = calexp.getInfo().getVisitInfo()
             visitInfo = raw.getInfo().getVisitInfo()
@@ -406,8 +419,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 ccdId = detector.getId()
 
                 # get the dataref -- can't be numpy int
-                ref = butler.dataRef('raw', dataId={'visit': int(visit['visit']),
-                                                    'ccd': ccdId})
+                ref = butler.dataRef('raw', dataId={self.config.visitDataRefName:
+                                                        int(visit['visit']),
+                                                    self.config.ccdDatRefName: ccdId})
                 try:
                     sources = ref.get('src',
                                       flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
