@@ -324,20 +324,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # Note that I found the raw access to be more reliable and faster
             #   than calexp_sub to get visitInfo().  This may not be the same
             #   for all repos and processing.
-            # calexp = butler.get('calexp_sub', dataId={'visit':srcVisit,
-            #                                          'ccd':self.config.referenceCCD},
-            #                    bbox=bbox)
-            #raw = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
-            #                                self.config.ccdDatRefName:
-            #                                    self.config.referenceCCD})
+            # At least at the moment, getting raw is faster than any other option
+            #  because it is uncompressed on disk.  This will probably change in
+            #  the future.
+            raw = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
+                                            self.config.ccdDatRefName:
+                                                self.config.referenceCCD})
 
-            # visitInfo = calexp.getInfo().getVisitInfo()
-            #visitInfo = raw.getInfo().getVisitInfo()
-
-            visitInfo = butler.get('raw_visitInfo', dataId={self.config.visitDataRefName:
-                                                                srcVisit,
-                                                            self.config.ccdDataRefName:
-                                                                self.config.referenceCCD})
+            visitInfo = raw.getInfo().getVisitInfo()
 
             rec = visitCat.addNew()
             rec['visit'] = srcVisit
