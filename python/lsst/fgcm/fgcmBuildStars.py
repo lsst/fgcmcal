@@ -89,6 +89,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=str,
         default="ccd"
     )
+    applyJacobian = pexConfig.Field(
+        doc="Apply Jacobian correction?",
+        dtype=bool,
+        default=True
+    )
 
     def setDefaults(self):
         pass
@@ -382,6 +387,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         sourceMapper.addMapping(sourceSchema.find('coord_ra').key, 'ra')
         sourceMapper.addMapping(sourceSchema.find('coord_dec').key, 'dec')
 
+        # map to x/y
+        sourceMapper.addMapping(sourceSchema.find('slot_Centroid_x').key, 'x')
+        sourceMapper.addMapping(sourceSchema.find('slot_Centroid_y').key, 'y')
+
         # and add the fields we want
         sourceMapper.editOutputSchema().addField(
             "visit", type=np.int32, doc="Visit number")
@@ -442,6 +451,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     deblendNchildKey = sources.schema.find('deblend_nchild').key
                     parentKey = sources.schema.find('parent').key
                     extKey = sources.schema.find('classification_extendedness').key
+                    jacobianKey = sources.schema.find('jacobian').key
 
                     outputSchema = sourceMapper.getOutputSchema()
                     visitKey = outputSchema.find('visit').key
@@ -479,9 +489,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat[ccdKey][:] = ccdId
                 # Compute magnitude by scaling flux with exposure time,
                 # and arbitrary zeropoint that needs to be investigated.
-                tempCat[magKey][:] = (25.0 - 2.5*np.log10(sources[fluxKey][gdFlag]) +
+                tempCat[magKey][:] = (self.config.zeropointDefault -
+                                      2.5*np.log10(sources[fluxKey][gdFlag]) +
                                       2.5*np.log10(expTime))
                 tempCat[magErrKey][:] = magErr[gdFlag]
+
+                if self.config.applyJacobian:
+                    tempCat[magKey][:] -= 2.5*np.log10(sources[jacobianKey][gdFlag])
 
                 fullCatalog.extend(tempCat)
 
