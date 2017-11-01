@@ -388,8 +388,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         sourceMapper.addMapping(sourceSchema.find('coord_dec').key, 'dec')
 
         # map to x/y
-        sourceMapper.addMapping(sourceSchema.find('slot_Centroid_x').key, 'x')
-        sourceMapper.addMapping(sourceSchema.find('slot_Centroid_y').key, 'y')
+        # sourceMapper.addMapping(sourceSchema.find('slot_Centroid_x').key, 'x')
+        # sourceMapper.addMapping(sourceSchema.find('slot_Centroid_y').key, 'y')
 
         # and add the fields we want
         sourceMapper.editOutputSchema().addField(
@@ -402,7 +402,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             "magerr", type=np.float32, doc="Raw magnitude error")
 
         # create the stub of the full catalog
-        fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
+        # fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
 
         # we need to know the ccds...
         camera = butler.get('camera')
@@ -458,6 +458,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     ccdKey = outputSchema.find('ccd').key
                     magKey = outputSchema.find('mag').key
                     magErrKey = outputSchema.find('magerr').key
+
+                    # and the final part of the sourceMapper
+                    sourceMapper.addMapping(sources.schema.find('slot_Centroid_x').key, 'x')
+                    sourceMapper.addMapping(sources.schema.find('slot_Centroid_y').key, 'y')
+
+                    fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
 
                     started = True
 
