@@ -811,6 +811,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                             starIds['dec'][:],
                             starIds['obsarrindex'][:],
                             starIds['nobs'][:],
+                            obsX=starObs['x'][starIndices['obsindex']],
+                            obsY=starObs['y'][starIndices['obsindex']],
                             flagID=flagId,
                             flagFlag=flagFlag,
                             computeNobs=True)
