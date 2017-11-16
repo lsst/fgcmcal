@@ -7,17 +7,11 @@ import traceback
 
 import numpy as np
 
-# import lsst.utils
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-# import lsst.pex.exceptions as pexExceptions
 import lsst.afw.table as afwTable
 import lsst.afw.geom as afwGeom
 import lsst.afw.cameraGeom as afwCameraGeom
-# from lsst.daf.base.dateTime import DateTime
-# import lsst.daf.persistence.butlerExceptions as butlerExceptions
-
-# import time
 
 import fgcm
 

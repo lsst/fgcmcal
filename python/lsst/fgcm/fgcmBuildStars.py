@@ -89,6 +89,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=str,
         default="ccd"
     )
+    applyJacobian = pexConfig.Field(
+        doc="Apply Jacobian correction?",
+        dtype=bool,
+        default=True
+    )
 
     def setDefaults(self):
         pass
@@ -392,9 +397,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         sourceMapper.editOutputSchema().addField(
             "magerr", type=np.float32, doc="Raw magnitude error")
 
-        # create the stub of the full catalog
-        fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
-
         # we need to know the ccds...
         camera = butler.get('camera')
 
@@ -442,12 +444,20 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     deblendNchildKey = sources.schema.find('deblend_nchild').key
                     parentKey = sources.schema.find('parent').key
                     extKey = sources.schema.find('classification_extendedness').key
+                    jacobianKey = sources.schema.find('jacobian').key
 
                     outputSchema = sourceMapper.getOutputSchema()
                     visitKey = outputSchema.find('visit').key
                     ccdKey = outputSchema.find('ccd').key
                     magKey = outputSchema.find('mag').key
                     magErrKey = outputSchema.find('magerr').key
+
+                    # and the final part of the sourceMapper
+                    sourceMapper.addMapping(sources.schema.find('slot_Centroid_x').key, 'x')
+                    sourceMapper.addMapping(sources.schema.find('slot_Centroid_y').key, 'y')
+
+                    # Create a stub of the full catalog
+                    fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
 
                     started = True
 
@@ -479,9 +489,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat[ccdKey][:] = ccdId
                 # Compute magnitude by scaling flux with exposure time,
                 # and arbitrary zeropoint that needs to be investigated.
-                tempCat[magKey][:] = (25.0 - 2.5*np.log10(sources[fluxKey][gdFlag]) +
+                tempCat[magKey][:] = (self.config.zeropointDefault -
+                                      2.5*np.log10(sources[fluxKey][gdFlag]) +
                                       2.5*np.log10(expTime))
                 tempCat[magErrKey][:] = magErr[gdFlag]
+
+                if self.config.applyJacobian:
+                    tempCat[magKey][:] -= 2.5*np.log10(sources[jacobianKey][gdFlag])
 
                 fullCatalog.extend(tempCat)
 
