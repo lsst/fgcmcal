@@ -916,10 +916,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['PARO3'].size)
         parSchema.addField('parlntauintercept', type='ArrayD',
                            doc='ln(Tau) intercept parameter vector',
-                           size=pars['PARTAUINTERCEPT'].size)
+                           size=pars['PARLNTAUINTERCEPT'].size)
         parSchema.addField('parlntauslope', type='ArrayD',
                            doc='ln(Tau) slope parameter vector',
-                           size=pars['PARTAUPERSLOPE'].size)
+                           size=pars['PARLNTAUSLOPE'].size)
         parSchema.addField('parpwvintercept', type='ArrayD', doc='PWV intercept parameter vector',
                            size=pars['PARPWVINTERCEPT'].size)
         parSchema.addField('parpwvperslope', type='ArrayD', doc='PWV percent slope parameter vector',
@@ -992,12 +992,15 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # parameter section
         rec['paralpha'][:] = pars['PARALPHA'][0, :]
         rec['paro3'][:] = pars['PARO3'][0, :]
-        rec['partauintercept'][:] = pars['PARTAUINTERCEPT'][0, :]
-        rec['partauperslope'][:] = pars['PARTAUPERSLOPE'][0, :]
+        rec['parlntauintercept'][:] = pars['PARLNTAUINTERCEPT'][0, :]
+        rec['parlntauslope'][:] = pars['PARLNTAUSLOPE'][0, :]
         rec['parpwvintercept'][:] = pars['PARPWVINTERCEPT'][0, :]
         rec['parpwvperslope'][:] = pars['PARPWVPERSLOPE'][0, :]
         rec['parqesysintercept'][:] = pars['PARQESYSINTERCEPT'][0, :]
         rec['parqesysslope'][:] = pars['PARQESYSSLOPE'][0, :]
+        rec['parretrievedpwvscale'] = pars['PARRETRIEVEDPWVSCALE']
+        rec['parretrievedpwvoffset'] = pars['PARRETRIEVEDPWVOFFSET']
+        rec['parretrievedpwvnightlyoffset'][:] = pars['PARRETRIEVEDPWVNIGHTLYOFFSET'][:]
         rec['compapercorrpivot'][:] = pars['COMPAPERCORRPIVOT'][0, :]
         rec['compapercorrslope'][:] = pars['COMPAPERCORRSLOPE'][0, :]
         rec['compapercorrslopeerr'][:] = pars['COMPAPERCORRSLOPEERR'][0, :]
@@ -1006,6 +1009,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['compvargray'][:] = pars['COMPVARGRAY'][0, :]
         rec['compngoodstarperexp'][:] = pars['COMPNGOODSTARPEREXP'][0, :]
         rec['compsigfgcm'][:] = pars['COMPSIGFGCM'][0, :]
+        rec['compretrievedpwv'][:] = pars['COMPRETRIEVEDPWV'][0, :]
+        rec['compretrievedpwvraw'][:] = pars['COMPRETRIEVEDPWVRAW'][0, :]
+        rec['compretrievedpwvflag'][:] = pars['COMPRETRIEVEDPWVFLAG'][0, :]
+        rec['compretrievedtaunight'][:] = pars['COMPRETRIEVEDTAUNIGHT'][0, :]
 
         # superstar section
         rec['superstarsize'][:] = fgcmFitCycle.fgcmPars.parSuperStarFlat.shape
