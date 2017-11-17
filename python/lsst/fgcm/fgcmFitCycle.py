@@ -143,7 +143,12 @@ class FgcmFitCycleConfig(pexConfig.Config):
         default=-0.25,
     )
     expGrayPhotometricCut = pexConfig.ListField(
-        doc="Maximum exposure gray for photometric selection",
+        doc="Negative exposure gray cut for photometric selection",
+        dtype=float,
+        default=(0.0,),
+    )
+    expGrayHighCut = pexConfig.ListField(
+        doc="Positive exposure gray cut for photometric selection",
         dtype=float,
         default=(0.0,),
     )
@@ -466,6 +471,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'minExpPerNight': self.config.minExpPerNight,
                       'expGrayInitialCut': self.config.expGrayInitialCut,
                       'expGrayPhotometricCut': np.array(self.config.expGrayPhotometricCut),
+                      'expGrayHighCut': np.array(self.config.expGrayHighCut),
                       'expGrayRecoverCut': self.config.expGrayRecoverCut,
                       'expVarGrayPhotometricCut': self.config.expVarGrayPhotometricCut,
                       'expGrayErrRecoverCut': self.config.expGrayErrRecoverCut,
@@ -484,6 +490,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'mapNSide': self.config.mapNSide,
                       'varNSig': self.config.varNSig,
                       'varMinBand': self.config.varMinBand,
+                      'useRetrievedPWV': False,
+                      'useNightlyRetrievedPWV': False,
+                      'pwvRetrievalSmoothBlock': 25,
+                      'useRetrievedTauInit': False,
+                      'tauRetrievalMinCCDPerNight': 500,
+                      'printOnly': False,
+                      'outputStars': False,
+                      'clobber': True,
                       'useSedLUT': False,
                       'resetParameters': True}
 
