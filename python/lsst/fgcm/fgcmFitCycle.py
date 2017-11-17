@@ -708,8 +708,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                             parLutFilterNames.size),
                                            ('FITBANDS', parFitBands.dtype.str, parFitBands.size),
                                            ('EXTRABANDS', parExtraBands.dtype.str, parExtraBands.size),
-                                           ('TAUUNIT', 'f8'),
-                                           ('TAUPERSLOPEUNIT', 'f8'),
+                                           ('LNTAUUNIT', 'f8'),
+                                           ('LNTAUSLOPEUNIT', 'f8'),
                                            ('ALPHAUNIT', 'f8'),
                                            ('PWVUNIT', 'f8'),
                                            ('PWVPERSLOPEUNIT', 'f8'),
@@ -895,7 +895,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('extrabands', type=str, doc='Bands that were not fit',
                            size=len(extraBandString))
         parSchema.addField('lntauunit', type=np.float64, doc='Step units for ln(AOD)')
-        parSchema.addField('tauslopeunit', type=np.float64,
+        parSchema.addField('lntauslopeunit', type=np.float64,
                            doc='Step units for ln(AOD) slope')
         parSchema.addField('alphaunit', type=np.float64, doc='Step units for alpha')
         parSchema.addField('pwvunit', type=np.float64, doc='Step units for pwv')
@@ -977,11 +977,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['lutfilternames'] = lutFilterNameString
         rec['fitbands'] = fitBandString
         rec['extrabands'] = extraBandString
-        rec['tauunit'] = parInfo['TAUUNIT']
-        rec['tauperslopeunit'] = parInfo['TAUPERSLOPEUNIT']
+        rec['lntauunit'] = parInfo['LNTAUUNIT']
+        rec['lntauslopeunit'] = parInfo['LNTAUSLOPEUNIT']
         rec['alphaunit'] = parInfo['ALPHAUNIT']
         rec['pwvunit'] = parInfo['PWVUNIT']
         rec['pwvperslopeunit'] = parInfo['PWVPERSLOPEUNIT']
+        rec['pwvglobalunit'] = parInfo['PWVGLOBALUNIT']
         rec['o3unit'] = parInfo['O3UNIT']
         rec['qesysunit'] = parInfo['QESYSUNIT']
         rec['qesysslopeunit'] = parInfo['QESYSSLOPEUNIT']
