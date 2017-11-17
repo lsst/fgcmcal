@@ -774,7 +774,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                            parCat['compretrievedpwv'].size),
                                           ('COMPRETRIEVEDPWVRAW', 'f8',
                                            parCat['compretrievedpwvraw'].size),
-                                          ('COMPRETREIVEDPWVFLAG', 'i2',
+                                          ('COMPRETRIEVEDPWVFLAG', 'i2',
                                            parCat['compretrievedpwvflag'].size),
                                           ('COMPRETRIEVEDTAUNIGHT', 'f8',
                                            parCat['compretrievedtaunight'].size)])
@@ -800,7 +800,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             inParams['COMPRETRIEVEDPWV'][:] = parCat['compretrievedpwv'][0, :]
             inParams['COMPRETRIEVEDPWVRAW'][:] = parCat['compretrievedpwvraw'][0, :]
             inParams['COMPRETRIEVEDPWVFLAG'][:] = parCat['compretrievedpwvflag'][0, :]
-            inParams['COMPRETREIVEDTAUNIGHT'][:] = parCat['compretrievedtaunight'][0, :]
+            inParams['COMPRETRIEVEDTAUNIGHT'][:] = parCat['compretrievedtaunight'][0, :]
 
             inSuperStar = np.zeros(parCat['superstarsize'][0, :], dtype='f8')
             inSuperStar[:, :, :] = parCat['superstar'][0, :].reshape(inSuperStar.shape)
