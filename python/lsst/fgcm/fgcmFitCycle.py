@@ -713,20 +713,23 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                            ('ALPHAUNIT', 'f8'),
                                            ('PWVUNIT', 'f8'),
                                            ('PWVPERSLOPEUNIT', 'f8'),
+                                           ('PWVGLOBALUNIT', 'f8'),
                                            ('O3UNIT', 'f8'),
                                            ('QESYSUNIT', 'f8'),
                                            ('QESYSSLOPEUNIT', 'f8'),
+
                                            ('HASEXTERNALPWV', 'i2'),
                                            ('HASEXTERNALTAU', 'i2')])
             inParInfo['NCCD'] = parCat['nccd']
             inParInfo['LUTFILTERNAMES'][:] = parLutFilterNames
             inParInfo['FITBANDS'][:] = parFitBands
             inParInfo['EXTRABANDS'][:] = parExtraBands
-            inParInfo['TAUUNIT'] = parCat['tauunit']
-            inParInfo['TAUPERSLOPEUNIT'] = parCat['tauperslopeunit']
+            inParInfo['LNTAUUNIT'] = parCat['lntauunit']
+            inParInfo['LNTAUSLOPEUNIT'] = parCat['lntauslopeunit']
             inParInfo['ALPHAUNIT'] = parCat['alphaunit']
             inParInfo['PWVUNIT'] = parCat['pwvunit']
             inParInfo['PWVPERSLOPEUNIT'] = parCat['pwvperslopeunit']
+            inParInfo['PWVGLOBALUNIT'] = parCat['pwvglobalunit']
             inParInfo['O3UNIT'] = parCat['o3unit']
             inParInfo['QESYSUNIT'] = parCat['qesysunit']
             inParInfo['QESYSSLOPEUNIT'] = parCat['qesysslopeunit']
@@ -735,10 +738,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
             inParams = np.zeros(1, dtype=[('PARALPHA', 'f8', parCat['paralpha'].size),
                                           ('PARO3', 'f8', parCat['paro3'].size),
-                                          ('PARTAUINTERCEPT', 'f8',
-                                           parCat['partauintercept'].size),
-                                          ('PARTAUPERSLOPE', 'f8',
-                                           parCat['partauperslope'].size),
+                                          ('PARLNTAUINTERCEPT', 'f8',
+                                           parCat['parlntauintercept'].size),
+                                          ('PARLNTAUSLOPE', 'f8',
+                                           parCat['parlntauslope'].size),
                                           ('PARPWVINTERCEPT', 'f8',
                                            parCat['parpwvintercept'].size),
                                           ('PARPWVPERSLOPE', 'f8',
@@ -747,6 +750,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                            parCat['parqesysintercept'].size),
                                           ('PARQESYSSLOPE', 'f8',
                                            parCat['parqesysslope'].size),
+                                          ('PARRETRIEVEDPWVSCALE', 'f8'),
+                                          ('PARRETRIEVEDPWVOFFSET', 'f8'),
+                                          ('PARRETRIEVEDPWVNIGHTLYOFFSET', 'f8',
+                                           parCat['parretrievedpwvnightlyoffset'].size),
                                           ('COMPAPERCORRPIVOT', 'f8',
                                            parCat['compapercorrpivot'].size),
                                           ('COMPAPERCORRSLOPE', 'f8',
@@ -762,15 +769,26 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                           ('COMPNGOODSTARPEREXP', 'i4',
                                            parCat['compngoodstarperexp'].size),
                                           ('COMPSIGFGCM', 'f8',
-                                           parCat['compsigfgcm'].size)])
+                                           parCat['compsigfgcm'].size),
+                                          ('COMPRETRIEVEDPWV', 'f8',
+                                           parCat['compretrievedpwv'].size),
+                                          ('COMPRETRIEVEDPWVRAW', 'f8',
+                                           parCat['compretrievedpwvraw'].size),
+                                          ('COMPRETREIVEDPWVFLAG', 'i2',
+                                           parCat['compretrievedpwvflag'].size),
+                                          ('COMPRETRIEVEDTAUNIGHT', 'f8',
+                                           parCat['compretrievedtaunight'].size)])
 
             inParams['PARALPHA'][:] = parCat['paralpha'][0, :]
             inParams['PARO3'][:] = parCat['paro3'][0, :]
-            inParams['PARTAUINTERCEPT'][:] = parCat['partauintercept'][0, :]
-            inParams['PARTAUPERSLOPE'][:] = parCat['partauperslope'][0, :]
+            inParams['PARLNTAUINTERCEPT'][:] = parCat['parlntauintercept'][0, :]
+            inParams['PARLNTAUSLOPE'][:] = parCat['parlntauslope'][0, :]
             inParams['PARPWVINTERCEPT'][:] = parCat['parpwvintercept'][0, :]
             inParams['PARQESYSINTERCEPT'][:] = parCat['parqesysintercept'][0, :]
             inParams['PARQESYSSLOPE'][:] = parCat['parqesysslope'][0, :]
+            inParams['PARRETRIEVEDPWVSCALE'] = parCat['parretrievedpwvscale']
+            inParams['PARRETRIEVEDPWVOFFSET'] = parCat['parretrievedpwvoffset']
+            inParams['PARRETRIEVEDPWVNIGHTLYOFFSET'][:] = parCat['parretrievedpwvnightlyoffset'][0, :]
             inParams['COMPAPERCORRPIVOT'][:] = parCat['compapercorrpivot'][0, :]
             inParams['COMPAPERCORRSLOPE'][:] = parCat['compapercorrslope'][0, :]
             inParams['COMPAPERCORRSLOPEERR'][:] = parCat['compapercorrslopeerr'][0, :]
@@ -779,6 +797,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             inParams['COMPVARGRAY'][:] = parCat['compvargray'][0, :]
             inParams['COMPNGOODSTARPEREXP'][:] = parCat['compngoodstarperexp'][0, :]
             inParams['COMPSIGFGCM'][:] = parCat['compsigfgcm'][0, :]
+            inParams['COMPRETRIEVEDPWV'][:] = parCat['compretrievedpwv'][0, :]
+            inParams['COMPRETRIEVEDPWVRAW'][:] = parCat['compretrievedpwvraw'][0, :]
+            inParams['COMPRETRIEVEDPWVFLAG'][:] = parCat['compretrievedpwvflag'][0, :]
+            inParams['COMPRETREIVEDTAUNIGHT'][:] = parCat['compretrievedtaunight'][0, :]
 
             inSuperStar = np.zeros(parCat['superstarsize'][0, :], dtype='f8')
             inSuperStar[:, :, :] = parCat['superstar'][0, :].reshape(inSuperStar.shape)
@@ -872,13 +894,15 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=len(fitBandString))
         parSchema.addField('extrabands', type=str, doc='Bands that were not fit',
                            size=len(extraBandString))
-        parSchema.addField('tauunit', type=np.float64, doc='Step units for AOD')
-        parSchema.addField('tauperslopeunit', type=np.float64,
-                           doc='Step units for AOD percent slope')
+        parSchema.addField('lntauunit', type=np.float64, doc='Step units for ln(AOD)')
+        parSchema.addField('tauslopeunit', type=np.float64,
+                           doc='Step units for ln(AOD) slope')
         parSchema.addField('alphaunit', type=np.float64, doc='Step units for alpha')
         parSchema.addField('pwvunit', type=np.float64, doc='Step units for pwv')
         parSchema.addField('pwvperslopeunit', type=np.float64,
                            doc='Step units for PWV percent slope')
+        parSchema.addField('pwvglobalunit', type=np.float64,
+                           doc='Step units for global PWV parameters')
         parSchema.addField('o3unit', type=np.float64, doc='Step units for O3')
         parSchema.addField('qesysunit', type=np.float64, doc='Step units for mirror gray')
         parSchema.addField('qesysslopeunit', type=np.float64, doc='Step units for mirror gray slope')
@@ -890,9 +914,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['PARALPHA'].size)
         parSchema.addField('paro3', type='ArrayD', doc='O3 parameter vector',
                            size=pars['PARO3'].size)
-        parSchema.addField('partauintercept', type='ArrayD', doc='Tau intercept parameter vector',
+        parSchema.addField('parlntauintercept', type='ArrayD',
+                           doc='ln(Tau) intercept parameter vector',
                            size=pars['PARTAUINTERCEPT'].size)
-        parSchema.addField('partauperslope', type='ArrayD', doc='Tau percent slope parameter vector',
+        parSchema.addField('parlntauslope', type='ArrayD',
+                           doc='ln(Tau) slope parameter vector',
                            size=pars['PARTAUPERSLOPE'].size)
         parSchema.addField('parpwvintercept', type='ArrayD', doc='PWV intercept parameter vector',
                            size=pars['PARPWVINTERCEPT'].size)
@@ -902,6 +928,13 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['PARQESYSINTERCEPT'].size)
         parSchema.addField('parqesysslope', type='ArrayD', doc='Mirror gray slope parameter vector',
                            size=pars['PARQESYSSLOPE'].size)
+        parSchema.addField('parretrievedpwvscale', type=np.float64,
+                           doc='Global scale for retrieved PWV')
+        parSchema.addField('parretrievedpwvoffset', type=np.float64,
+                           doc='Global offset for retrieved PWV')
+        parSchema.addField('parretrievedpwvnightlyoffset', type='ArrayD',
+                           doc='Nightly offset for retrieved PWV',
+                           size=pars['PARRETRIEVEDPWVNIGHTLYOFFSET'].size)
         parSchema.addField('compapercorrpivot', type='ArrayD', doc='Aperture correction pivot',
                            size=pars['COMPAPERCORRPIVOT'].size)
         parSchema.addField('compapercorrslope', type='ArrayD', doc='Aperture correction slope',
@@ -919,6 +952,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['COMPNGOODSTARPEREXP'].size)
         parSchema.addField('compsigfgcm', type='ArrayD', doc='Computed sigma_fgcm',
                            size=pars['COMPSIGFGCM'].size)
+        parSchema.addField('compretrievedpwv', type='ArrayD', doc='Retrieved PWV (smoothed)',
+                           size=pars['COMPRETRIEVEDPWV'].size)
+        parSchema.addField('compretrievedpwvraw', type='ArrayD', doc='Retrieved PWV (raw)',
+                           size=pars['COMPRETRIEVEDPWVRAW'].size)
+        parSchema.addField('compretrievedpwvflag', type='ArrayI', doc='Retrieved PWV Flag',
+                           size=pars['COMPRETRIEVEDPWVFLAG'].size)
+        parSchema.addField('compretrievedtaunight', type='ArrayD', doc='Retrieved tau (per night)',
+                           size=pars['COMPRETRIEVEDTAUNIGHT'].size)
 
         # superstarflat section
         parSchema.addField('superstarsize', type='ArrayI', doc='Superstar matrix size',
