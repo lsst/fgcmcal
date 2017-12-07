@@ -67,6 +67,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=bool,
         default=False,
     )
+    superStarSubCcd = pexConfig.Field(
+        doc="Compute superstar flat on sub-ccd scale",
+        dtype=bool,
+        default=False,
+    )
     cycleNumber = pexConfig.Field(
         doc="Fit Cycle Number",
         dtype=int,
@@ -437,7 +442,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'obsFile': None,
                       'indexFile': None,
                       'lutFile': None,
-                      'ccdOffsetFile': None,
                       'mirrorArea': np.pi*(camera.telescopeDiameter/2.)**2.,
                       'cameraGain': self.config.cameraGain,
                       'ccdStartIndex': camera[0].getId(),
@@ -456,6 +460,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'reserveFraction': self.config.reserveFraction,
                       'freezeStdAtmosphere': self.config.freezeStdAtmosphere,
                       'precomputeSuperStarInitialCycle': self.config.precomputeSuperStarInitialCycle,
+                      'superStarSubCCD': self.config.superStarSubCcd,
                       'cycleNumber': self.config.cycleNumber,
                       'maxIter': self.config.maxIter,
                       'UTBoundary': self.config.utBoundary,
@@ -645,7 +650,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                            ('DELTA_RA', 'f8'),
                                                            ('DELTA_DEC', 'f8'),
                                                            ('RA_SIZE', 'f8'),
-                                                           ('DEC_SIZE', 'f8')])
+                                                           ('DEC_SIZE', 'f8'),
+                                                           ('X_SIZE', 'i4'),
+                                                           ('Y_SIZE', 'i4')])
 
         camera = butler.get('camera')
 
@@ -664,19 +671,20 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             xform = orient.makePixelFpTransform(extent)
             pointXform = xform.applyForward(camPoint.getPoint())
             # this requires a pixelScale
-            ccdOffsets['DELTA_RA'][i] = pointXform.getX() * self.config.pixelScale / 3600.0
-            ccdOffsets['DELTA_DEC'][i] = pointXform.getY() * self.config.pixelScale / 3600.0
+            # NOTE that this now works properly with HSC, but I need to work on
+            # generalizing this properly
+            ccdOffsets['DELTA_RA'][i] = -pointXform.getY() * self.config.pixelScale / 3600.0
+            ccdOffsets['DELTA_DEC'][i] = -pointXform.getX() * self.config.pixelScale / 3600.0
 
             # but this does not (for the delta)
             boxXform = xform.applyForward(afwGeom.Point2D(bbox.getMaxX(), bbox.getMaxY()))
-            ccdOffsets['RA_SIZE'][i] = 2. * np.abs(boxXform.getX() -
-                                                   pointXform.getX()) / 3600.0
-            ccdOffsets['DEC_SIZE'][i] = 2. * np.abs(boxXform.getY() -
-                                                    pointXform.getY()) / 3600.0
+            ccdOffsets['RA_SIZE'][i] = 2. * np.abs(boxXform.getY() -
+                                                   pointXform.getY()) / 3600.0
+            ccdOffsets['DEC_SIZE'][i] = 2. * np.abs(boxXform.getX() -
+                                                    pointXform.getX()) / 3600.0
 
-            # old version below
-            # point = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
-            # bbox = detector.getBBox()
+            ccdOffsets['X_SIZE'][i] = bbox.getMaxX()
+            ccdOffsets['Y_SIZE'][i] = bbox.getMaxY()
 
         noFitsDict = {'lutIndex': lutIndexVals,
                       'lutStd': lutStd,
@@ -803,7 +811,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             inParams['COMPRETRIEVEDTAUNIGHT'][:] = parCat['compretrievedtaunight'][0, :]
 
             inSuperStar = np.zeros(parCat['superstarsize'][0, :], dtype='f8')
-            inSuperStar[:, :, :] = parCat['superstar'][0, :].reshape(inSuperStar.shape)
+            inSuperStar[:, :, :, :] = parCat['superstar'][0, :].reshape(inSuperStar.shape)
 
             fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                               fgcmExpInfo,
@@ -963,7 +971,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         # superstarflat section
         parSchema.addField('superstarsize', type='ArrayI', doc='Superstar matrix size',
-                           size=3)
+                           size=4)
         parSchema.addField('superstar', type='ArrayD', doc='Superstar matrix (flattened)',
                            size=fgcmFitCycle.fgcmPars.parSuperStarFlat.size)
 
