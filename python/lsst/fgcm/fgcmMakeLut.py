@@ -7,37 +7,19 @@ import traceback
 
 import numpy as np
 
-# import lsst.utils
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-# import lsst.pex.exceptions as pexExceptions
 import lsst.afw.table as afwTable
-# from lsst.daf.base.dateTime import DateTime
-# import lsst.afw.geom as afwGeom
-# import lsst.daf.persistence.butlerExceptions as butlerExceptions
 
 from .detectorThroughput import DetectorThroughput
 
-# import time
-
 import fgcm
 
-__all__ = ['FgcmMakeLutConfig', 'FgcmMakeLutTask']
+__all__ = ['FgcmMakeLutParametersConfig', 'FgcmMakeLutConfig', 'FgcmMakeLutTask']
 
+class FgcmMakeLutParametersConfig(pexConfig.Config):
+    """Config for parameters if atmosphereTableName not available"""
 
-class FgcmMakeLutConfig(pexConfig.Config):
-    """Config for FgcmMakeLutTask"""
-
-    filterNames = pexConfig.ListField(
-        doc="Filter names to build LUT",
-        dtype=str,
-        default=(),
-    )
-    stdFilterNames = pexConfig.ListField(
-        doc="Standard filternames to match to filterNames",
-        dtype=str,
-        default=(),
-    )
     elevation = pexConfig.Field(
         doc="Telescope elevation (m)",
         dtype=float,
@@ -46,62 +28,62 @@ class FgcmMakeLutConfig(pexConfig.Config):
     pmbRange = pexConfig.ListField(
         doc="Barometric Pressure range (millibar)",
         dtype=float,
-        default=(770.0, 790.0,),
+        default=None,
     )
     pmbSteps = pexConfig.Field(
         doc="Barometric Pressure number of steps",
         dtype=int,
-        default=5,
+        default=None,
     )
     pwvRange = pexConfig.ListField(
         doc="Precipitable Water Vapor range (mm)",
         dtype=float,
-        default=(0.1, 12.0,),
+        default=None,
     )
     pwvSteps = pexConfig.Field(
         doc="Precipitable Water Vapor number of steps",
         dtype=int,
-        default=21,
+        default=None,
     )
     o3Range = pexConfig.ListField(
         doc="Ozone range (dob)",
         dtype=float,
-        default=(220.0, 310.0,),
+        default=None,
     )
     o3Steps = pexConfig.Field(
         doc="Ozone number of steps",
         dtype=int,
-        default=3,
+        default=None,
     )
     tauRange = pexConfig.ListField(
         doc="Aerosol Optical Depth range (unitless)",
         dtype=float,
-        default=(0.002, 0.25,),
+        default=None,
     )
     tauSteps = pexConfig.Field(
         doc="Aerosol Optical Depth number of steps",
         dtype=int,
-        default=11,
+        default=None,
     )
     alphaRange = pexConfig.ListField(
         doc="Aerosol alpha range (unitless)",
         dtype=float,
-        default=(0.0, 2.0),
+        default=None,
     )
     alphaSteps = pexConfig.Field(
         doc="Aerosol alpha number of steps",
         dtype=int,
-        default=9,
+        default=None,
     )
     zenithRange = pexConfig.ListField(
         doc="Zenith angle range (degree)",
         dtype=float,
-        default=(0.0, 70.0,),
+        default=None,
     )
     zenithSteps = pexConfig.Field(
         doc="Zenith angle number of steps",
         dtype=int,
-        default=21,
+        default=None,
     )
     pmbStd = pexConfig.Field(
         doc="Standard Atmosphere pressure (millibar)",
@@ -141,7 +123,7 @@ class FgcmMakeLutConfig(pexConfig.Config):
     lambdaStep = pexConfig.Field(
         doc="Wavelength step for generating atmospheres (nm)",
         dtype=float,
-        default=0.5,
+        default=None,
     )
     lambdaRange = pexConfig.ListField(
         doc="Wavelength range for LUT (A)",
@@ -152,6 +134,50 @@ class FgcmMakeLutConfig(pexConfig.Config):
     def setDefaults(self):
         pass
 
+
+class FgcmMakeLutConfig(pexConfig.Config):
+    """Config for FgcmMakeLutTask"""
+
+    filterNames = pexConfig.ListField(
+        doc="Filter names to build LUT",
+        dtype=str,
+        default=None,
+    )
+    stdFilterNames = pexConfig.ListField(
+        doc="Standard filternames to match to filterNames",
+        dtype=str,
+        default=None,
+    )
+    atmosphereTableName = pexConfig.Field(
+        doc="FGCM name or filename of precomputed atmospheres",
+        dtype=str,
+        default=None,
+        optional=True,
+    )
+    parameters = pexConfig.ConfigField(
+        doc="Atmosphere parameters (required if no atmosphereTableName)",
+        dtype=FgcmMakeLutParametersConfig,
+        default=None,
+        check=None)
+
+    def setDefaults(self):
+        pass
+
+    def validate(self):
+        # check that filterNames and stdFilterNames are okay
+        self._fields['filterNames'].validate(self)
+        self._fields['stdFilterNames'].validate(self)
+
+        # check if we have an atmosphereTableName, and if valid
+        if self.atmosphereTableName is not None:
+            try:
+                fgcmAtmTable = fgcm.FgcmAtmosphereTable.initWithTableName(self.atmosphereTableName)
+            except IOError:
+                raise RuntimeError("Could not find atmosphereTableName: %s" %
+                                   (self.atmosphereTableName))
+        else:
+            # Validate the parameters
+            self._fields['parameters'].validate(self)
 
 class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmMakeLutTask
@@ -288,34 +314,40 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         nCcd = len(camera)
         self.log.info("Found %d ccds for look-up table" % (nCcd))
 
-        # make the config dictionary
+        # create the stub of the lutConfig
         lutConfig = {}
         lutConfig['logger'] = self.log
-        lutConfig['elevation'] = self.config.elevation
         lutConfig['filterNames'] = self.config.filterNames
         lutConfig['stdFilterNames'] = self.config.stdFilterNames
         lutConfig['nCCD'] = nCcd
-        lutConfig['pmbRange'] = self.config.pmbRange
-        lutConfig['pmbSteps'] = self.config.pmbSteps
-        lutConfig['pwvRange'] = self.config.pwvRange
-        lutConfig['pwvSteps'] = self.config.pwvSteps
-        lutConfig['o3Range'] = self.config.o3Range
-        lutConfig['o3Steps'] = self.config.o3Steps
-        lutConfig['tauRange'] = self.config.tauRange
-        lutConfig['tauSteps'] = self.config.tauSteps
-        lutConfig['alphaRange'] = self.config.alphaRange
-        lutConfig['alphaSteps'] = self.config.alphaSteps
-        lutConfig['zenithRange'] = self.config.zenithRange
-        lutConfig['zenithSteps'] = self.config.zenithSteps
-        lutConfig['pmbStd'] = self.config.pmbStd
-        lutConfig['pwvStd'] = self.config.pwvStd
-        lutConfig['o3Std'] = self.config.o3Std
-        lutConfig['tauStd'] = self.config.tauStd
-        lutConfig['alphaStd'] = self.config.alphaStd
-        lutConfig['airmassStd'] = self.config.airmassStd
-        lutConfig['lambdaRange'] = self.config.lambdaRange
-        lutConfig['lambdaStep'] = self.config.lambdaStep
-        lutConfig['lambdaNorm'] = self.config.lambdaNorm
+
+        # atmosphereTable already validated if available
+        if self.config.atmosphereTableName is not None:
+            lutConfig['atmosphereTableName'] = self.config.atmosphereTableName
+        else:
+            # use the regular paramters (also validated if needed)
+            lutConfig['elevation'] = self.config.elevation
+            lutConfig['pmbRange'] = self.config.pmbRange
+            lutConfig['pmbSteps'] = self.config.pmbSteps
+            lutConfig['pwvRange'] = self.config.pwvRange
+            lutConfig['pwvSteps'] = self.config.pwvSteps
+            lutConfig['o3Range'] = self.config.o3Range
+            lutConfig['o3Steps'] = self.config.o3Steps
+            lutConfig['tauRange'] = self.config.tauRange
+            lutConfig['tauSteps'] = self.config.tauSteps
+            lutConfig['alphaRange'] = self.config.alphaRange
+            lutConfig['alphaSteps'] = self.config.alphaSteps
+            lutConfig['zenithRange'] = self.config.zenithRange
+            lutConfig['zenithSteps'] = self.config.zenithSteps
+            lutConfig['pmbStd'] = self.config.pmbStd
+            lutConfig['pwvStd'] = self.config.pwvStd
+            lutConfig['o3Std'] = self.config.o3Std
+            lutConfig['tauStd'] = self.config.tauStd
+            lutConfig['alphaStd'] = self.config.alphaStd
+            lutConfig['airmassStd'] = self.config.airmassStd
+            lutConfig['lambdaRange'] = self.config.lambdaRange
+            lutConfig['lambdaStep'] = self.config.lambdaStep
+            lutConfig['lambdaNorm'] = self.config.lambdaNorm
 
         # make the lut object
         self.log.info("Making the LUT maker object")
