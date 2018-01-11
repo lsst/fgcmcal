@@ -424,8 +424,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # FIXME:
         #  check config variables for valid ranges
 
-        bands = np.array(self.config.bands)
         fitFlag = np.array(self.config.fitFlag, dtype=np.bool)
+
+        fitBands = [b for i, b in enumerate(self.config.bands) if fitFlag[i]]
+        extraBands = [b for i, b in enumerate(self.config.bands) if not fitFlag[i]]
 
         camera = butler.get('camera')
 
@@ -449,9 +451,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'ccdField': 'CCD',
                       'seeingField': 'SEEING',  # FIXME
                       'deepFlag': 'DEEPFLAG',  # unused
-                      'bands': bands,
-                      'fitBands': bands[fitFlag],
-                      'extraBands': bands[~fitFlag],
+                      'bands': self.config.bands,
+                      'fitBands': fitBands,
+                      'extraBands': extraBands,
                       'filterToBand': self.config.filterToBand,
                       'logLevel': 'INFO',  # FIXME
                       'nCore': self.config.nCore,
@@ -613,7 +615,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # and clear out the memory from the big object
         lutCat = None
 
-        fgcmLut = fgcm.FgcmLUT(lutIndexVals, lutFlat, lutDerivFlat, lutStd)
+        fgcmLut = fgcm.FgcmLUT(lutIndexVals, lutFlat, lutDerivFlat, lutStd,
+                               filterToBand=self.config.filterToBand)
 
         # and clear out the memory of the big created objects
         lutFlat = None
