@@ -326,28 +326,28 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
             lutConfig['atmosphereTableName'] = self.config.atmosphereTableName
         else:
             # use the regular paramters (also validated if needed)
-            lutConfig['elevation'] = self.config.elevation
-            lutConfig['pmbRange'] = self.config.pmbRange
-            lutConfig['pmbSteps'] = self.config.pmbSteps
-            lutConfig['pwvRange'] = self.config.pwvRange
-            lutConfig['pwvSteps'] = self.config.pwvSteps
-            lutConfig['o3Range'] = self.config.o3Range
-            lutConfig['o3Steps'] = self.config.o3Steps
-            lutConfig['tauRange'] = self.config.tauRange
-            lutConfig['tauSteps'] = self.config.tauSteps
-            lutConfig['alphaRange'] = self.config.alphaRange
-            lutConfig['alphaSteps'] = self.config.alphaSteps
-            lutConfig['zenithRange'] = self.config.zenithRange
-            lutConfig['zenithSteps'] = self.config.zenithSteps
-            lutConfig['pmbStd'] = self.config.pmbStd
-            lutConfig['pwvStd'] = self.config.pwvStd
-            lutConfig['o3Std'] = self.config.o3Std
-            lutConfig['tauStd'] = self.config.tauStd
-            lutConfig['alphaStd'] = self.config.alphaStd
-            lutConfig['airmassStd'] = self.config.airmassStd
-            lutConfig['lambdaRange'] = self.config.lambdaRange
-            lutConfig['lambdaStep'] = self.config.lambdaStep
-            lutConfig['lambdaNorm'] = self.config.lambdaNorm
+            lutConfig['elevation'] = self.config.parameters.elevation
+            lutConfig['pmbRange'] = self.config.parameters.pmbRange
+            lutConfig['pmbSteps'] = self.config.parameters.pmbSteps
+            lutConfig['pwvRange'] = self.config.parameters.pwvRange
+            lutConfig['pwvSteps'] = self.config.parameters.pwvSteps
+            lutConfig['o3Range'] = self.config.parameters.o3Range
+            lutConfig['o3Steps'] = self.config.parameters.o3Steps
+            lutConfig['tauRange'] = self.config.parameters.tauRange
+            lutConfig['tauSteps'] = self.config.parameters.tauSteps
+            lutConfig['alphaRange'] = self.config.parameters.alphaRange
+            lutConfig['alphaSteps'] = self.config.parameters.alphaSteps
+            lutConfig['zenithRange'] = self.config.parameters.zenithRange
+            lutConfig['zenithSteps'] = self.config.parameters.zenithSteps
+            lutConfig['pmbStd'] = self.config.parameters.pmbStd
+            lutConfig['pwvStd'] = self.config.parameters.pwvStd
+            lutConfig['o3Std'] = self.config.parameters.o3Std
+            lutConfig['tauStd'] = self.config.parameters.tauStd
+            lutConfig['alphaStd'] = self.config.parameters.alphaStd
+            lutConfig['airmassStd'] = self.config.parameters.airmassStd
+            lutConfig['lambdaRange'] = self.config.parameters.lambdaRange
+            lutConfig['lambdaStep'] = self.config.parameters.lambdaStep
+            lutConfig['lambdaNorm'] = self.config.parameters.lambdaNorm
 
         # make the lut object
         self.log.info("Making the LUT maker object")
@@ -358,9 +358,9 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
 
         # these will be in Angstroms
         # note that lambdaStep is currently in nm, because dumb.  convert to A
-        throughputLambda = np.arange(self.config.lambdaRange[0],
-                                     self.config.lambdaRange[1]+self.config.lambdaStep*10,
-                                     self.config.lambdaStep*10.)
+        throughputLambda = np.arange(self.fgcmLutMaker.lambdaRange[0],
+                                     self.fgcmLutMaker.lambdaRange[1]+self.fgcmLutMaker.lambdaStep*10,
+                                     self.fgcmLutMaker.lambdaStep*10.)
 
         self.log.info("Built throughput lambda, %.1f-%.1f, step %.2f" %
                       (throughputLambda[0], throughputLambda[-1],
@@ -431,21 +431,21 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                            size=2)
         lutSchema.addField('lambdastep', type=np.float64, doc='Wavelength step')
         lutSchema.addField('lambdastd', type='ArrayD', doc='Standard Wavelength',
-                           size=self.fgcmLutMaker.filterNames.size)
+                           size=len(self.fgcmLutMaker.filterNames))
         lutSchema.addField('lambdastdfilter', type='ArrayD', doc='Standard Wavelength (raw)',
-                           size=self.fgcmLutMaker.filterNames.size)
+                           size=len(self.fgcmLutMaker.filterNames))
         lutSchema.addField('i0std', type='ArrayD', doc='I0 Standard',
-                           size=self.fgcmLutMaker.filterNames.size)
+                           size=len(self.fgcmLutMaker.filterNames))
         lutSchema.addField('i1std', type='ArrayD', doc='I1 Standard',
-                           size=self.fgcmLutMaker.filterNames.size)
+                           size=len(self.fgcmLutMaker.filterNames))
         lutSchema.addField('i10std', type='ArrayD', doc='I10 Standard',
-                           size=self.fgcmLutMaker.filterNames.size)
+                           size=len(self.fgcmLutMaker.filterNames))
         lutSchema.addField('lambdab', type='ArrayD', doc='Wavelength for passband (no atm)',
-                           size=self.fgcmLutMaker.filterNames.size)
+                           size=len(self.fgcmLutMaker.filterNames))
         lutSchema.addField('atmlambda', type='ArrayD', doc='Atmosphere wavelengths',
                            size=self.fgcmLutMaker.atmLambda.size)
         lutSchema.addField('atmstdtrans', type='ArrayD', doc='Standard Atmosphere Throughput',
-                           size=self.fgcmLutMaker.atmStd.size)
+                           size=self.fgcmLutMaker.atmStdTrans.size)
 
         # and the look-up-tables
         lutSchema.addField('luttype', type=str, size=20, doc='Look-up table type')
