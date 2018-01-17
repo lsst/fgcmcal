@@ -1,6 +1,7 @@
 # See COPYRIGHT file at the top of the source tree.
 
 from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import sys
 import traceback
@@ -52,6 +53,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         doc="Healpix Nside for matching",
         dtype=int,
         default=4096,
+    )
+    coarseNside = pexConfig.Field(
+        doc="Healpix coarse Nside for partitioning matches",
+        dtype=int,
+        default=8,
     )
     zeropointDefault = pexConfig.Field(
         doc="Zeropoint default (arbitrary?)",
@@ -550,6 +556,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                       'matchRadius': self.config.matchRadius,
                       'isolationRadius': self.config.isolationRadius,
                       'matchNSide': self.config.matchNside,
+                      'coarseNSide': self.config.coarseNside,
                       'densNSide': self.config.densityCutNside,
                       'densMaxPerPixel': self.config.densityCutMaxPerPixel,
                       'referenceBand': self.config.referenceBand,
