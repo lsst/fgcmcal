@@ -1,6 +1,7 @@
 # See COPYRIGHT file at the top of the source tree.
 
 from __future__ import division, absolute_import, print_function
+from past.builtins import xrange
 
 import sys
 import traceback
@@ -512,8 +513,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         lutCat = butler.get('fgcmLookUpTable')
 
         # first we need the lutIndexVals
-        lutFilterNames = np.array(lutCat[0]['filternames'].split(','))
-        lutStdFilterNames = np.array(lutCat[0]['stdfilternames'].split(','))
+        # dtype is set for py2/py3/fits/fgcm compatibility
+        lutFilterNames = np.array(lutCat[0]['filternames'].split(','), dtype='a')
+        lutStdFilterNames = np.array(lutCat[0]['stdfilternames'].split(','), dtype='a')
 
         # FIXME: check that lutBands equal listed bands!
 
@@ -893,9 +895,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema = afwTable.Schema()
 
         comma = ','
-        lutFilterNameString = comma.join(parInfo['LUTFILTERNAMES'][0])
-        fitBandString = comma.join(parInfo['FITBANDS'][0])
-        extraBandString = comma.join(parInfo['EXTRABANDS'][0])
+        lutFilterNameString = comma.join([n.decode('utf-8')
+                                          for n in parInfo['LUTFILTERNAMES'][0]])
+        fitBandString = comma.join([n.decode('utf-8')
+                                    for n in parInfo['FITBANDS'][0]])
+        extraBandString = comma.join([n.decode('utf-8')
+                                      for n in parInfo['EXTRABANDS'][0]])
 
         # parameter info section
         parSchema.addField('nccd', type=np.int32, doc='Number of CCDs')
@@ -1090,7 +1095,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         zptCat.table.preallocate(fgcmFitCycle.fgcmZpts.zpStruct.size)
         for filterName in fgcmFitCycle.fgcmZpts.zpStruct['FILTERNAME']:
             rec = zptCat.addNew()
-            rec['filtername'] = filterName
+            rec['filtername'] = filterName.decode('utf-8')
 
         zptCat = zptCat.copy(deep=True)
 

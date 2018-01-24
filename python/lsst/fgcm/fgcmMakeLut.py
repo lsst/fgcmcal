@@ -17,6 +17,7 @@ import fgcm
 
 __all__ = ['FgcmMakeLutParametersConfig', 'FgcmMakeLutConfig', 'FgcmMakeLutTask']
 
+
 class FgcmMakeLutParametersConfig(pexConfig.Config):
     """Config for parameters if atmosphereTableName not available"""
 
@@ -171,13 +172,14 @@ class FgcmMakeLutConfig(pexConfig.Config):
         # check if we have an atmosphereTableName, and if valid
         if self.atmosphereTableName is not None:
             try:
-                fgcmAtmTable = fgcm.FgcmAtmosphereTable.initWithTableName(self.atmosphereTableName)
+                fgcm.FgcmAtmosphereTable.initWithTableName(self.atmosphereTableName)
             except IOError:
                 raise RuntimeError("Could not find atmosphereTableName: %s" %
                                    (self.atmosphereTableName))
         else:
             # Validate the parameters
             self._fields['parameters'].validate(self)
+
 
 class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmMakeLutTask
