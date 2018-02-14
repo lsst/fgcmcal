@@ -16,6 +16,11 @@ setupRequired(obs_base)
 setupRequired(pex_exceptions)
 setupRequired(pex_config)
 setupRequired(pipe_tasks)
+setupRequired(numpy)
+setupRequired(scipy)
+setupRequired(matplotlib)
+setupRequired(healpy)
+setupRequired(pyyaml)
 
 
 # The following is boilerplate for all packages.
@@ -26,3 +31,4 @@ setupRequired(pipe_tasks)
 #envPrepend(LSST_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
 
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
+envPrepend(PATH, ${PRODUCT_DIR}/bin.src)
