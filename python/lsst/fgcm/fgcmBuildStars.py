@@ -453,12 +453,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     # Flags and other bits have had names changed at some point.  Try new
                     # then old
                     try:
-                        satCenterKey = sources.schema.find('base_PixelFlags_flag_saturatedCenter')
+                        satCenterKey = sources.schema.find('base_PixelFlags_flag_saturatedCenter').key
                     except KeyError:
                         satCenterKey = sources.schema.find('flag_pixel_saturated_center').key
 
                     try:
-                        intCenterKey = sources.schema.find('base_PixelFlags_flag_interpolatedCenter')
+                        intCenterKey = sources.schema.find('base_PixelFlags_flag_interpolatedCenter').key
                     except KeyError:
                         intCenterKey = sources.schema.find('flag_pixel_interpolated_center').key
 
@@ -473,12 +473,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                         pixCrCenterKey = sources.schema.find('flag_pixel_cr_center').key
 
                     try:
-                        pixBadKey = sources.schema.find('base_PixelFlags_bad').key
+                        pixBadKey = sources.schema.find('base_PixelFlags_flag_bad').key
                     except KeyError:
                         pixBadKey = sources.schema.find('flag_pixel_bad').key
 
                     try:
-                        pixInterpKey = sources.schema.find('base_PixelFlags_interpolated').key
+                        pixInterpKey = sources.schema.find('base_PixelFlags_flag_interpolated').key
                     except KeyError:
                         pixInterpKey = sources.schema.find('flag_pixel_interpolated_any').key
 
@@ -523,7 +523,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                                 ~sources[pixEdgeKey],
                                                 ~sources[pixCrCenterKey],
                                                 ~sources[pixBadKey],
-                                                ~sources[pixInterpAnyKey],
+                                                ~sources[pixInterpKey],
                                                 ~sources[centroidFlagKey],
                                                 ~sources[apFluxFlagKey],
                                                 sources[deblendNchildKey] == 0,
