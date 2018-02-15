@@ -148,19 +148,26 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         butler, dataRefList = args
 
         task = self.TaskClass(config=self.config, log=self.log)
+
+        exitStatus = 0
         if self.doRaise:
             results = task.run(butler, dataRefList)
         else:
             try:
                 results = task.run(butler, dataRefList)
             except Exception as e:
+                exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
                 if not isinstance(e, pipeBase.TaskError):
                     traceback.print_exc(file=sys.stderr)
 
         task.writeMetadata(butler)
+
         if self.doReturnResults:
-            return results
+            return [pipeBase.Struct(exitStatus=exitStatus,
+                                    results=results)]
+        else:
+            return [pipeBase.Struct(exitStatus=exitStatus)]
 
     # turn off any multiprocessing
 
@@ -264,9 +271,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            not butler.datasetExists('fgcmStarIndices')):
             self._fgcmMatchStars(butler, visitCat)
 
-        # FIXME: probably need list of dataRefs actually used?
-        #        What is this used for?
-        return pipeBase.Struct(dataRefs=dataRefs)
+        # The return value could be the visitCat, if anybody wants that.
+        return visitCat
 
     def _fgcmMakeVisitCatalog(self, butler, dataRefs):
         """

@@ -291,19 +291,27 @@ class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
         """
 
         task = self.TaskClass(config=self.config, log=self.log)
+
+        exitStatus = 0
         if self.doRaise:
             results = task.run(butler)
         else:
             try:
                 results = task.run(butler)
             except Exception as e:
+                exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
                 if not isinstance(e, pipeBase.TaskError):
                     traceback.print_exc(file=sys.stderr)
 
         task.writeMetadata(butler)
+
         if self.doReturnResults:
-            return results
+            # Note that there's not much results to return (empty list)
+            return [pipeBase.Struct(exitStatus=exitStatus,
+                                    results=results)]
+        else:
+            return [pipeBase.Struct(exitStatus=exitStatus)]
 
     # turn off any multiprocessing
 
