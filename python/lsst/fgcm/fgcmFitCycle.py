@@ -1015,29 +1015,22 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['hasexternaltau'] = 0
 
         # parameter section
-        rec['paralpha'][:] = pars['PARALPHA'][0, :]
-        rec['paro3'][:] = pars['PARO3'][0, :]
-        rec['parlntauintercept'][:] = pars['PARLNTAUINTERCEPT'][0, :]
-        rec['parlntauslope'][:] = pars['PARLNTAUSLOPE'][0, :]
-        rec['parpwvintercept'][:] = pars['PARPWVINTERCEPT'][0, :]
-        rec['parpwvperslope'][:] = pars['PARPWVPERSLOPE'][0, :]
-        rec['parqesysintercept'][:] = pars['PARQESYSINTERCEPT'][0, :]
-        rec['parqesysslope'][:] = pars['PARQESYSSLOPE'][0, :]
-        rec['parretrievedpwvscale'] = pars['PARRETRIEVEDPWVSCALE']
-        rec['parretrievedpwvoffset'] = pars['PARRETRIEVEDPWVOFFSET']
-        rec['parretrievedpwvnightlyoffset'][:] = pars['PARRETRIEVEDPWVNIGHTLYOFFSET'][:]
-        rec['compapercorrpivot'][:] = pars['COMPAPERCORRPIVOT'][0, :]
-        rec['compapercorrslope'][:] = pars['COMPAPERCORRSLOPE'][0, :]
-        rec['compapercorrslopeerr'][:] = pars['COMPAPERCORRSLOPEERR'][0, :]
-        rec['compapercorrrange'][:] = pars['COMPAPERCORRRANGE'][0, :]
-        rec['compexpgray'][:] = pars['COMPEXPGRAY'][0, :]
-        rec['compvargray'][:] = pars['COMPVARGRAY'][0, :]
-        rec['compngoodstarperexp'][:] = pars['COMPNGOODSTARPEREXP'][0, :]
-        rec['compsigfgcm'][:] = pars['COMPSIGFGCM'][0, :]
-        rec['compretrievedpwv'][:] = pars['COMPRETRIEVEDPWV'][0, :]
-        rec['compretrievedpwvraw'][:] = pars['COMPRETRIEVEDPWVRAW'][0, :]
-        rec['compretrievedpwvflag'][:] = pars['COMPRETRIEVEDPWVFLAG'][0, :]
-        rec['compretrievedtaunight'][:] = pars['COMPRETRIEVEDTAUNIGHT'][0, :]
+
+        scalarNames = ['parretrievedpwvscale', 'parretrievedpwvoffset']
+
+        arrNames = ['paralpha', 'paro3', 'parlntauintercept', 'parlntauslope',
+                    'parpwvintercept', 'parpwvperslope', 'parqesysintercept',
+                    'parqesysslope', 'parretrievedpwvnightlyoffset', 'compapercorrpivot',
+                    'compapercorrslope', 'compapercorrslopeerr', 'compapercorrrange',
+                    'compexpgray', 'compvargray', 'compngoodstarperexp', 'compsigfgcm',
+                    'compretrievedpwv', 'compretrievedpwvraw', 'compretrievedpwvflag',
+                    'compretrievedtaunight']
+
+        for scalarName in scalarNames:
+            rec[scalarName] = pars[scalarName.upper()]
+
+        for arrName in arrNames:
+            rec[arrName][:] = np.atleast_1d(pars[0][arrName.upper()])[:]
 
         # superstar section
         rec['superstarsize'][:] = fgcmFitCycle.fgcmPars.parSuperStarFlat.shape
@@ -1107,6 +1100,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         zptCat = zptCat.copy(deep=True)
 
+        # FIXME: will need to port over the visitDataRefName from the build stars config...
         zptCat['visit'][:] = fgcmFitCycle.fgcmZpts.zpStruct['VISIT']
         zptCat['ccd'][:] = fgcmFitCycle.fgcmZpts.zpStruct['CCD']
         zptCat['fgcmflag'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FLAG']
