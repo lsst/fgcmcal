@@ -314,6 +314,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             srcVisits = [d.dataId[self.config.visitDataRefName] for d in dataRefs if
                          d.dataId[self.config.ccdDataRefName] == self.config.referenceCCD]
 
+        # Sort the visits for searching/indexing
+        srcVisits.sort()
+
         self.log.info("Found %d visits in %.2f s" %
                       (len(srcVisits), time.time()-startTime))
 
