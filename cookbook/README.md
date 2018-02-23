@@ -67,8 +67,11 @@ and compute the atmosphere table once.
 This is a very simple command-line task (where you substitute your username for
 `user`).  E.g.,
 
-```fgcmMakeLut.py /datasets/hsc/repo --rerun \
-RC/w_2018_06/DM-13435:private/user/fgcm_cookbook --configfile fgcmMakeLutHscFromTable.py```
+```bash
+fgcmMakeLut.py /datasets/hsc/repo --rerun \
+RC/w_2018_06/DM-13435:private/user/fgcm_cookbook --configfile \
+fgcmMakeLutHscFromTable.py
+```
 
 ## Ingesting and Matching Star Observations
 
@@ -92,9 +95,11 @@ config](fgcmBuildStarsHsc.py) for HSC is available.
 
 This is also a simple command-line task.  E.g.,
 
-```fgcmBuildStars.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
+```bash
+fgcmBuildStars.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
 wide --configfile fgcmBuildStarsHsc.py --id field=SSP_WIDE ccd=13 \
-filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y```
+filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y
+```
 
 ## Running a Fit Cycle
 
@@ -131,9 +136,11 @@ output into a file with `tee`.  Note that if you want to start a new fit with
 different parameters with the same stars/LUT then you can simply specify a new
 output rerun and go from there.
 
-```fgcmFitCycle.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
+```bash
+fgcmFitCycle.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
 wide:fit1 --configfile fgcmFitCycleHsc_cycle00_config.py |& tee \
-fgcm_cookbook_cycle00.log```
+fgcm_cookbook_cycle00.log
+```
 
 
 ### Subsequent Fit Cycles
@@ -148,8 +155,11 @@ constrain the fit.  You can also up the number of iterations per fit cycle.  In
 my experience, the fit does not improve if you go beyond ~50 iterations.  The
 best way to get the fit to improve is to remove non-photometric exposures.
 
-```fgcmFitCycle /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
-fit1 --configfile fgcmFitCycleHsc_cycle01_config.py |& tee fgcm_cookbook_cycle01.log```
+```bash
+fgcmFitCycle.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
+fit1 --configfile fgcmFitCycleHsc_cycle01_config.py |& tee \
+fgcm_cookbook_cycle01.log
+```
 
 ## Outputs
 
@@ -213,7 +223,9 @@ please see the [FGCM paper](http://adsabs.harvard.edu/abs/2018AJ....155...41B).
 The data products that are of use to the end user, and grabbed from the butler,
 e.g.:
 
-```zeropoints = butler.get('fgcmZeropoints', dataId={'fgcmcycle': last_cycle_run})```
+```python
+zeropoints = butler.get('fgcmZeropoints', dataId={'fgcmcycle': last_cycle_run})
+```
 
 * `fgcmZeropoints-%(fgcmcycle)02d.fits`: Table of zeropoints (`FGCM_ZPT`) and
   first-order chromatic corrections (`FGCM_I10`) per visit/ccd.  Quality of
