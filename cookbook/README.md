@@ -64,11 +64,11 @@ and compute the atmosphere table once.
 
 ### Running `fgcmMakeLut.py`
 
-This is a very simple command-line task.  E.g.,
+This is a very simple command-line task (where you substitute your username for
+`user`).  E.g.,
 
-`fgcmMakeLut.py /datasets/hsc/repo --rerun
-RC/w_2018_06/DM-13435:private/user/fgcm_cookbook --configfile
-fgcmMakeLutHscFromTable.py`
+```fgcmMakeLut.py /datasets/hsc/repo --rerun \
+RC/w_2018_06/DM-13435:private/user/fgcm_cookbook --configfile fgcmMakeLutHscFromTable.py```
 
 ## Ingesting and Matching Star Observations
 
@@ -92,9 +92,9 @@ config](fgcmBuildStarsHsc.py) for HSC is available.
 
 This is also a simple command-line task.  E.g.,
 
-`fgcmBuildStars.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun
-wide --configfile fgcmBuildStarsHsc.py --id field=SSP_WIDE ccd=13
-filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y`
+```fgcmBuildStars.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
+wide --configfile fgcmBuildStarsHsc.py --id field=SSP_WIDE ccd=13 \
+filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y```
 
 ## Running a Fit Cycle
 
@@ -131,9 +131,9 @@ output into a file with `tee`.  Note that if you want to start a new fit with
 different parameters with the same stars/LUT then you can simply specify a new
 output rerun and go from there.
 
-`fgcmFitCycle.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun
-wide:fit1 --configfile fgcmFitCycleHsc_cycle00_config.py |& tee
-fgcm_cookbook_cycle00.log`
+```fgcmFitCycle.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
+wide:fit1 --configfile fgcmFitCycleHsc_cycle00_config.py |& tee \
+fgcm_cookbook_cycle00.log```
 
 
 ### Subsequent Fit Cycles
@@ -148,8 +148,8 @@ constrain the fit.  You can also up the number of iterations per fit cycle.  In
 my experience, the fit does not improve if you go beyond ~50 iterations.  The
 best way to get the fit to improve is to remove non-photometric exposures.
 
-`fgcmFitCycle /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun fit1
---configfile fgcmFitCycleHsc_cycle01_config.py |& tee fgcm_cookbook_cycle01.log`
+```fgcmFitCycle /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
+fit1 --configfile fgcmFitCycleHsc_cycle01_config.py |& tee fgcm_cookbook_cycle01.log```
 
 ## Outputs
 
@@ -164,48 +164,48 @@ There are a wide range of diagnostic plots that get output.  This is a brief
 explanation of what's in each one.  For details on how quantities are computed,
 please see the [FGCM paper](http://adsabs.harvard.edu/abs/2018AJ....155...41B).
 
-* _airmass_expgray_BAND.png: Average exposure gray residual (EXP^gray) as a
+* `_airmass_expgray_BAND.png`: Average exposure gray residual (EXP^gray) as a
   function of airmass.  Used to check for airmass residuals.
-* _UT_expgray_BAND.png: Average EXP^gray as a function of UT.  Used to check
+* `_UT_expgray_BAND.png`: Average EXP^gray as a function of UT.  Used to check
   for residuals through the night.
-* _expgray_BAND.png: Histogram of all EXP^gray with Gaussian fit.  Used to
+* `_expgray_BAND.png`: Histogram of all EXP^gray with Gaussian fit.  Used to
   determine photometric cuts for next fit cycle.
-* _initial_expgray_BAND.png: Histogram of all EXP^gray estimated from
+* `_initial_expgray_BAND.png`: Histogram of all EXP^gray estimated from
   bright-observation algorithm (cycle 0 only).  Used for initial rough
   determination of photoemtric cuts for 0th fit cycle.
-* _expgray_redblue_compare_BAND.png: Difference in gray residual between
+* `_expgray_redblue_compare_BAND.png`: Difference in gray residual between
   reddest and bluest 25% of stars on each exposure.  Used to check for
   chromatic residuals.
-* _i1r1_BAND.png: Chromatic slope factor retrieved from stars (R1) vs predicted
+* `_i1r1_BAND.png`: Chromatic slope factor retrieved from stars (R1) vs predicted
   from FGCM fit (I1), for each visit/ccd.  Used to confirm filter/ccd
   throughputs.
-* _I1_BAND.png: Map of producted chromatic slope (I1) from input throughput.
-* _R1_BAND.png: Map of retrieved chromatic slope (R1) from stars.
-* _R1-I1_BAND.png: Residual between R1 - I1 over the field.  Used to check for
+* `_I1_BAND.png`: Map of producted chromatic slope (I1) from input throughput.
+* `_R1_BAND.png`: Map of retrieved chromatic slope (R1) from stars.
+* `_R1-I1_BAND.png`: Residual between R1 - I1 over the field.  Used to check for
   outliers which are usually caused by incorrect system throughput predictions.
-* _mjd_deep_expgray.png: Not currently used for FGCM in the stack.
-* _pwv_vs_rpwv.png: Model PWV vs "retrieved" PWV from z-band colors
+* `_mjd_deep_expgray.png`: Not currently used for FGCM in the stack.
+* `_pwv_vs_rpwv.png`: Model PWV vs "retrieved" PWV from z-band colors
   (experimental).
-* _pwv_vs_rpwv_scaled.png: Model PWV vs scaled retrieved PWV from z-band colors
+* `_pwv_vs_rpwv_scaled.png`: Model PWV vs scaled retrieved PWV from z-band colors
   (experimental).
-* _rpwv_vs_rpwv_in.png: Comparison of retrieved PWV from z-band colors from
+* `_rpwv_vs_rpwv_in.png`: Comparison of retrieved PWV from z-band colors from
   previous cycle to present cycle (experimental).
-* _rpwv_vs_rpwv_smooth.png: Comparison of retrieved PWV to smoothed retrieved
+* `_rpwv_vs_rpwv_smooth.png`: Comparison of retrieved PWV to smoothed retrieved
   PWV (experimental).
-* _sigfgcm_all_BAND.png: Four panels showing individual star repeatability for
+* `_sigfgcm_all_BAND.png`: Four panels showing individual star repeatability for
   all colors; blue/middle/red 25%/50%/25% of stars.  Used to determine
   intrinsic calibration error.
-* _sigfgcm_reserved_BAND.png: Four panels showing individual star repeatability
+* `_sigfgcm_reserved_BAND.png`: Four panels showing individual star repeatability
   for reserved stars not used in fit.
-* _sigfgcm_reseved_crunched_BAND.png: Four panels showing individual star
+* `_sigfgcm_reseved_crunched_BAND.png`: Four panels showing individual star
   repeatability after "gray crunch" for reserved stars.  Used to estimate final
   output repeatability.
-* _superstar_BAND_EPOCH.png: Two panels showing the overall super-star flat
+* `_superstar_BAND_EPOCH.png`: Two panels showing the overall super-star flat
   illumination correction (left), and residual from last fit cycle (right).
   Used to check for superstar convergence.
-* _nightly_PAR.png: Average nightly parameter value for alpha, o3, pwv, tau.
-* _qesys_washes.png: Overall model for systematic dimming.
-* _zeropoints.png: All zeropoints as a function of MJD from first exposure of
+* `_nightly_PAR.png`: Average nightly parameter value for alpha, o3, pwv, tau.
+* `_qesys_washes.png`: Overall model for systematic dimming.
+* `_zeropoints.png`: All zeropoints as a function of MJD from first exposure of
   calibration run.
 
 ### Data Products
@@ -213,13 +213,12 @@ please see the [FGCM paper](http://adsabs.harvard.edu/abs/2018AJ....155...41B).
 The data products that are of use to the end user, and grabbed from the butler,
 e.g.:
 
-`zeropoints = butler.get('fgcmZeropoints', dataId={'fgcmcycle':
-last_cycle_run})`
+```zeropoints = butler.get('fgcmZeropoints', dataId={'fgcmcycle': last_cycle_run})```
 
-* fgcmZeropoints-%(fgcmcycle)02d.fits: Table of zeropoints (`FGCM_ZPT`) and
+* `fgcmZeropoints-%(fgcmcycle)02d.fits`: Table of zeropoints (`FGCM_ZPT`) and
   first-order chromatic corrections (`FGCM_I10`) per visit/ccd.  Quality of
   exposure is given by `FGCM_FLAG`, see FGCM paper for details.
-* fgcmAtmosphereParameters-%(fgcmcycle)02d.fits: Atmosphere model parameters
+* `fgcmAtmosphereParameters-%(fgcmcycle)02d.fits`: Atmosphere model parameters
   (per visit) that can be used as input to MODTRAN to generate atmosphere
   transmission.
 * Other data products are used as an input to the next fit cycle.
