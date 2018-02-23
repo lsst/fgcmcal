@@ -24,6 +24,11 @@ __all__ = ['FgcmBuildStarsConfig', 'FgcmBuildStarsTask']
 class FgcmBuildStarsConfig(pexConfig.Config):
     """Config for FgcmBuildStarsTask"""
 
+    remake = pexConfig.Field(
+        doc="Remake visit catalog and stars even if they are already in the butler tree.",
+        dtype=bool,
+        default=False,
+    )
     minPerBand = pexConfig.Field(
         doc="Minimum observations per band",
         dtype=int,
@@ -253,23 +258,25 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             * dataRefs: the provided data references consolidated
         """
 
-        # make the visit catalog if necessary
-        #  question: what's the propper clobber interface?
-        #  we also need to know the way of checking the matched config?
-        if (butler.datasetExists('fgcmVisitCatalog')):
-            visitCat = butler.get('fgcmVisitCatalog')
-        else:
+        # Make the visit catalog if necessary
+        if self.config.remake or not butler.datasetExists('fgcmVisitCatalog'):
             # we need to build visitCat
             visitCat = self._fgcmMakeVisitCatalog(butler, dataRefs)
+        else:
+            self.log.info("Found fgcmVisitCatalog.")
+            visitCat = butler.get('fgcmVisitCatalog')
 
-        # and compile all the stars
-        #  this will put this dataset out.
-        if (not butler.datasetExists('fgcmStarObservations')):
+        # Compile all the stars
+        if self.config.remake or not butler.datasetExists('fgcmStarObservations'):
             self._fgcmMakeAllStarObservations(butler, visitCat)
+        else:
+            self.log.info("Found fgcmStarObservations")
 
-        if (not butler.datasetExists('fgcmStarIds') or
-           not butler.datasetExists('fgcmStarIndices')):
+        if self.config.remake or (not butler.datasetExists('fgcmStarIds') or
+                                  not butler.datasetExists('fgcmStarIndices')):
             self._fgcmMatchStars(butler, visitCat)
+        else:
+            self.log.info("Found fgcmStarIds and fgcmStarIndices")
 
         # The return value could be the visitCat, if anybody wants that.
         return visitCat
