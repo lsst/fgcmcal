@@ -16,6 +16,18 @@ of the HSC RC dataset from PDR1.  This is regularly reprocessed, starting with
 "Periodic dataset reprocessing = FY18a".  The `lsst-dev` path where the
 current reprocessing lives is `/datasets/hsc/repo/rerun/RC/weekly_tag/ticket/`.
 
+Setup
+-----
+
+The environment should be set up as follows:
+
+```
+setup lsst_distrib
+setup obs_subaru
+setup -j -r /path/to/thirdparty/fgcm/.
+setup -j -r /path/to/lsst-dm/fgcm/.
+```
+
 Running FGCM
 ------------
 
