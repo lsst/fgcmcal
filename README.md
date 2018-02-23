@@ -34,7 +34,7 @@ dependencies](https://github.com/erykoff/fgcm#dependencies) are satisfied with
 a simple `setup lsst_apps`.
 
 To install to use with the LSST stack, you simply need to run `setup -j -r
-/path/to/fgcm/.` which will read in the associated `eups` table and you should
+/path/to/thirdparty/fgcm/.` which will read in the associated `eups` table and you should
 be good to go.
 
 Installing the FGCM LSST Package
