@@ -77,11 +77,11 @@ and compute the atmosphere table once.
 ### Running `fgcmMakeLut.py`
 
 This is a very simple command-line task (where you substitute your username for
-`user`).  E.g.,
+`USER`).  E.g.,
 
 ```bash
 fgcmMakeLut.py /datasets/hsc/repo --rerun \
-RC/w_2018_06/DM-13435:private/user/fgcm_cookbook --configfile \
+RC/w_2018_06/DM-13435:private/USER/fgcm_cookbook --configfile \
 fgcmMakeLutHscFromTable.py
 ```
 
@@ -108,7 +108,7 @@ config](fgcmBuildStarsHsc.py) for HSC is available.
 This is also a simple command-line task.  E.g.,
 
 ```bash
-fgcmBuildStars.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
+fgcmBuildStars.py /datasets/hsc/repo/rerun/private/USER/fgcm_cookbook --rerun \
 wide --configfile fgcmBuildStarsHsc.py --id field=SSP_WIDE ccd=13 \
 filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y
 ```
@@ -149,8 +149,8 @@ different parameters with the same stars/LUT then you can simply specify a new
 output rerun and go from there.
 
 ```bash
-fgcmFitCycle.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
-wide:fit1 --configfile fgcmFitCycleHsc_cycle00_config.py |& tee \
+fgcmFitCycle.py /datasets/hsc/repo/rerun/private/USER/fgcm_cookbook --rerun \
+wide:fit1 --configfile fgcmFitCycleHscCookbook_cycle00_config.py |& tee \
 fgcm_cookbook_cycle00.log
 ```
 
@@ -168,8 +168,8 @@ my experience, the fit does not improve if you go beyond ~50 iterations.  The
 best way to get the fit to improve is to remove non-photometric exposures.
 
 ```bash
-fgcmFitCycle.py /datasets/hsc/repo/rerun/private/user/fgcm_cookbook --rerun \
-fit1 --configfile fgcmFitCycleHsc_cycle01_config.py |& tee \
+fgcmFitCycle.py /datasets/hsc/repo/rerun/private/USER/fgcm_cookbook --rerun \
+fit1 --configfile fgcmFitCycleHscCookbook_cycle01_config.py |& tee \
 fgcm_cookbook_cycle01.log
 ```
 
