@@ -32,8 +32,11 @@ config.cameraGain = 3.0
 # Pixel scale (arcseconds)
 config.pixelScale = 0.17
 # Amount of gray extinction to be considered "photometric".  This will
-# get ratcheded down in further cycles
+# get ratcheded down in further cycles.
 config.expGrayPhotometricCut = (-0.05, -0.05, -0.05, -0.05, -0.05)
+# Amount of gray "positive extinction" to be considered "photometric".  Used
+# to cull out-of-model exposures.
+config.expGrayHighCut = (0.2, 0.2, 0.2, 0.2, 0.2)
 # Number of bins to do aperture correction.  Not currently supported in LSST stack.
 config.aperCorrFitNBins = 0
 # "Fudge factors" for computing SED slope (best values for HSC not determined yet)
