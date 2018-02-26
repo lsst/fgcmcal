@@ -1166,7 +1166,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         self.log.info("Saved config for next cycle to %s" % (configFileName))
         self.log.info("Be sure to look at:")
-        self.log.info("   config.freezeStdAtmosphere")
         self.log.info("   config.expGrayPhotometricCut")
+        self.log.info("   config.expGrayHighCut")
 
         # tear down and clear memory
