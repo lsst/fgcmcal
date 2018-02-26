@@ -11,7 +11,7 @@ config.bands = ('g', 'r', 'i', 'z', 'y')
 config.fitFlag = (1, 1, 1, 1, 1)
 # Dictionary that maps "filters" (instrumental configurations) to "bands"
 # (abstract names).  All filters must be listed in the LUT.
-config.filterToBand = {'g':'g', 'r':'r', 'i':'i', 'i2':'i', 'z':'z', 'y':'y'}
+config.filterToBand = {'g':'g', 'r':'r', 'i':'i', 'z':'z', 'y':'y'}
 # Maximum number of fit iterations (15 for testing, 50+ for a full run.)
 config.maxIter = 15
 # Number of cores to run with python multiprocessing
