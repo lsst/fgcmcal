@@ -31,4 +31,4 @@ setupRequired(pyyaml)
 #envPrepend(LSST_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
 
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
-envPrepend(PATH, ${PRODUCT_DIR}/bin.src)
+envPrepend(PATH, ${PRODUCT_DIR}/bin)
