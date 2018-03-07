@@ -31,20 +31,28 @@ as a third-party package, but it is my intention that it will be.  Installation
 is simple.  First, download the code from https://github.com/erykoff/fgcm .
 Note that all of the [required
 dependencies](https://github.com/erykoff/fgcm#dependencies) are satisfied with
-a simple `setup lsst_apps`.
+a simple `setup lsst_apps` or `setup lsst_distrib`.
 
 To install to use with the LSST stack, you simply need to run `setup -j -r
 /path/to/thirdparty/fgcm/.` which will read in the associated `eups` table and you should
 be good to go.
 
-Installing the FGCM LSST Package
---------------------------------
+Installing the FGCM LSST Package (`fgcmcal`)
+--------------------------------------------
 
 Also, at the moment, the FGCM LSST package is not distributed with the LSST
 stack, but it will be.  Installation is just like above.  First, download the
-code from https://github.com/lsst-dm/fgcm .  To install, you simply need to run
-`setup -j -r /path/to/lsst-dm/fgcm/.` (after doing `setup lsst_apps`) which
-will read in the associated `eups` table and you should be good to go.
+code from https://github.com/lsst-dm/fgcmcal .  To install, you first need to
+run `scons` as:
+
+```
+setup lsst_distrib
+cd /path/to/lsst-dm/fgcmcal
+scons
+```
+
+Then, to set it up for use you simply need to run `setup -j -r
+/path/to/lsst-dm/fgcmcal/.`  This will read in the associated `eups` table.
 
 FGCM Cookbook
 -------------
