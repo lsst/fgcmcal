@@ -16,7 +16,7 @@ config.densityCutMaxPerPixel = 1000
 config.zeropointDefault = 25.0
 # Dictionary that maps "filters" (instrumental configurations) to "bands"
 # (abstract names).  All filters must be listed in the LUT.
-config.filterToBand = {'g':'g', 'r':'r', 'i':'i', 'i2':'i', 'z':'z', 'y':'y'}
+config.filterToBand = {'g':'g', 'r':'r', 'i':'i', 'z':'z', 'y':'y'}
 # Which bands are required to be observed to be considered a calibration star
 config.requiredBands = ['g','r','i','z']
 # The reference band is used for initial star selection
