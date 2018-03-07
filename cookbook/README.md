@@ -23,9 +23,8 @@ The environment should be set up as follows:
 
 ```
 setup lsst_distrib
-setup obs_subaru
 setup -j -r /path/to/thirdparty/fgcm/.
-setup -j -r /path/to/lsst-dm/fgcm/.
+setup -j -r /path/to/lsst-dm/fgcmcal/.
 ```
 
 Running FGCM
