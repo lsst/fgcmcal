@@ -10,8 +10,9 @@ import numpy as np
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
+from lsst.afw.image import Filter
 
-from .detectorThroughput import DetectorThroughput
+# from .detectorThroughput import DetectorThroughput
 
 import fgcm
 
@@ -326,6 +327,9 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         nCcd = len(camera)
         self.log.info("Found %d ccds for look-up table" % (nCcd))
 
+        # Load in optics, etc.
+        self._loadThroughputs(butler)
+
         # create the stub of the lutConfig
         lutConfig = {}
         lutConfig['logger'] = self.log
@@ -378,7 +382,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                       (throughputLambda[0], throughputLambda[-1],
                        throughputLambda[1]-throughputLambda[0]))
 
-        tput = DetectorThroughput()
+        # tput = DetectorThroughput()
 
         throughputDict = {}
         for i, filterName in enumerate(self.config.filterNames):
@@ -386,8 +390,9 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
             tDict['LAMBDA'] = throughputLambda
             for ccdIndex, detector in enumerate(camera):
                 # make sure we convert the calling units from A to nm
-                tDict[ccdIndex] = tput.getThroughputDetector(detector, filterName,
-                                                             throughputLambda/10.)
+                # tDict[ccdIndex] = tput.getThroughputDetector(detector, filterName,
+                 #                                            throughputLambda/10.)
+                tDict[ccdIndex] = self._getThroughputDetector(detector, filterName, throughputLambda)
             throughputDict[filterName] = tDict
 
         # set the throughputs
@@ -518,3 +523,48 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         butler.put(lutCat, 'fgcmLookUpTable')
 
         # and we're done
+
+    def _loadThroughputs(self, butler):
+        """
+        """
+
+        self._opticsTransmission = butler.get('transmission_optics')
+        self._sensorsTransmission = {}
+        for detector in camera:
+            self._sensorsTransmission[detector.getId()] = butler.get('transmission_sensor',
+                                                                     dataId={'ccd': detector.getId()})
+        self._filtersTransmission = {}
+        for filterName in self.config.filterNames:
+            f = Filter(filterName)
+            foundTrans = False
+            # Get all possible aliases, and also try the short filterName
+            aliases = f.getAliases()
+            aliases.extend(filterName)
+            for alias in f.getAliases():
+                try:
+                    self._filtersTransmission[filterName] = butler.get('transmission_filter',
+                                                                       dataId={'filter': alias})
+                    foundTrans = True
+                    break
+                except:
+                    pass
+            if not foundTrans:
+                raise ValueError("Could not find transmission for filter %s via any alias." % (filterName))
+
+
+    def _getThroughputDetector(self, detector, filterName, throughputLambda):
+        """
+        """
+
+        c = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
+
+        throughput = self._opticsTransmission.sampleAt(position=c,
+                                                       wavelengths=throughputLambda)
+
+        throughput *= self._sensorsTransmission[detector.getId()].sampleAt(position=c,
+                                                                           wavelengths=throughputLambda)
+
+        throughput *= self._filtersTransmission[filterName].sampleAt(position=c,
+                                                                     wavelengths=throughputLambda)
+
+        return throughput
