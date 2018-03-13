@@ -685,7 +685,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             ccdOffsets['CCDNUM'][i] = detector.getId()
 
             xform = orient.makePixelFpTransform(extent)
-            pointXform = xform.applyForward(camPoint.getPoint())
+            pointXform = xform.applyForward(camPoint)
             # this requires a pixelScale
             # NOTE that this now works properly with HSC, but I need to work on
             # generalizing this properly
