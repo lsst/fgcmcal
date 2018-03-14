@@ -3,6 +3,9 @@
 from __future__ import division, absolute_import, print_function
 from past.builtins import xrange
 
+import matplotlib
+matplotlib.use("Agg")
+
 import sys
 import traceback
 
@@ -291,19 +294,27 @@ class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
         """
 
         task = self.TaskClass(config=self.config, log=self.log)
+
+        exitStatus = 0
         if self.doRaise:
             results = task.run(butler)
         else:
             try:
                 results = task.run(butler)
             except Exception as e:
+                exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
                 if not isinstance(e, pipeBase.TaskError):
                     traceback.print_exc(file=sys.stderr)
 
         task.writeMetadata(butler)
+
         if self.doReturnResults:
-            return results
+            # Note that there's not much results to return (empty list)
+            return [pipeBase.Struct(exitStatus=exitStatus,
+                                    results=results)]
+        else:
+            return [pipeBase.Struct(exitStatus=exitStatus)]
 
     # turn off any multiprocessing
 
@@ -674,7 +685,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             ccdOffsets['CCDNUM'][i] = detector.getId()
 
             xform = orient.makePixelFpTransform(extent)
-            pointXform = xform.applyForward(camPoint.getPoint())
+            pointXform = xform.applyForward(camPoint)
             # this requires a pixelScale
             # NOTE that this now works properly with HSC, but I need to work on
             # generalizing this properly
@@ -1007,29 +1018,22 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['hasexternaltau'] = 0
 
         # parameter section
-        rec['paralpha'][:] = pars['PARALPHA'][0, :]
-        rec['paro3'][:] = pars['PARO3'][0, :]
-        rec['parlntauintercept'][:] = pars['PARLNTAUINTERCEPT'][0, :]
-        rec['parlntauslope'][:] = pars['PARLNTAUSLOPE'][0, :]
-        rec['parpwvintercept'][:] = pars['PARPWVINTERCEPT'][0, :]
-        rec['parpwvperslope'][:] = pars['PARPWVPERSLOPE'][0, :]
-        rec['parqesysintercept'][:] = pars['PARQESYSINTERCEPT'][0, :]
-        rec['parqesysslope'][:] = pars['PARQESYSSLOPE'][0, :]
-        rec['parretrievedpwvscale'] = pars['PARRETRIEVEDPWVSCALE']
-        rec['parretrievedpwvoffset'] = pars['PARRETRIEVEDPWVOFFSET']
-        rec['parretrievedpwvnightlyoffset'][:] = pars['PARRETRIEVEDPWVNIGHTLYOFFSET'][:]
-        rec['compapercorrpivot'][:] = pars['COMPAPERCORRPIVOT'][0, :]
-        rec['compapercorrslope'][:] = pars['COMPAPERCORRSLOPE'][0, :]
-        rec['compapercorrslopeerr'][:] = pars['COMPAPERCORRSLOPEERR'][0, :]
-        rec['compapercorrrange'][:] = pars['COMPAPERCORRRANGE'][0, :]
-        rec['compexpgray'][:] = pars['COMPEXPGRAY'][0, :]
-        rec['compvargray'][:] = pars['COMPVARGRAY'][0, :]
-        rec['compngoodstarperexp'][:] = pars['COMPNGOODSTARPEREXP'][0, :]
-        rec['compsigfgcm'][:] = pars['COMPSIGFGCM'][0, :]
-        rec['compretrievedpwv'][:] = pars['COMPRETRIEVEDPWV'][0, :]
-        rec['compretrievedpwvraw'][:] = pars['COMPRETRIEVEDPWVRAW'][0, :]
-        rec['compretrievedpwvflag'][:] = pars['COMPRETRIEVEDPWVFLAG'][0, :]
-        rec['compretrievedtaunight'][:] = pars['COMPRETRIEVEDTAUNIGHT'][0, :]
+
+        scalarNames = ['parretrievedpwvscale', 'parretrievedpwvoffset']
+
+        arrNames = ['paralpha', 'paro3', 'parlntauintercept', 'parlntauslope',
+                    'parpwvintercept', 'parpwvperslope', 'parqesysintercept',
+                    'parqesysslope', 'parretrievedpwvnightlyoffset', 'compapercorrpivot',
+                    'compapercorrslope', 'compapercorrslopeerr', 'compapercorrrange',
+                    'compexpgray', 'compvargray', 'compngoodstarperexp', 'compsigfgcm',
+                    'compretrievedpwv', 'compretrievedpwvraw', 'compretrievedpwvflag',
+                    'compretrievedtaunight']
+
+        for scalarName in scalarNames:
+            rec[scalarName] = pars[scalarName.upper()]
+
+        for arrName in arrNames:
+            rec[arrName][:] = np.atleast_1d(pars[0][arrName.upper()])[:]
 
         # superstar section
         rec['superstarsize'][:] = fgcmFitCycle.fgcmPars.parSuperStarFlat.shape
@@ -1099,6 +1103,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         zptCat = zptCat.copy(deep=True)
 
+        # FIXME: will need to port over the visitDataRefName from the build stars config...
         zptCat['visit'][:] = fgcmFitCycle.fgcmZpts.zpStruct['VISIT']
         zptCat['ccd'][:] = fgcmFitCycle.fgcmZpts.zpStruct['CCD']
         zptCat['fgcmflag'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FLAG']
@@ -1164,7 +1169,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         self.log.info("Saved config for next cycle to %s" % (configFileName))
         self.log.info("Be sure to look at:")
-        self.log.info("   config.freezeStdAtmosphere")
         self.log.info("   config.expGrayPhotometricCut")
+        self.log.info("   config.expGrayHighCut")
 
         # tear down and clear memory

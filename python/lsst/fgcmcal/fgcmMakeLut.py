@@ -211,19 +211,27 @@ class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
         An empty list if self.doReturnResults is True
         """
         task = self.TaskClass(config=self.config, log=self.log)
+
+        exitStatus = 0
         if self.doRaise:
             results = task.run(butler)
         else:
             try:
                 results = task.run(butler)
             except Exception as e:
+                exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
                 if not isinstance(e, pipeBase.TaskError):
                     traceback.print_exc(file=sys.stderr)
 
         task.writeMetadata(butler)
+
         if self.doReturnResults:
-            return results
+            # Not much in terms of results to return (empty list)
+            return [pipeBase.Struct(exitStatus=exitStatus,
+                                    results=results)]
+        else:
+            return [pipeBase.Struct(exitStatus=exitStatus)]
 
     # turn off any multiprocessing
 
@@ -296,6 +304,8 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
 
         if (not butler.datasetExists('fgcmLookUpTable')):
             self._fgcmMakeLut(butler)
+        else:
+            self.log.info("Found existing fgcmLookUpTable.  Skipping creation.")
 
         return []
 

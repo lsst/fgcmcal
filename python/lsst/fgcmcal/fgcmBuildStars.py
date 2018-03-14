@@ -24,6 +24,11 @@ __all__ = ['FgcmBuildStarsConfig', 'FgcmBuildStarsTask']
 class FgcmBuildStarsConfig(pexConfig.Config):
     """Config for FgcmBuildStarsTask"""
 
+    remake = pexConfig.Field(
+        doc="Remake visit catalog and stars even if they are already in the butler tree.",
+        dtype=bool,
+        default=False,
+    )
     minPerBand = pexConfig.Field(
         doc="Minimum observations per band",
         dtype=int,
@@ -148,19 +153,26 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         butler, dataRefList = args
 
         task = self.TaskClass(config=self.config, log=self.log)
+
+        exitStatus = 0
         if self.doRaise:
             results = task.run(butler, dataRefList)
         else:
             try:
                 results = task.run(butler, dataRefList)
             except Exception as e:
+                exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
                 if not isinstance(e, pipeBase.TaskError):
                     traceback.print_exc(file=sys.stderr)
 
         task.writeMetadata(butler)
+
         if self.doReturnResults:
-            return results
+            return [pipeBase.Struct(exitStatus=exitStatus,
+                                    results=results)]
+        else:
+            return [pipeBase.Struct(exitStatus=exitStatus)]
 
     # turn off any multiprocessing
 
@@ -246,27 +258,28 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             * dataRefs: the provided data references consolidated
         """
 
-        # make the visit catalog if necessary
-        #  question: what's the propper clobber interface?
-        #  we also need to know the way of checking the matched config?
-        if (butler.datasetExists('fgcmVisitCatalog')):
-            visitCat = butler.get('fgcmVisitCatalog')
-        else:
+        # Make the visit catalog if necessary
+        if self.config.remake or not butler.datasetExists('fgcmVisitCatalog'):
             # we need to build visitCat
             visitCat = self._fgcmMakeVisitCatalog(butler, dataRefs)
+        else:
+            self.log.info("Found fgcmVisitCatalog.")
+            visitCat = butler.get('fgcmVisitCatalog')
 
-        # and compile all the stars
-        #  this will put this dataset out.
-        if (not butler.datasetExists('fgcmStarObservations')):
+        # Compile all the stars
+        if self.config.remake or not butler.datasetExists('fgcmStarObservations'):
             self._fgcmMakeAllStarObservations(butler, visitCat)
+        else:
+            self.log.info("Found fgcmStarObservations")
 
-        if (not butler.datasetExists('fgcmStarIds') or
-           not butler.datasetExists('fgcmStarIndices')):
+        if self.config.remake or (not butler.datasetExists('fgcmStarIds') or
+                                  not butler.datasetExists('fgcmStarIndices')):
             self._fgcmMatchStars(butler, visitCat)
+        else:
+            self.log.info("Found fgcmStarIds and fgcmStarIndices")
 
-        # FIXME: probably need list of dataRefs actually used?
-        #        What is this used for?
-        return pipeBase.Struct(dataRefs=dataRefs)
+        # The return value could be the visitCat, if anybody wants that.
+        return visitCat
 
     def _fgcmMakeVisitCatalog(self, butler, dataRefs):
         """
@@ -307,6 +320,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # get the visits from the datarefs, only for referenceCCD
             srcVisits = [d.dataId[self.config.visitDataRefName] for d in dataRefs if
                          d.dataId[self.config.ccdDataRefName] == self.config.referenceCCD]
+
+        # Sort the visits for searching/indexing
+        srcVisits.sort()
 
         self.log.info("Found %d visits in %.2f s" %
                       (len(srcVisits), time.time()-startTime))
@@ -434,23 +450,62 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 if not started:
                     # get the keys for quicker look-up
 
-                    # based pm ApFlux.  Maybe make configurable?
-                    # Note that these seem to be the right flags to cut on, but
-                    #  names may change between versions of the stack?
+                    # Calibration is based on ApFlux.  Maybe this should be configurable
+                    # in the future.
                     fluxKey = sources.getApFluxKey()
                     fluxErrKey = sources.getApFluxErrKey()
-                    satCenterKey = sources.schema.find('flag_pixel_saturated_center').key
-                    intCenterKey = sources.schema.find('flag_pixel_interpolated_center').key
-                    pixEdgeKey = sources.schema.find('flag_pixel_edge').key
-                    pixCrCenterKey = sources.schema.find('flag_pixel_cr_center').key
-                    pixBadKey = sources.schema.find('flag_pixel_bad').key
-                    pixInterpAnyKey = sources.schema.find('flag_pixel_interpolated_any').key
+
+                    # These flags have the same name across processing
                     centroidFlagKey = sources.schema.find('slot_Centroid_flag').key
                     apFluxFlagKey = sources.schema.find('slot_ApFlux_flag').key
-                    deblendNchildKey = sources.schema.find('deblend_nchild').key
                     parentKey = sources.schema.find('parent').key
-                    extKey = sources.schema.find('classification_extendedness').key
-                    jacobianKey = sources.schema.find('jacobian').key
+
+                    # Flags and other bits have had names changed at some point.  Try new
+                    # then old
+                    try:
+                        satCenterKey = sources.schema.find('base_PixelFlags_flag_saturatedCenter').key
+                    except KeyError:
+                        satCenterKey = sources.schema.find('flag_pixel_saturated_center').key
+
+                    try:
+                        intCenterKey = sources.schema.find('base_PixelFlags_flag_interpolatedCenter').key
+                    except KeyError:
+                        intCenterKey = sources.schema.find('flag_pixel_interpolated_center').key
+
+                    try:
+                        pixEdgeKey = sources.schema.find('base_PixelFlags_flag_edge').key
+                    except KeyError:
+                        pixEdgeKey = sources.schema.find('flag_pixel_edge').key
+
+                    try:
+                        pixCrCenterKey = sources.schema.find('base_PixelFlags_flag_crCenter').key
+                    except KeyError:
+                        pixCrCenterKey = sources.schema.find('flag_pixel_cr_center').key
+
+                    try:
+                        pixBadKey = sources.schema.find('base_PixelFlags_flag_bad').key
+                    except KeyError:
+                        pixBadKey = sources.schema.find('flag_pixel_bad').key
+
+                    try:
+                        pixInterpKey = sources.schema.find('base_PixelFlags_flag_interpolated').key
+                    except KeyError:
+                        pixInterpKey = sources.schema.find('flag_pixel_interpolated_any').key
+
+                    try:
+                        deblendNchildKey = sources.schema.find('deblend_nChild').key
+                    except KeyError:
+                        deblendNchildKey = sources.schema.find('deblend_nchild').key
+
+                    try:
+                        extKey = sources.schema.find('base_ClassificationExtendedness_value').key
+                    except KeyError:
+                        extKey = sources.schema.find('classification_extendedness').key
+
+                    try:
+                        jacobianKey = sources.schema.find('base_Jacobian_value').key
+                    except KeyError:
+                        jacobianKey = sources.schema.find('jacobian').key
 
                     outputSchema = sourceMapper.getOutputSchema()
                     visitKey = outputSchema.find('visit').key
@@ -478,7 +533,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                                 ~sources[pixEdgeKey],
                                                 ~sources[pixCrCenterKey],
                                                 ~sources[pixBadKey],
-                                                ~sources[pixInterpAnyKey],
+                                                ~sources[pixInterpKey],
                                                 ~sources[centroidFlagKey],
                                                 ~sources[apFluxFlagKey],
                                                 sources[deblendNchildKey] == 0,

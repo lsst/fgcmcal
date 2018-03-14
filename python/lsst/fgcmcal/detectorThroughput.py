@@ -49,7 +49,7 @@ class DetectorThroughput(object):
         c = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
 
         return self.getThroughputXY(filterName,
-                                    c.getPoint().getX(), c.getPoint().getY(),
+                                    c.getX(), c.getY(),
                                     lam)
 
     def getThroughputXY(self, filterName, x, y, lam):
