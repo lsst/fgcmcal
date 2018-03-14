@@ -13,8 +13,6 @@ import lsst.afw.table as afwTable
 import lsst.afw.cameraGeom as afwCameraGeom
 from lsst.afw.image import Filter
 
-# from .detectorThroughput import DetectorThroughput
-
 import fgcm
 
 __all__ = ['FgcmMakeLutParametersConfig', 'FgcmMakeLutConfig', 'FgcmMakeLutTask']
@@ -383,16 +381,11 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                       (throughputLambda[0], throughputLambda[-1],
                        throughputLambda[1]-throughputLambda[0]))
 
-        # tput = DetectorThroughput()
-
         throughputDict = {}
         for i, filterName in enumerate(self.config.filterNames):
             tDict = {}
             tDict['LAMBDA'] = throughputLambda
             for ccdIndex, detector in enumerate(camera):
-                # make sure we convert the calling units from A to nm
-                # tDict[ccdIndex] = tput.getThroughputDetector(detector, filterName,
-                 #                                            throughputLambda/10.)
                 tDict[ccdIndex] = self._getThroughputDetector(detector, filterName, throughputLambda)
             throughputDict[filterName] = tDict
 
@@ -526,7 +519,16 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         # and we're done
 
     def _loadThroughputs(self, butler):
-        """
+        """Internal method to load throughput data for filters
+
+        Parameters
+        ----------
+        butler: `lsst.dat.persistence.butler.Butler`
+           A butler with the camera and transmission info
+
+        Returns
+        -------
+        None
         """
 
         camera = butler.get('camera')
@@ -556,7 +558,23 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
 
 
     def _getThroughputDetector(self, detector, filterName, throughputLambda):
-        """
+        """Internal method to get throughput for a detector.
+
+        Returns the throughput at the center of the detector for a given filter.
+
+        Parameters
+        ----------
+        detector: `lsst.afw.cameraGeom._detector.Detector`
+           Detector on camera
+        filterName: `str`
+           Short name for filter
+        throughputLambda: `np.array(dtype=np.float64)`, A
+           Wavelength steps (A)
+
+        Returns
+        -------
+        throughput: `np.array(dtype=np.float64)`
+           Throughput (max 1.0) at throughputLambda
         """
 
         c = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
