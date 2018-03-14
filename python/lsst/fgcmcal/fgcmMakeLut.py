@@ -10,6 +10,7 @@ import numpy as np
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
+import lsst.afw.cameraGeom as afwCameraGeom
 from lsst.afw.image import Filter
 
 # from .detectorThroughput import DetectorThroughput
@@ -527,6 +528,8 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
     def _loadThroughputs(self, butler):
         """
         """
+
+        camera = butler.get('camera')
 
         self._opticsTransmission = butler.get('transmission_optics')
         self._sensorsTransmission = {}
