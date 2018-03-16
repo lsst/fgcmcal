@@ -13,6 +13,7 @@ import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
 from lsst.daf.base.dateTime import DateTime
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
+from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
 import time
 
@@ -105,10 +106,25 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=bool,
         default=True
     )
+    sourceSelector = sourceSelectorRegistry.makeField(
+        doc="How to select sources",
+        default="science"
+    )
 
     def setDefaults(self):
-        pass
+        sourceSelector = self.sourceSelector["science"]
+        sourceSelector.setDefaults()
 
+        sourceSelector.doFlags = True
+        sourceSelector.doUnresolved = True
+        sourceSelector.doSignalToNoise = True
+        sourceSelector.doIsolated = True
+
+        sourceSelector.signalToNoise.fluxField = 'slot_ApFlux_flux'
+        sourceSelector.signalToNoise.errField = 'slot_ApFlux_fluxSigma'
+        sourceSelector.signalToNoise.minimum = 10.0
+
+        sourceSelector.unresolved.maximum = 0.5
 
 class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmBuildStarsTask
@@ -217,6 +233,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         """
 
         pipeBase.CmdLineTask.__init__(self, **kwargs)
+        self.makeSubtask("sourceSelector")
 
     @classmethod
     def _makeArgumentParser(cls):
@@ -455,108 +472,78 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     fluxKey = sources.getApFluxKey()
                     fluxErrKey = sources.getApFluxErrKey()
 
-                    # These flags have the same name across processing
-                    centroidFlagKey = sources.schema.find('slot_Centroid_flag').key
-                    apFluxFlagKey = sources.schema.find('slot_ApFlux_flag').key
-                    parentKey = sources.schema.find('parent').key
-
-                    # Flags and other bits have had names changed at some point.  Try new
-                    # then old
+                    # Need to check old and new flag names for compatibility
+                    # with the i2 test data that is on tiger
+                    newStyle = False
                     try:
-                        satCenterKey = sources.schema.find('base_PixelFlags_flag_saturatedCenter').key
+                        jacobianKey = sources.schema['base_Jacobian_value'].asKey()
+                        newStyle = True
                     except KeyError:
-                        satCenterKey = sources.schema.find('flag_pixel_saturated_center').key
+                        jacobianKey = sources.schema['jacobian'].asKey()
 
-                    try:
-                        intCenterKey = sources.schema.find('base_PixelFlags_flag_interpolatedCenter').key
-                    except KeyError:
-                        intCenterKey = sources.schema.find('flag_pixel_interpolated_center').key
+                    if newStyle:
+                        badFlags = ['base_PixelFlags_flag_edge',
+                                    'base_PixelFlags_flag_interpolatedCenter',
+                                    'base_PixelFlags_flag_saturatedCenter',
+                                    'base_PixelFlags_flag_crCenter',
+                                    'base_PixelFlags_flag_bad',
+                                    'base_PixelFlags_flag_interpolated',
+                                    'base_PixelFlags_flag_saturated',
+                                    'slot_Centroid_flag',
+                                    'slot_ApFlux_flag']
+                        deblendNchildName = 'deblend_nChild'
+                        extendednessName = 'base_ClassificationExtendedness_value'
 
-                    try:
-                        pixEdgeKey = sources.schema.find('base_PixelFlags_flag_edge').key
-                    except KeyError:
-                        pixEdgeKey = sources.schema.find('flag_pixel_edge').key
+                    else:
+                        # Old style
+                        badFlags = ['flag_pixel_edge',
+                                    'flag_pixel_interpolated_center',
+                                    'flag_pixel_saturated_center',
+                                    'flag_pixel_cr_center',
+                                    'flag_pixel_bad',
+                                    'flag_pixel_interpolated_any',
+                                    'flag_pixel_saturated',
+                                    'slot_Centroid_flag',
+                                    'slot_ApFlux_flag']
+                        deblendNchildName = 'deblend_nchild'
+                        extendednessName = 'classification_extendedness'
 
-                    try:
-                        pixCrCenterKey = sources.schema.find('base_PixelFlags_flag_crCenter').key
-                    except KeyError:
-                        pixCrCenterKey = sources.schema.find('flag_pixel_cr_center').key
-
-                    try:
-                        pixBadKey = sources.schema.find('base_PixelFlags_flag_bad').key
-                    except KeyError:
-                        pixBadKey = sources.schema.find('flag_pixel_bad').key
-
-                    try:
-                        pixInterpKey = sources.schema.find('base_PixelFlags_flag_interpolated').key
-                    except KeyError:
-                        pixInterpKey = sources.schema.find('flag_pixel_interpolated_any').key
-
-                    try:
-                        deblendNchildKey = sources.schema.find('deblend_nChild').key
-                    except KeyError:
-                        deblendNchildKey = sources.schema.find('deblend_nchild').key
-
-                    try:
-                        extKey = sources.schema.find('base_ClassificationExtendedness_value').key
-                    except KeyError:
-                        extKey = sources.schema.find('classification_extendedness').key
-
-                    try:
-                        jacobianKey = sources.schema.find('base_Jacobian_value').key
-                    except KeyError:
-                        jacobianKey = sources.schema.find('jacobian').key
+                    self.sourceSelector.config.flags.bad = badFlags
+                    self.sourceSelector.config.isolated.nChildName = deblendNchildName
+                    self.sourceSelector.config.unresolved.name = extendednessName
 
                     outputSchema = sourceMapper.getOutputSchema()
-                    visitKey = outputSchema.find('visit').key
-                    ccdKey = outputSchema.find('ccd').key
-                    magKey = outputSchema.find('mag').key
-                    magErrKey = outputSchema.find('magerr').key
+                    visitKey = outputSchema['visit'].asKey()
+                    ccdKey = outputSchema['ccd'].asKey()
+                    magKey = outputSchema['mag'].asKey()
+                    magErrKey = outputSchema['magerr'].asKey()
 
                     # and the final part of the sourceMapper
-                    sourceMapper.addMapping(sources.schema.find('slot_Centroid_x').key, 'x')
-                    sourceMapper.addMapping(sources.schema.find('slot_Centroid_y').key, 'y')
+                    sourceMapper.addMapping(sources.schema['slot_Centroid_x'].asKey(), 'x')
+                    sourceMapper.addMapping(sources.schema['slot_Centroid_y'].asKey(), 'y')
 
                     # Create a stub of the full catalog
                     fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
 
                     started = True
 
-                magErr = (2.5/np.log(10.)) * (sources[fluxErrKey] /
-                                              sources[fluxKey])
-                magErr = np.nan_to_num(magErr)
-
-                # This selection method is fastest and works
-                #  with afwTable (patched Sept. 2017)
-                gdFlag = np.logical_and.reduce([~sources[satCenterKey],
-                                                ~sources[intCenterKey],
-                                                ~sources[pixEdgeKey],
-                                                ~sources[pixCrCenterKey],
-                                                ~sources[pixBadKey],
-                                                ~sources[pixInterpKey],
-                                                ~sources[centroidFlagKey],
-                                                ~sources[apFluxFlagKey],
-                                                sources[deblendNchildKey] == 0,
-                                                sources[parentKey] == 0,
-                                                sources[extKey] < 0.5,
-                                                np.isfinite(magErr),
-                                                magErr > 0.001,
-                                                magErr < 0.1])
+                goodSrc = self.sourceSelector.selectSources(sources)
 
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
-                tempCat.table.preallocate(gdFlag.sum())
-                tempCat.extend(sources[gdFlag], mapper=sourceMapper)
+                tempCat.table.preallocate(len(goodSrc.sourceCat))
+                tempCat.extend(goodSrc.sourceCat, mapper=sourceMapper)
                 tempCat[visitKey][:] = visit['visit']
                 tempCat[ccdKey][:] = ccdId
-                # Compute magnitude by scaling flux with exposure time,
-                # and arbitrary zeropoint that needs to be investigated.
+                # Compute "magnitude" by scaling flux with exposure time.
+                # Add an arbitrary zeropoint that needs to be investigated.
                 tempCat[magKey][:] = (self.config.zeropointDefault -
-                                      2.5*np.log10(sources[fluxKey][gdFlag]) +
-                                      2.5*np.log10(expTime))
-                tempCat[magErrKey][:] = magErr[gdFlag]
+                                      2.5 * np.log10(goodSrc.sourceCat[fluxKey]) +
+                                      2.5 * np.log10(expTime))
+                tempCat[magErrKey][:] = (2.5 / np.log10.) * (goodSrc.sourceCat[fluxErrKey] /
+                                                             goodSrc.sourceCat[fluxKey])
 
                 if self.config.applyJacobian:
-                    tempCat[magKey][:] -= 2.5*np.log10(sources[jacobianKey][gdFlag])
+                    tempCat[magKey][:] -= 2.5 * np.log10(goodSrc.sourceCat[jacobianKey])
 
                 fullCatalog.extend(tempCat)
 
