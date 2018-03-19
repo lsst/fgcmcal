@@ -249,6 +249,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         pipeBase.CmdLineTask.__init__(self, **kwargs)
         self.makeSubtask("sourceSelector")
+        # Only log fatal errors from the sourceSelector
+        self.sourceSelector.log.setLevel(self.sourceSelector.log.FATAL)
+
 
     @classmethod
     def _makeArgumentParser(cls):
