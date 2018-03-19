@@ -106,6 +106,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=bool,
         default=True
     )
+    jacobianField = pexConfig.Field(
+        doc="Name of field with jacobian correction",
+        dtype=str,
+        default="base_Jacobian_value"
+    )
     sourceSelector = sourceSelectorRegistry.makeField(
         doc="How to select sources",
         default="science"
@@ -114,6 +119,16 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     def setDefaults(self):
         sourceSelector = self.sourceSelector["science"]
         sourceSelector.setDefaults()
+
+        sourceSelector.flags.bad = ['base_PixelFlags_flag_edge',
+                                    'base_PixelFlags_flag_interpolatedCenter',
+                                    'base_PixelFlags_flag_saturatedCenter',
+                                    'base_PixelFlags_flag_crCenter',
+                                    'base_PixelFlags_flag_bad',
+                                    'base_PixelFlags_flag_interpolated',
+                                    'base_PixelFlags_flag_saturated',
+                                    'slot_Centroid_flag',
+                                    'slot_ApFlux_flag']
 
         sourceSelector.doFlags = True
         sourceSelector.doUnresolved = True
@@ -472,45 +487,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     fluxKey = sources.getApFluxKey()
                     fluxErrKey = sources.getApFluxErrKey()
 
-                    # Need to check old and new flag names for compatibility
-                    # with the i2 test data that is on tiger
-                    newStyle = False
-                    try:
-                        jacobianKey = sources.schema['base_Jacobian_value'].asKey()
-                        newStyle = True
-                    except KeyError:
-                        jacobianKey = sources.schema['jacobian'].asKey()
-
-                    if newStyle:
-                        badFlags = ['base_PixelFlags_flag_edge',
-                                    'base_PixelFlags_flag_interpolatedCenter',
-                                    'base_PixelFlags_flag_saturatedCenter',
-                                    'base_PixelFlags_flag_crCenter',
-                                    'base_PixelFlags_flag_bad',
-                                    'base_PixelFlags_flag_interpolated',
-                                    'base_PixelFlags_flag_saturated',
-                                    'slot_Centroid_flag',
-                                    'slot_ApFlux_flag']
-                        deblendNchildName = 'deblend_nChild'
-                        extendednessName = 'base_ClassificationExtendedness_value'
-
+                    if self.config.applyJacobian:
+                        jacobianKey = sources.schema[self.config.jacobianField].asKey()
                     else:
-                        # Old style
-                        badFlags = ['flag_pixel_edge',
-                                    'flag_pixel_interpolated_center',
-                                    'flag_pixel_saturated_center',
-                                    'flag_pixel_cr_center',
-                                    'flag_pixel_bad',
-                                    'flag_pixel_interpolated_any',
-                                    'flag_pixel_saturated',
-                                    'slot_Centroid_flag',
-                                    'slot_ApFlux_flag']
-                        deblendNchildName = 'deblend_nchild'
-                        extendednessName = 'classification_extendedness'
-
-                    self.sourceSelector.config.flags.bad = badFlags
-                    self.sourceSelector.config.isolated.nChildName = deblendNchildName
-                    self.sourceSelector.config.unresolved.name = extendednessName
+                        jacobianKey = None
 
                     outputSchema = sourceMapper.getOutputSchema()
                     visitKey = outputSchema['visit'].asKey()
@@ -539,8 +519,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat[magKey][:] = (self.config.zeropointDefault -
                                       2.5 * np.log10(goodSrc.sourceCat[fluxKey]) +
                                       2.5 * np.log10(expTime))
-                tempCat[magErrKey][:] = (2.5 / np.log10.) * (goodSrc.sourceCat[fluxErrKey] /
-                                                             goodSrc.sourceCat[fluxKey])
+                tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (goodSrc.sourceCat[fluxErrKey] /
+                                                               goodSrc.sourceCat[fluxKey])
 
                 if self.config.applyJacobian:
                     tempCat[magKey][:] -= 2.5 * np.log10(goodSrc.sourceCat[jacobianKey])
