@@ -80,7 +80,7 @@ This is a very simple command-line task (where you substitute your username for
 
 ```bash
 fgcmMakeLut.py /datasets/hsc/repo --rerun \
-RC/w_2018_10/DM-00000:private/USER/fgcm_cookbook/lut --configfile \
+RC/w_2018_10/DM-13647:private/USER/fgcm_cookbook/lut --configfile \
 $FGCMCAL_DIR/cookbook/fgcmMakeLutHscFromTable.py
 ```
 
