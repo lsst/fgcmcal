@@ -106,7 +106,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=bool,
         default=True
     )
-    jacobianField = pexConfig.Field(
+    jacobianName = pexConfig.Field(
         doc="Name of field with jacobian correction",
         dtype=str,
         default="base_Jacobian_value"
@@ -492,7 +492,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     fluxErrKey = sources.getApFluxErrKey()
 
                     if self.config.applyJacobian:
-                        jacobianKey = sources.schema[self.config.jacobianField].asKey()
+                        jacobianKey = sources.schema[self.config.jacobianName].asKey()
                     else:
                         jacobianKey = None
 
