@@ -138,6 +138,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector.signalToNoise.fluxField = 'slot_ApFlux_flux'
         sourceSelector.signalToNoise.errField = 'slot_ApFlux_fluxSigma'
         sourceSelector.signalToNoise.minimum = 10.0
+        sourceSelector.signalToNoise.maximum = 1000.0
 
         sourceSelector.unresolved.maximum = 0.5
 
