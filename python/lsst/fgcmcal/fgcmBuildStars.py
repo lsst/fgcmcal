@@ -357,7 +357,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
                                                             self.config.ccdDataRefName:
                                                                 self.config.referenceCCD})):
-                    srcVisits.append(dataset[0])
+                        srcVisits.append(dataset[0])
             else:
                 # Slower mode, check all CCDs
                 allVisits = butler.queryMetadata('src',
@@ -369,7 +369,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 for dataset in allVisits:
                     if dataset[0] in srcVisits:
                         continue
-                    for ccd in len(camera):
+                    for ccd in xrange(len(camera)):
                         if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
                                                                 self.config.ccdDataRefName:
                                                                     ccd})):

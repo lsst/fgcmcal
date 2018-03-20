@@ -520,6 +520,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'useSedLUT': False,
                       'resetParameters': True}
 
+        """
         # set up the look-up-table
         lutCat = butler.get('fgcmLookUpTable')
 
@@ -630,12 +631,18 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         fgcmLut = fgcm.FgcmLUT(lutIndexVals, lutFlat, lutDerivFlat, lutStd,
                                filterToBand=self.config.filterToBand)
+                               """
 
+        fgcmLut = self._loadFgcmLut(butler, filterToBand=self.config.filterToBand)
+
+        """
         # and clear out the memory of the big created objects
         lutFlat = None
         lutDerivFlat = None
+        """
 
         # next we need the exposure/visit information
+        """
         visitCat = butler.get('fgcmVisitCatalog')
 
         fgcmExpInfo = np.zeros(len(visitCat), dtype=[('VISIT', 'i8'),
@@ -660,7 +667,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # Note that we have to go through asAstropy() to get a string
         #  array out of an afwTable
         fgcmExpInfo['FILTERNAME'][:] = visitCat.asAstropy()['filtername']
+        """
 
+        fgcmExpInfo = self._loadVisitCatalog(butler)
+
+        """
         # and we need to know the ccd offsets from the camera geometry
         ccdOffsets = np.zeros(lutIndexVals['NCCD'], dtype=[('CCDNUM', 'i4'),
                                                            ('DELTA_RA', 'f8'),
@@ -701,6 +712,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
             ccdOffsets['X_SIZE'][i] = bbox.getMaxX()
             ccdOffsets['Y_SIZE'][i] = bbox.getMaxY()
+            """
+        ccdOffsets = self._loadCcdOffsets(butler)
 
         noFitsDict = {'lutIndex': lutIndexVals,
                       'lutStd': lutStd,
@@ -1173,3 +1186,202 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         self.log.info("   config.expGrayHighCut")
 
         # tear down and clear memory
+
+    def _loadFgcmLut(self, butler, filterToBand=None):
+        """
+        """
+
+        # set up the look-up-table
+        lutCat = butler.get('fgcmLookUpTable')
+
+        # first we need the lutIndexVals
+        # dtype is set for py2/py3/fits/fgcm compatibility
+        lutFilterNames = np.array(lutCat[0]['filternames'].split(','), dtype='a')
+        lutStdFilterNames = np.array(lutCat[0]['stdfilternames'].split(','), dtype='a')
+
+        # FIXME: check that lutBands equal listed bands!
+
+        lutIndexVals = np.zeros(1, dtype=[('FILTERNAMES', lutFilterNames.dtype.str,
+                                           lutFilterNames.size),
+                                          ('STDFILTERNAMES', lutStdFilterNames.dtype.str,
+                                           lutStdFilterNames.size),
+                                          ('PMB', 'f8', lutCat[0]['pmb'].size),
+                                          ('PMBFACTOR', 'f8', lutCat[0]['pmbfactor'].size),
+                                          ('PMBELEVATION', 'f8'),
+                                          ('LAMBDANORM', 'f8'),
+                                          ('PWV', 'f8', lutCat[0]['pwv'].size),
+                                          ('O3', 'f8', lutCat[0]['o3'].size),
+                                          ('TAU', 'f8', lutCat[0]['tau'].size),
+                                          ('ALPHA', 'f8', lutCat[0]['alpha'].size),
+                                          ('ZENITH', 'f8', lutCat[0]['zenith'].size),
+                                          ('NCCD', 'i4')])
+
+        lutIndexVals['FILTERNAMES'][:] = lutFilterNames
+        lutIndexVals['STDFILTERNAMES'][:] = lutStdFilterNames
+        lutIndexVals['PMB'][:] = lutCat[0]['pmb']
+        lutIndexVals['PMBFACTOR'][:] = lutCat[0]['pmbfactor']
+        lutIndexVals['PMBELEVATION'] = lutCat[0]['pmbelevation']
+        lutIndexVals['LAMBDANORM'] = lutCat[0]['lambdanorm']
+        lutIndexVals['PWV'][:] = lutCat[0]['pwv']
+        lutIndexVals['O3'][:] = lutCat[0]['o3']
+        lutIndexVals['TAU'][:] = lutCat[0]['tau']
+        lutIndexVals['ALPHA'][:] = lutCat[0]['alpha']
+        lutIndexVals['ZENITH'][:] = lutCat[0]['zenith']
+        lutIndexVals['NCCD'] = lutCat[0]['nccd']
+
+        # now we need the Standard Values
+        lutStd = np.zeros(1, dtype=[('PMBSTD', 'f8'),
+                                    ('PWVSTD', 'f8'),
+                                    ('O3STD', 'f8'),
+                                    ('TAUSTD', 'f8'),
+                                    ('ALPHASTD', 'f8'),
+                                    ('ZENITHSTD', 'f8'),
+                                    ('LAMBDARANGE', 'f8', 2),
+                                    ('LAMBDASTEP', 'f8'),
+                                    ('LAMBDASTD', 'f8', lutFilterNames.size),
+                                    ('LAMBDASTDFILTER', 'f8', lutStdFilterNames.size),
+                                    ('I0STD', 'f8', lutFilterNames.size),
+                                    ('I1STD', 'f8', lutFilterNames.size),
+                                    ('I10STD', 'f8', lutFilterNames.size),
+                                    ('LAMBDAB', 'f8', lutFilterNames.size),
+                                    ('ATMLAMBDA', 'f8', lutCat[0]['atmlambda'].size),
+                                    ('ATMSTDTRANS', 'f8', lutCat[0]['atmstdtrans'].size)])
+        lutStd['PMBSTD'] = lutCat[0]['pmbstd']
+        lutStd['PWVSTD'] = lutCat[0]['pwvstd']
+        lutStd['O3STD'] = lutCat[0]['o3std']
+        lutStd['TAUSTD'] = lutCat[0]['taustd']
+        lutStd['ALPHASTD'] = lutCat[0]['alphastd']
+        lutStd['ZENITHSTD'] = lutCat[0]['zenithstd']
+        lutStd['LAMBDARANGE'][:] = lutCat[0]['lambdarange'][:]
+        lutStd['LAMBDASTEP'] = lutCat[0]['lambdastep']
+        lutStd['LAMBDASTD'][:] = lutCat[0]['lambdastd']
+        lutStd['LAMBDASTDFILTER'][:] = lutCat[0]['lambdastdfilter']
+        lutStd['I0STD'][:] = lutCat[0]['i0std']
+        lutStd['I1STD'][:] = lutCat[0]['i1std']
+        lutStd['I10STD'][:] = lutCat[0]['i10std']
+        lutStd['LAMBDAB'][:] = lutCat[0]['lambdab']
+        lutStd['ATMLAMBDA'][:] = lutCat[0]['atmlambda'][:]
+        lutStd['ATMSTDTRANS'][:] = lutCat[0]['atmstdtrans'][:]
+
+        lutTypes = []
+        for row in lutCat:
+            lutTypes.append(row['luttype'])
+
+        # And the flattened look-up-table
+        lutFlat = np.zeros(lutCat[0]['lut'].size, dtype=[('I0', 'f4'),
+                                                         ('I1', 'f4')])
+
+        try:
+            lutFlat['I0'][:] = lutCat[lutTypes.index('I0')]['lut'][:]
+            lutFlat['I1'][:] = lutCat[lutTypes.index('I1')]['lut'][:]
+        except:
+            # need to raise exception
+            pass
+
+        lutDerivFlat = np.zeros(lutCat[0]['lut'].size, dtype=[('D_PWV', 'f4'),
+                                                              ('D_O3', 'f4'),
+                                                              ('D_LNTAU', 'f4'),
+                                                              ('D_ALPHA', 'f4'),
+                                                              ('D_SECZENITH', 'f4'),
+                                                              ('D_PWV_I1', 'f4'),
+                                                              ('D_O3_I1', 'f4'),
+                                                              ('D_LNTAU_I1', 'f4'),
+                                                              ('D_ALPHA_I1', 'f4'),
+                                                              ('D_SECZENITH_I1', 'f4')])
+
+        try:
+            for name in lutDerivFlat.dtype.names:
+                lutDerivFlat[name][:] = lutCat[lutTypes.index(name)]['lut'][:]
+        except:
+            # raise a helpful exception
+            pass
+
+        # and clear out the memory from the big object
+        lutCat = None
+
+        fgcmLut = fgcm.FgcmLUT(lutIndexVals, lutFlat, lutDerivFlat, lutStd,
+                               filterToBand=self.config.filterToBand)
+
+        # and clear out the memory of the large temporary objects
+        lutFlat = None
+        lutDerivFlat = None
+
+        return fgcmLut
+
+    def _loadVisitCatalog(self, butler):
+        """
+        """
+
+        # next we need the exposure/visit information
+        visitCat = butler.get('fgcmVisitCatalog')
+
+        fgcmExpInfo = np.zeros(len(visitCat), dtype=[('VISIT', 'i8'),
+                                                     ('MJD', 'f8'),
+                                                     ('EXPTIME', 'f8'),
+                                                     ('SEEING', 'f8'),
+                                                     ('DEEPFLAG', 'i2'),
+                                                     ('TELHA', 'f8'),
+                                                     ('TELRA', 'f8'),
+                                                     ('TELDEC', 'f8'),
+                                                     ('PMB', 'f8'),
+                                                     ('FILTERNAME', 'a2')])
+        fgcmExpInfo['VISIT'][:] = visitCat['visit']
+        fgcmExpInfo['MJD'][:] = visitCat['mjd']
+        fgcmExpInfo['EXPTIME'][:] = visitCat['exptime']
+        fgcmExpInfo['SEEING'][:] = visitCat['fwhm']
+        fgcmExpInfo['DEEPFLAG'][:] = visitCat['deepflag']
+        fgcmExpInfo['TELHA'][:] = visitCat['telha']
+        fgcmExpInfo['TELRA'][:] = visitCat['telra']
+        fgcmExpInfo['TELDEC'][:] = visitCat['teldec']
+        fgcmExpInfo['PMB'][:] = visitCat['pmb']
+        # Note that we have to go through asAstropy() to get a string
+        #  array out of an afwTable
+        fgcmExpInfo['FILTERNAME'][:] = visitCat.asAstropy()['filtername']
+
+        return fgcmExpInfo
+
+    def _loadCcdOffsets(self, butler):
+        """
+        """
+        camera = butler.get('camera')
+
+        # and we need to know the ccd offsets from the camera geometry
+        ccdOffsets = np.zeros(len(camera), dtype=[('CCDNUM', 'i4'),
+                                                  ('DELTA_RA', 'f8'),
+                                                  ('DELTA_DEC', 'f8'),
+                                                  ('RA_SIZE', 'f8'),
+                                                  ('DEC_SIZE', 'f8'),
+                                                  ('X_SIZE', 'i4'),
+                                                  ('Y_SIZE', 'i4')])
+
+        extent = afwGeom.Extent2D(self.config.pixelScale, self.config.pixelScale)
+
+        for i, detector in enumerate(camera):
+            # new version, using proper rotations
+            #  but I worry this only works with HSC, as there's a unit inconsistency
+
+            camPoint = detector.getCenter(afwCameraGeom.PIXELS)
+            bbox = detector.getBBox()
+            orient = detector.getOrientation()
+
+            ccdOffsets['CCDNUM'][i] = detector.getId()
+
+            xform = orient.makePixelFpTransform(extent)
+            pointXform = xform.applyForward(camPoint)
+            # this requires a pixelScale
+            # NOTE that this now works properly with HSC, but I need to work on
+            # generalizing this properly
+            ccdOffsets['DELTA_RA'][i] = -pointXform.getY() * self.config.pixelScale / 3600.0
+            ccdOffsets['DELTA_DEC'][i] = -pointXform.getX() * self.config.pixelScale / 3600.0
+
+            # but this does not (for the delta)
+            boxXform = xform.applyForward(afwGeom.Point2D(bbox.getMaxX(), bbox.getMaxY()))
+            ccdOffsets['RA_SIZE'][i] = 2. * np.abs(boxXform.getY() -
+                                                   pointXform.getY()) / 3600.0
+            ccdOffsets['DEC_SIZE'][i] = 2. * np.abs(boxXform.getX() -
+                                                    pointXform.getX()) / 3600.0
+
+            ccdOffsets['X_SIZE'][i] = bbox.getMaxX()
+            ccdOffsets['Y_SIZE'][i] = bbox.getMaxY()
+
+        return ccdOffsets
