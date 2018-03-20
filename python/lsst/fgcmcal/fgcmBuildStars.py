@@ -91,6 +91,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=int,
         default=13,
     )
+    checkAllCcds = pexConfig.Field(
+        doc="Check all CCDs.  Necessary for testing",
+        dtype=bool,
+        default=False,
+    )
     visitDataRefName = pexConfig.Field(
         doc="dataRef name for the 'visit' field",
         dtype=str,
@@ -341,17 +346,34 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         if len(dataRefs) == 0:
             # We did not specify any datarefs, so find all of them
-            allVisits = butler.queryMetadata('src',
-                                             format=[self.config.visitDataRefName, 'filter'],
-                                             dataId={self.config.ccdDataRefName:
-                                                     self.config.referenceCCD})
-
-            srcVisits = []
-            for dataset in allVisits:
-                if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
-                                                        self.config.ccdDataRefName:
-                                                            self.config.referenceCCD})):
+            if not self.config.checkAllCcds:
+                # Faster mode, scan through referenceCCD
+                allVisits = butler.queryMetadata('src',
+                                                 format=[self.config.visitDataRefName, 'filter'],
+                                                 dataId={self.config.ccdDataRefName:
+                                                             self.config.referenceCCD})
+                srcVisits = []
+                for dataset in allVisits:
+                    if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
+                                                            self.config.ccdDataRefName:
+                                                                self.config.referenceCCD})):
                     srcVisits.append(dataset[0])
+            else:
+                # Slower mode, check all CCDs
+                allVisits = butler.queryMetadata('src',
+                                                 format=[self.config.visitDataRefName, 'filter'])
+                srcVisits = []
+
+                camera = butler.get('camera')
+
+                for dataset in allVisits:
+                    if dataset[0] in srcVisits:
+                        continue
+                    for ccd in len(camera):
+                        if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
+                                                                self.config.ccdDataRefName:
+                                                                    ccd})):
+                            srcVisits.append(dataset[0])
         else:
             # get the visits from the datarefs, only for referenceCCD
             srcVisits = [d.dataId[self.config.visitDataRefName] for d in dataRefs if
