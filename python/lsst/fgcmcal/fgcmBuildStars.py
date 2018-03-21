@@ -425,7 +425,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                                 self.config.ccdDataRefName: srcCcds[i]})
             except butlerExceptions.NoResults:
                 exp = butler.get('calexp', dataId={self.config.visitDataRefName: srcVisit,
-                                                self.config.ccdDataRefName: srcCcds[i]})
+                                                   self.config.ccdDataRefName: srcCcds[i]})
 
             visitInfo = exp.getInfo().getVisitInfo()
 
@@ -505,15 +505,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             for detector in camera:
                 ccdId = detector.getId()
 
-                # get the dataref -- can't be numpy int
-                ref = butler.dataRef('raw', dataId={self.config.visitDataRefName:
-                                                    int(visit['visit']),
-                                                    self.config.ccdDataRefName: ccdId})
                 try:
-                    sources = ref.get('src',
-                                      flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
+                    # Need to cast visit['visit'] to python int because butler
+                    # can't use numpy ints
+                    sources = butler.get('src', dataId={self.config.visitDataRefName:
+                                                            int(visit['visit']),
+                                                        self.config.ccdDataRefName: ccdId},
+                                         flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
                 except butlerExceptions.NoResults:
-                    # this ccd does not exist.  That's fine.
+                    # this is not a problem if this ccd isn't there
                     continue
 
                 if not started:
