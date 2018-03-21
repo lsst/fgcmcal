@@ -633,8 +633,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                filterToBand=self.config.filterToBand)
                                """
 
-        fgcmLut, lutIndexVals = self._loadFgcmLut(butler,
-                                                  filterToBand=self.config.filterToBand)
+        fgcmLut, lutIndexVals, lutStd = self._loadFgcmLut(butler,
+                                                          filterToBand=self.config.filterToBand)
 
         """
         # and clear out the memory of the big created objects
@@ -1307,7 +1307,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         lutFlat = None
         lutDerivFlat = None
 
-        return fgcmLut, lutIndexVals
+        return fgcmLut, lutIndexVals, lutStd
 
     def _loadVisitCatalog(self, butler):
         """
