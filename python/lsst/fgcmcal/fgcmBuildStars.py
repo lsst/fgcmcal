@@ -418,15 +418,20 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # At least at the moment, getting raw is faster than any other option
             #  because it is uncompressed on disk.  This will probably change in
             #  the future.
+            # Try raw first, fall back to calexp if not available.
 
-            raw = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
-                                            self.config.ccdDataRefName: srcCcds[i]})
+            try:
+                exp = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
+                                                self.config.ccdDataRefName: srcCcds[i]})
+            except butlerExceptions.NoResults:
+                exp = butler.get('calexp', dataId={self.config.visitDataRefName: srcVisit,
+                                                self.config.ccdDataRefName: srcCcds[i]})
 
-            visitInfo = raw.getInfo().getVisitInfo()
+            visitInfo = exp.getInfo().getVisitInfo()
 
             rec = visitCat.addNew()
             rec['visit'] = srcVisit
-            rec['filtername'] = raw.getInfo().getFilter().getName()
+            rec['filtername'] = exp.getInfo().getFilter().getName()
             radec = visitInfo.getBoresightRaDec()
             rec['telra'] = radec.getRa().asDegrees()
             rec['teldec'] = radec.getDec().asDegrees()
