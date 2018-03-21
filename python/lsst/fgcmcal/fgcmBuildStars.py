@@ -344,6 +344,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         startTime = time.time()
 
+        camera = butler.get('camera')
+        nCcd = len(camera)
+
         if len(dataRefs) == 0:
             # We did not specify any datarefs, so find all of them
             if not self.config.checkAllCcds:
@@ -353,31 +356,34 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                                  dataId={self.config.ccdDataRefName:
                                                              self.config.referenceCCD})
                 srcVisits = []
+                srcCcds = []
                 for dataset in allVisits:
                     if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
                                                             self.config.ccdDataRefName:
                                                                 self.config.referenceCCD})):
                         srcVisits.append(dataset[0])
+                        srcCcds.append(self.config.referenceCCD)
             else:
                 # Slower mode, check all CCDs
                 allVisits = butler.queryMetadata('src',
                                                  format=[self.config.visitDataRefName, 'filter'])
                 srcVisits = []
-
-                camera = butler.get('camera')
+                srcCcds = []
 
                 for dataset in allVisits:
                     if dataset[0] in srcVisits:
                         continue
-                    for ccd in xrange(len(camera)):
+                    for ccd in xrange(nCcd):
                         if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
                                                                 self.config.ccdDataRefName:
                                                                     ccd})):
                             srcVisits.append(dataset[0])
+                            srcCcds.append(ccd)
         else:
             # get the visits from the datarefs, only for referenceCCD
             srcVisits = [d.dataId[self.config.visitDataRefName] for d in dataRefs if
                          d.dataId[self.config.ccdDataRefName] == self.config.referenceCCD]
+            srcCcds = [self.config.referenceCCD] * len(srcVisits)
 
         # Sort the visits for searching/indexing
         srcVisits.sort()
@@ -405,16 +411,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
 
         # now loop over visits and get the information
-        for srcVisit in srcVisits:
+        for i, srcVisit in enumerate(srcVisits):
             # Note that I found the raw access to be more reliable and faster
             #   than calexp_sub to get visitInfo().  This may not be the same
             #   for all repos and processing.
             # At least at the moment, getting raw is faster than any other option
             #  because it is uncompressed on disk.  This will probably change in
             #  the future.
+
             raw = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
-                                            self.config.ccdDataRefName:
-                                                self.config.referenceCCD})
+                                            self.config.ccdDataRefName: srcCcds[i]})
 
             visitInfo = raw.getInfo().getVisitInfo()
 
