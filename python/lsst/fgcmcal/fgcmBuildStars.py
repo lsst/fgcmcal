@@ -379,6 +379,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                                                     ccd})):
                             srcVisits.append(dataset[0])
                             srcCcds.append(ccd)
+                            # Once we find that a butler dataset exists, break out
+                            break
         else:
             # get the visits from the datarefs, only for referenceCCD
             srcVisits = [d.dataId[self.config.visitDataRefName] for d in dataRefs if
