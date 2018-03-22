@@ -128,13 +128,20 @@ class FgcmcalTestBase(object):
                 '--doraise']
         args.extend(self.otherArgs)
 
+        # Move into the test directory so the plots will get cleaned in tearDown
+        cwd = os.getcwd()
+        os.chdir(self.testDir)
+
         args = [self.inputDir, '--output', self.testDir, '--doraise']
         result = fgcmcal.FgcmFitCycleTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
 
+        # Move back to the previous directory
+        os.chdir(cwd)
+
         butler = dafPersistence.butler.Butler(self.testDir)
 
-        zps = butler.get('fgcmZeropoints')
+        zps = butler.get('fgcmZeropoints', fgcmcycle=0)
 
         self.assertEqual(nZp, len(zps))
 
