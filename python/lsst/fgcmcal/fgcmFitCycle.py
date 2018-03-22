@@ -256,6 +256,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=str,
         default=("NO_DATA",),
     )
+    colorSplitIndices = pexConfig.ListField(
+        doc="Band indices to use to split stars by color",
+        dtype=int,
+        default=None,
+    )
 
     def setDefaults(self):
         pass
@@ -499,6 +504,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'aperCorrFitNBins': self.config.aperCorrFitNBins,
                       'sedFitBandFudgeFactors': np.array(self.config.sedFudgeFactors)[fitFlag],
                       'sedExtraBandFudgeFactors': np.array(self.config.sedFudgeFactors)[~fitFlag],
+                      'colorSplitIndices': np.array(self.config.colorSplitIndices),
                       'sigFgcmMaxErr': self.config.sigFgcmMaxErr,
                       'sigFgcmMaxEGray': self.config.sigFgcmMaxEGray,
                       'ccdGrayMaxStarErr': self.config.ccdGrayMaxStarErr,
