@@ -16,3 +16,4 @@ doc/doxygen.conf
 tests/.tests
 version.py
 bin/*.py
+pytest_session.txt
