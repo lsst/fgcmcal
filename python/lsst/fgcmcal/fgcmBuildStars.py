@@ -414,26 +414,19 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # now loop over visits and get the information
         for i, srcVisit in enumerate(srcVisits):
-            # Note that I found the raw access to be more reliable and faster
-            #   than calexp_sub to get visitInfo().  This may not be the same
-            #   for all repos and processing.
-            # At least at the moment, getting raw is faster than any other option
-            #  because it is uncompressed on disk.  This will probably change in
-            #  the future.
-            # Try raw first, fall back to calexp if not available.
+            # Use bypass functions for visitInfo and filter
 
-            try:
-                exp = butler.get('raw', dataId={self.config.visitDataRefName: srcVisit,
-                                                self.config.ccdDataRefName: srcCcds[i]})
-            except butlerExceptions.NoResults:
-                exp = butler.get('calexp', dataId={self.config.visitDataRefName: srcVisit,
-                                                   self.config.ccdDataRefName: srcCcds[i]})
+            # Note that in some older repos this has an overhead due to gzipping
+            # of calexps, but this is obsolete so I won't worry about it.
 
-            visitInfo = exp.getInfo().getVisitInfo()
+            visitInfo = butler.get('calexp_visitInfo', dataId={self.config.visitDataRefName: srcVisit,
+                                                               self.config.ccdDataRefName: srcCcds[i]})
+            f = butler.get('calexp_filter', dataId={self.config.visitDataRefName: srcVisit,
+                                                    self.config.ccdDataRefName: srcCcds[i]})
 
             rec = visitCat.addNew()
             rec['visit'] = srcVisit
-            rec['filtername'] = exp.getInfo().getFilter().getName()
+            rec['filtername'] = f.getName()
             radec = visitInfo.getBoresightRaDec()
             rec['telra'] = radec.getRa().asDegrees()
             rec['teldec'] = radec.getDec().asDegrees()
