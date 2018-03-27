@@ -47,6 +47,8 @@ config.starColorCuts = ('g,r,-0.25,2.25',
                         'r,i,-0.50,2.25',
                         'i,z,-0.50,1.00',
                         'g,i,0.0,3.5')
+# Which band indices are used to do color splits? (Default g-i)
+config.colorSplitIndices = (0, 2)
 # Freeze atmosphere to standard values?  Recommended for first fit cycle.
 config.freezeStdAtmosphere = True
 # Precompute "superstar" in initial cycle (==00) based on bright star observations?  Recommended for HSC.
