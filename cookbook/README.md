@@ -12,7 +12,7 @@ This cookbook assumes access to
 [lsst-dev](https://developer.lsst.io/services/lsst-dev.html) and the existence
 of the HSC RC dataset from PDR1.  This is regularly reprocessed, starting with
 [DM-10404](https://jira.lsstcorp.org/browse/DM-10404) and now on
-[DM-13435](https://jira.lsstcorp.org/browse/DM-13435) (part of the Epic
+[DM-13795](https://jira.lsstcorp.org/browse/DM-13795) (part of the Epic
 "Periodic dataset reprocessing = FY18a".  The `lsst-dev` path where the
 current reprocessing lives is `/datasets/hsc/repo/rerun/RC/weekly_tag/ticket/`.
 
@@ -80,7 +80,7 @@ This is a very simple command-line task (where you substitute your username for
 
 ```bash
 fgcmMakeLut.py /datasets/hsc/repo --rerun \
-RC/w_2018_10/DM-13647:private/USER/fgcm_cookbook/lut --configfile \
+RC/w_2018_12/DM-13795:private/USER/fgcm_cookbook/lut --configfile \
 $FGCMCAL_DIR/cookbook/fgcmMakeLutHscFromTable.py
 ```
 
