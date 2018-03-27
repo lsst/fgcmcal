@@ -6,6 +6,7 @@ import inspect
 import unittest
 import os
 import tempfile
+import numpy as np
 
 import lsst.utils
 import lsst.pex.exceptions
@@ -34,6 +35,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         lsst.log.setLevel("HscMapper", lsst.log.FATAL)
 
     def test_fgcmcalTasks(self):
+        # Set numpy seed for stability
+        np.random.seed(seed=1000)
 
         # First test making the LUT
         self.config = fgcmcal.FgcmMakeLutConfig()
