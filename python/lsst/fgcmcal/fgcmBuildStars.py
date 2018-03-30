@@ -116,6 +116,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=str,
         default="base_Jacobian_value"
     )
+    renormalizeFlats = pexConfig.Field(
+        doc="Renormalize large-scale flat-field changes?",
+        dtype=bool,
+        default=False
+    )
     sourceSelector = sourceSelectorRegistry.makeField(
         doc="How to select sources",
         default="science"
@@ -402,8 +407,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         schema.addField('mjd', type=np.float64, doc="MJD of visit")
         schema.addField('exptime', type=np.float32, doc="Exposure time")
         schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
+        # The following 3 fields are not used yet
         schema.addField('fwhm', type=np.float32, doc="Seeing FWHM?")
+        schema.addField('skybrightness', type=np.float32, doc="Sky brightness (ADU)")
         schema.addField('deepflag', type=np.int32, doc="Deep observation")
+        schema.addField('scaling', type='ArrayD', doc="Scaling applied due to flat adjustment",
+                        size=len(camera))
 
         visitCat = afwTable.BaseCatalog(schema)
         visitCat.table.preallocate(len(srcVisits))
@@ -437,9 +446,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # Note that I don't know if this unit will need to be per-camera config
             rec['pmb'] = visitInfo.getWeather().getAirPressure() / 100
             rec['fwhm'] = 0.0
+            rec['skybrightness'] = 0.0
             rec['deepflag'] = 0
+            rec['scaling'][:] = 1.0
 
         self.log.info("Found all VisitInfo in %.2f s" % (time.time() - startTime))
+
+        # Compute flat scaling if desired...
+        if self.config.renormalizeFlats:
+            scalingValues = self._computeFlatScaling(butler, visitCat)
+            visitCat['scaling'] *= scalingValues
 
         # and now persist it
         butler.put(visitCat, 'fgcmVisitCatalog')
@@ -497,7 +513,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             nStarInVisit = 0
 
             # loop over CCDs
-            for detector in camera:
+            for ccdIndex, detector in enumerate(camera):
                 ccdId = detector.getId()
 
                 try:
@@ -548,9 +564,11 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat[ccdKey][:] = ccdId
                 # Compute "magnitude" by scaling flux with exposure time.
                 # Add an arbitrary zeropoint that needs to be investigated.
+                scaledFlux = goodSrc.sourceCat[fluxKey] * visit['scaling'][ccdIndex]
                 tempCat[magKey][:] = (self.config.zeropointDefault -
-                                      2.5 * np.log10(goodSrc.sourceCat[fluxKey]) +
+                                      2.5 * np.log10(scaledFlux) +
                                       2.5 * np.log10(expTime))
+                # magErr is computed with original (unscaled) flux
                 tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (goodSrc.sourceCat[fluxErrKey] /
                                                                goodSrc.sourceCat[fluxKey])
 
@@ -673,3 +691,90 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # and we're done with the stars
         return None
+
+    def _computeFlatScaling(butler, visitCat):
+        """
+        """
+
+        # Get the maximum ccd id.
+        # Note that this (and other assumptions) will have to be
+        # rethought if we don't have integer ccds...
+        camera = butler.get('camera')
+        nCcd = len(camera)
+
+        # A dictionary to map Flats to visit/ccd pars
+        visitCcdFlatDict = {}
+
+        # A dictionary to store flat values
+        flatValueDict = {}
+
+        # And a string that will be unique for my internal keys
+        joiner = '++'
+
+        for vis in visitCat:
+            visit = vis['visit']
+            for ccdIndex, detector in enumerate(camera):
+                dataId = {'visit': int(visit),
+                          'ccd': detector.getId()}
+                if not butler.datasetExists('src', dataId=dataId):
+                    continue
+
+                flatRef = butler.dataRef('flat', dataId=dataId)
+
+                fName = flatRef.dataId['filter']
+                cDate = flatRef.dataId['calibDate']
+
+                flatKey = '%s%s%s%s%04d' % (cDate, joiner, fName, joiner, ccdIndex)
+
+                if flatKey not in flatValueDict:
+                    # Read in the flat and record the value
+                    self.log.info("Found new flat: %s" % (flatKey))
+                    flat = flatRef.get()
+                    flatValueDict[flatKey] = np.median(flat.getImage().getArray())
+
+                visitCcdKey = visit * (nCcd + 1) + ccdIndex
+                visitCcdFlatDict[visitCcdKey] = flatKey
+
+        # Group flats together in a dict
+        flatFields = {}
+        for key in flatValueDict:
+            parts = key.split(joiner)
+            flatName = parts[0] + joiner + parts[1]
+            if flatName not in flatFields:
+                flatFields[flatName] = (parts[1], np.zeros(nCcd))
+            flatFields[flatName][1][int(parts[2])] = flatValueDict[key]
+
+        # And group by filter...
+        flatFilters = {flatFields[x][0] for x in flatFields}
+
+        # Compute scaling
+        flatScaleDict = flatValueDict.copy()
+        for flatFilter in flatFilters:
+            # get all the flats which have this...
+            flatKeys = [key for key in flatFields if flatFields[key][0] == flatFilter]
+
+        # take the first one as the arbitrary reference
+        referenceFlat = flatFields[flatKeys[0]][1]
+
+        for flatKey in flatKeys:
+            scaleVals = np.ones_like(referenceFlat)
+            u, = np.where((referenceFlat > 0) & (flatFields[flatKey][1] > 0))
+            scaleVals[u] = referenceFlat[u] / flatFields[flatKey][1][u]
+
+            for ccdIndex in range(nCcd):
+                flatCcdKey = '%s%s%04d' % (flatKey, joiner, ccdIndex)
+                if flatCcdKey in flatScaleDict:
+                    flatScaleDict[flatCcdKey] = scaleVals[ccdIndex]
+
+
+        scalingValues = np.ones((len(visitCat), nCcd))
+        for visitIndex,vis in enumerate(visitCat):
+            visit = vis['visit']
+            for ccdIndex, detector in enumerate(camera):
+                visitCcdKey = visit * (nCcd + 1) + ccdIndex
+                try:
+                    scalingValues[visitIndex, ccdIndex] = flatScaleDict[visitCcdFlatDict[visitCcdKey]]
+                except KeyError:
+                    pass
+
+        return scalingValues
