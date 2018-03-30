@@ -11,6 +11,7 @@ import numpy as np
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
+import lsst.afw.geom as afwGeom
 from lsst.daf.base.dateTime import DateTime
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
@@ -396,7 +397,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         srcVisits.sort()
 
         self.log.info("Found %d visits in %.2f s" %
-                      (len(srcVisits), time.time()-startTime))
+                      (len(srcVisits), time.time() - startTime))
 
         schema = afwTable.Schema()
         schema.addField('visit', type=np.int32, doc="Visit number")
@@ -407,9 +408,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         schema.addField('mjd', type=np.float64, doc="MJD of visit")
         schema.addField('exptime', type=np.float32, doc="Exposure time")
         schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
-        # The following 3 fields are not used yet
-        schema.addField('fwhm', type=np.float32, doc="Seeing FWHM?")
-        schema.addField('skybrightness', type=np.float32, doc="Sky brightness (ADU)")
+        schema.addField('psfsigma', type='ArrayD', doc="PSF sigma", size=len(camera))
+        schema.addField('skybackground', type='ArrayD', doc="Sky background (ADU)",
+                        size=len(camera))
+        # the following field is not used yet
         schema.addField('deepflag', type=np.int32, doc="Deep observation")
         schema.addField('scaling', type='ArrayD', doc="Scaling applied due to flat adjustment",
                         size=len(camera))
@@ -445,15 +447,19 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # convert from Pa to millibar
             # Note that I don't know if this unit will need to be per-camera config
             rec['pmb'] = visitInfo.getWeather().getAirPressure() / 100
-            rec['fwhm'] = 0.0
-            rec['skybrightness'] = 0.0
+            rec['psfsigma'][:] = 0.0
+            rec['skybackground'][:] = 0.0
             rec['deepflag'] = 0
             rec['scaling'][:] = 1.0
 
         self.log.info("Found all VisitInfo in %.2f s" % (time.time() - startTime))
 
+        visitCat['psfsigma'] = self._computePsfSigma(butler, visitCat)
+        visitCat['skybackground'] = self._computeSkyBackground(butler, visitCat)
+
         # Compute flat scaling if desired...
         if self.config.renormalizeFlats:
+            self.log.info("Reading flats for renormalizeFlats")
             scalingValues = self._computeFlatScaling(butler, visitCat)
             visitCat['scaling'] *= scalingValues
 
@@ -692,7 +698,60 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # and we're done with the stars
         return None
 
-    def _computeFlatScaling(butler, visitCat):
+    def _computePsfSigma(self, butler, visitCat):
+        """
+        """
+        startTime = time.time()
+
+        camera = butler.get('camera')
+
+        bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
+
+        psfSigma = np.zeros((len(visitCat), len(camera)))
+
+        for visitIndex, vis in enumerate(visitCat):
+            visit = vis['visit']
+            for ccdIndex, detector in enumerate(camera):
+                dataId = {'visit': int(visit),
+                          'ccd': detector.getId()}
+
+                if not butler.datasetExists('calexp', dataId=dataId):
+                    continue
+                exp = butler.get('calexp_sub', dataId=dataId, bbox=bbox)
+                psfSigma[visitIndex, ccdIndex] = exp.getPsf().computeShape().getDeterminantRadius()
+
+        self.log.info("Computed psfs from %d visits in %.2f s" %
+                      (len(visitCat), time.time() - startTime))
+        return psfSigma
+
+    def _computeSkyBackground(self, butler, visitCat):
+        """
+        """
+        startTime = time.time()
+
+        camera = butler.get('camera')
+
+        skyBackground = np.zeros((len(visitCat), len(camera)))
+
+        for visitIndex, vis in enumerate(visitCat):
+            visit = vis['visit']
+            for ccdIndex, detector in enumerate(camera):
+                dataId = {'visit': int(visit),
+                          'ccd': detector.getId()}
+
+                if not butler.datasetExists('calexpBackground', dataId=dataId):
+                    continue
+
+                bgStats = (bg[0].getStatsImage().getImage().array
+                           for bg in butler.get('calexpBackground',
+                                                dataId=dataId))
+                skyBackground[visitIndex, ccdIndex] = sum(np.median(bg[np.isfinite(bg)]) for bg in bgStats)
+
+        self.log.info("Computed background from %d visits in %.2f s" %
+                      (len(visitCat), time.time() - startTime))
+        return skyBackground
+
+    def _computeFlatScaling(self, butler, visitCat):
         """
         """
 
