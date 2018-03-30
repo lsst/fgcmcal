@@ -1342,13 +1342,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmExpInfo['TELDEC'][:] = visitCat['teldec']
         fgcmExpInfo['PMB'][:] = visitCat['pmb']
         fgcmExpInfo['PSFSIGMA'][:] = visitCat['psfsigma']
+        fgcmExpInfo['SKYBACKGROUND'][:] = visitCat['skybackground']
         # Note that we have to go through asAstropy() to get a string
         #  array out of an afwTable
         fgcmExpInfo['FILTERNAME'][:] = visitCat.asAstropy()['filtername']
-
-        # Need to compute the mean of the skybackground here...
-        for visitIndex, visit in enumerate(visitCat):
-            fgcmExpInfo['SKYBACKGROUND'][visitIndex] = np.mean(visit['skybackground'][(visit['skybackground'] > 0.0)])
 
         return fgcmExpInfo
 

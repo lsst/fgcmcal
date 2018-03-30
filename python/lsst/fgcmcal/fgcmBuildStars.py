@@ -409,8 +409,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         schema.addField('exptime', type=np.float32, doc="Exposure time")
         schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
         schema.addField('psfsigma', type=np.float32, doc="PSF sigma (reference CCD)")
-        schema.addField('skybackground', type='ArrayD', doc="Sky background (ADU)",
-                        size=len(camera))
+        schema.addField('skybackground', type=np.float32, doc="Sky background (ADU) (reference CCD)")
         # the following field is not used yet
         schema.addField('deepflag', type=np.int32, doc="Deep observation")
         schema.addField('scaling', type='ArrayD', doc="Scaling applied due to flat adjustment",
@@ -453,22 +452,32 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # convert from Pa to millibar
             # Note that I don't know if this unit will need to be per-camera config
             rec['pmb'] = visitInfo.getWeather().getAirPressure() / 100
-            rec['skybackground'][:] = 0.0
             rec['deepflag'] = 0
             rec['scaling'][:] = 1.0
 
             rec['psfsigma'] = psf.computeShape().getDeterminantRadius()
 
-        self.log.info("Found all VisitInfo in %.2f s" % (time.time() - startTime))
+            if butler.datasetExists('calexpBackground', dataId=dataId):
+                # Get background for reference CCD
+                # This approximation is good enough for now
+                bgStats = (bg[0].getStatsImage().getImage().array
+                           for bg in butler.get('calexpBackground',
+                                                dataId=dataId))
+                rec['skybackground'] = sum(np.median(bg[np.isfinite(bg)]) for bg in bgStats)
+            else:
+                rec['skybackground'] = -1.0
+
 
         # visitCat['psfsigma'] = self._computePsfSigma(butler, visitCat)
-        visitCat['skybackground'] = self._computeSkyBackground(butler, visitCat)
+        # visitCat['skybackground'] = self._computeSkyBackground(butler, visitCat)
 
         # Compute flat scaling if desired...
         if self.config.renormalizeFlats:
             self.log.info("Reading flats for renormalizeFlats")
             scalingValues = self._computeFlatScaling(butler, visitCat)
             visitCat['scaling'] *= scalingValues
+
+        self.log.info("Found all VisitInfo in %.2f s" % (time.time() - startTime))
 
         # and now persist it
         butler.put(visitCat, 'fgcmVisitCatalog')
