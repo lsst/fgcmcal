@@ -408,7 +408,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         schema.addField('mjd', type=np.float64, doc="MJD of visit")
         schema.addField('exptime', type=np.float32, doc="Exposure time")
         schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
-        schema.addField('psfsigma', type='ArrayD', doc="PSF sigma", size=len(camera))
+        schema.addField('psfsigma', type=np.float32, doc="PSF sigma (reference CCD)")
         schema.addField('skybackground', type='ArrayD', doc="Sky background (ADU)",
                         size=len(camera))
         # the following field is not used yet
@@ -420,8 +420,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         visitCat.table.preallocate(len(srcVisits))
 
         startTime = time.time()
-        # reading in a small bbox is marginally faster in the scan
-        # bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
+        # reading in a small bbox is faster for non-gzipped images
+        bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
 
         # now loop over visits and get the information
         for i, srcVisit in enumerate(srcVisits):
@@ -430,10 +430,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # Note that in some older repos this has an overhead due to gzipping
             # of calexps, but this is obsolete so I won't worry about it.
 
-            visitInfo = butler.get('calexp_visitInfo', dataId={self.config.visitDataRefName: srcVisit,
-                                                               self.config.ccdDataRefName: srcCcds[i]})
-            f = butler.get('calexp_filter', dataId={self.config.visitDataRefName: srcVisit,
-                                                    self.config.ccdDataRefName: srcCcds[i]})
+            dataId = {self.config.visitDataRefName: srcVisit,
+                      self.config.ccdDataRefName: srcCcds[i]}
+
+            # visitInfo = butler.get('calexp_visitInfo', dataId=dataId)
+            # f = butler.get('calexp_filter', dataId=dataId)
+            exp = butler.get('calexp_sub', dataId=dataId, bbox=bbox,
+                             flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
+            visitInfo = exp.getInfo().getVisitInfo()
+            f = exp.getFilter()
+            psf = exp.getPsf()
 
             rec = visitCat.addNew()
             rec['visit'] = srcVisit
@@ -447,14 +453,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # convert from Pa to millibar
             # Note that I don't know if this unit will need to be per-camera config
             rec['pmb'] = visitInfo.getWeather().getAirPressure() / 100
-            rec['psfsigma'][:] = 0.0
             rec['skybackground'][:] = 0.0
             rec['deepflag'] = 0
             rec['scaling'][:] = 1.0
 
+            rec['psfsigma'] = psf.computeShape().getDeterminantRadius()
+
         self.log.info("Found all VisitInfo in %.2f s" % (time.time() - startTime))
 
-        visitCat['psfsigma'] = self._computePsfSigma(butler, visitCat)
+        # visitCat['psfsigma'] = self._computePsfSigma(butler, visitCat)
         visitCat['skybackground'] = self._computeSkyBackground(butler, visitCat)
 
         # Compute flat scaling if desired...
@@ -710,6 +717,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         psfSigma = np.zeros((len(visitCat), len(camera)))
 
         for visitIndex, vis in enumerate(visitCat):
+            self.log.info(' Working on %d' % (vis['visit']))
             visit = vis['visit']
             for ccdIndex, detector in enumerate(camera):
                 dataId = {'visit': int(visit),
@@ -717,7 +725,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 if not butler.datasetExists('calexp', dataId=dataId):
                     continue
-                exp = butler.get('calexp_sub', dataId=dataId, bbox=bbox)
+                exp = butler.get('calexp_sub', dataId=dataId, bbox=bbox,
+                                 flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
                 psfSigma[visitIndex, ccdIndex] = exp.getPsf().computeShape().getDeterminantRadius()
 
         self.log.info("Computed psfs from %d visits in %.2f s" %
