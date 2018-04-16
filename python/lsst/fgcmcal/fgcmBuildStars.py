@@ -596,6 +596,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 if self.config.applyJacobian:
                     tempCat[magKey][:] -= 2.5 * np.log10(goodSrc.sourceCat[jacobianKey])
+                    # Need to divide scaling by mean of the jacobian of the sources!
+                    # FIXME
 
                 fullCatalog.extend(tempCat)
 
@@ -821,7 +823,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 flatFields[flatName] = (parts[1], np.zeros(nCcd))
             flatFields[flatName][1][int(parts[2])] = flatValueDict[key]
 
-        # And group by filter...
+        # And group by filter (uniquely)...
         flatFilters = {flatFields[x][0] for x in flatFields}
 
         # Compute scaling
@@ -830,20 +832,21 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # get all the flats which have this...
             flatKeys = [key for key in flatFields if flatFields[key][0] == flatFilter]
 
-        # take the first one as the arbitrary reference
-        referenceFlat = flatFields[flatKeys[0]][1]
+            # take the first one as the arbitrary reference
+            referenceFlat = flatFields[flatKeys[0]][1]
 
-        for flatKey in flatKeys:
-            scaleVals = np.ones_like(referenceFlat)
-            u, = np.where((referenceFlat > 0) & (flatFields[flatKey][1] > 0))
-            scaleVals[u] = referenceFlat[u] / flatFields[flatKey][1][u]
+            # Loop over all the flats and scale to reference
+            for flatKey in flatKeys:
+                scaleVals = np.ones_like(referenceFlat)
+                u, = np.where((referenceFlat > 0) & (flatFields[flatKey][1] > 0))
+                scaleVals[u] = referenceFlat[u] / flatFields[flatKey][1][u]
 
-            for ccdIndex in range(nCcd):
-                flatCcdKey = '%s%s%04d' % (flatKey, joiner, ccdIndex)
-                if flatCcdKey in flatScaleDict:
-                    flatScaleDict[flatCcdKey] = scaleVals[ccdIndex]
+                for ccdIndex in range(nCcd):
+                    flatCcdKey = '%s%s%04d' % (flatKey, joiner, ccdIndex)
+                    if flatCcdKey in flatScaleDict:
+                        flatScaleDict[flatCcdKey] = scaleVals[ccdIndex]
 
-
+        # And compute scaling values for each visit/ccd pair
         scalingValues = np.ones((len(visitCat), nCcd))
         for visitIndex,vis in enumerate(visitCat):
             visit = vis['visit']
