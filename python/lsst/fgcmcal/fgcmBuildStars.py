@@ -153,6 +153,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
 
         sourceSelector.unresolved.maximum = 0.5
 
+
 class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmBuildStarsTask
 
@@ -264,7 +265,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # Only log fatal errors from the sourceSelector
         self.sourceSelector.log.setLevel(self.sourceSelector.log.FATAL)
 
-
     @classmethod
     def _makeArgumentParser(cls):
         """Create an argument parser"""
@@ -360,13 +360,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 allVisits = butler.queryMetadata('src',
                                                  format=[self.config.visitDataRefName, 'filter'],
                                                  dataId={self.config.ccdDataRefName:
-                                                             self.config.referenceCCD})
+                                                         self.config.referenceCCD})
                 srcVisits = []
                 srcCcds = []
                 for dataset in allVisits:
                     if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
                                                             self.config.ccdDataRefName:
-                                                                self.config.referenceCCD})):
+                                                            self.config.referenceCCD})):
                         srcVisits.append(dataset[0])
                         srcCcds.append(self.config.referenceCCD)
             else:
@@ -467,10 +467,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             else:
                 rec['skybackground'] = -1.0
 
-
-        # visitCat['psfsigma'] = self._computePsfSigma(butler, visitCat)
-        # visitCat['skybackground'] = self._computeSkyBackground(butler, visitCat)
-
         # Compute flat scaling if desired...
         if self.config.renormalizeFlats:
             self.log.info("Reading flats for renormalizeFlats")
@@ -542,7 +538,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     # Need to cast visit['visit'] to python int because butler
                     # can't use numpy ints
                     sources = butler.get('src', dataId={self.config.visitDataRefName:
-                                                            int(visit['visit']),
+                                                        int(visit['visit']),
                                                         self.config.ccdDataRefName: ccdId},
                                          flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
                 except butlerExceptions.NoResults:
@@ -827,6 +823,18 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         flatFilters = {flatFields[x][0] for x in flatFields}
 
         # Compute scaling
+        # Here's the math...
+        # When flat fields are applied, we have:
+        #  maskedImage.scaledDivides(1.0 / flatScale, flatMaskedImage)
+        # Right now, I'm assuming that flatScale == 1.0, but I don't know where
+        # this is recorded.
+        # And scaledDivides is "Divide lhs by c * rhs"
+        #  maskedImageNew = maskedImage / ((1.0 / flatScale) * flatMaskedImage)
+        # To remove the flat (on CCD scale) we need to *multiply* by median(flatField)
+        # Then to apply the reference flat we need to *divide* by median(referenceFlat)
+        # So the (multiplicative) scaling to switch from flatField to referenceFlat is:
+        #  scaling = median(flatField) / median(referenceFlat)
+
         flatScaleDict = flatValueDict.copy()
         for flatFilter in flatFilters:
             # get all the flats which have this...
@@ -839,7 +847,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             for flatKey in flatKeys:
                 scaleVals = np.ones_like(referenceFlat)
                 u, = np.where((referenceFlat > 0) & (flatFields[flatKey][1] > 0))
-                scaleVals[u] = referenceFlat[u] / flatFields[flatKey][1][u]
+                scaleVals[u] = flatFields[flatKey][1][u] / referenceFlat[u]
 
                 for ccdIndex in range(nCcd):
                     flatCcdKey = '%s%s%04d' % (flatKey, joiner, ccdIndex)
@@ -848,7 +856,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # And compute scaling values for each visit/ccd pair
         scalingValues = np.ones((len(visitCat), nCcd))
-        for visitIndex,vis in enumerate(visitCat):
+        for visitIndex, vis in enumerate(visitCat):
             visit = vis['visit']
             for ccdIndex, detector in enumerate(camera):
                 visitCcdKey = visit * (nCcd + 1) + ccdIndex
