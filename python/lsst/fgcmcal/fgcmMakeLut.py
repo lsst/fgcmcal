@@ -556,7 +556,6 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
             if not foundTrans:
                 raise ValueError("Could not find transmission for filter %s via any alias." % (filterName))
 
-
     def _getThroughputDetector(self, detector, filterName, throughputLambda):
         """Internal method to get throughput for a detector.
 
