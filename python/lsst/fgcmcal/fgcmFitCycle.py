@@ -4,7 +4,7 @@ from __future__ import division, absolute_import, print_function
 from past.builtins import xrange
 
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("Agg")  # noqa
 
 import sys
 import traceback
@@ -466,7 +466,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'ccdStartIndex': camera[0].getId(),
                       'expField': 'VISIT',
                       'ccdField': 'CCD',
-                      'seeingField': 'SEEING',  # FIXME
+                      'seeingField': 'PSFSIGMA',
                       'deepFlag': 'DEEPFLAG',  # unused
                       'bands': self.config.bands,
                       'fitBands': fitBands,
@@ -1325,7 +1325,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmExpInfo = np.zeros(len(visitCat), dtype=[('VISIT', 'i8'),
                                                      ('MJD', 'f8'),
                                                      ('EXPTIME', 'f8'),
-                                                     ('SEEING', 'f8'),
+                                                     ('PSFSIGMA', 'f8'),
+                                                     ('SKYBACKGROUND', 'f8'),
                                                      ('DEEPFLAG', 'i2'),
                                                      ('TELHA', 'f8'),
                                                      ('TELRA', 'f8'),
@@ -1335,12 +1336,13 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmExpInfo['VISIT'][:] = visitCat['visit']
         fgcmExpInfo['MJD'][:] = visitCat['mjd']
         fgcmExpInfo['EXPTIME'][:] = visitCat['exptime']
-        fgcmExpInfo['SEEING'][:] = visitCat['fwhm']
         fgcmExpInfo['DEEPFLAG'][:] = visitCat['deepflag']
         fgcmExpInfo['TELHA'][:] = visitCat['telha']
         fgcmExpInfo['TELRA'][:] = visitCat['telra']
         fgcmExpInfo['TELDEC'][:] = visitCat['teldec']
         fgcmExpInfo['PMB'][:] = visitCat['pmb']
+        fgcmExpInfo['PSFSIGMA'][:] = visitCat['psfsigma']
+        fgcmExpInfo['SKYBACKGROUND'][:] = visitCat['skybackground']
         # Note that we have to go through asAstropy() to get a string
         #  array out of an afwTable
         fgcmExpInfo['FILTERNAME'][:] = visitCat.asAstropy()['filtername']
