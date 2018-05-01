@@ -132,7 +132,6 @@ class FgcmcalTestBase(object):
         cwd = os.getcwd()
         os.chdir(self.testDir)
 
-        args = [self.inputDir, '--output', self.testDir, '--doraise']
         result = fgcmcal.FgcmFitCycleTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
 
@@ -147,6 +146,23 @@ class FgcmcalTestBase(object):
 
         gd, = np.where(zps['fgcmflag'] == 1)
         self.assertEqual(nGoodZp, len(gd))
+
+    def _runFgcmOutputProducts(self):
+        """
+        """
+
+        if self.logLevel is not None:
+            self.otherArgs.extend(['--loglevel', 'fgcmcal=%s'%self.logLevel])
+
+        args = [self.inputDir, '--output', self.testDir,
+                '--doraise']
+        args.extend(self.otherArgs)
+
+        resultfgcmcal.FgcmOutputProductsTask.parseAndRun(args=args, config=self.config)
+        self._checkResult(result)
+
+        butler = dafPersistence.butler.Butler(self.testDir)
+
 
     def _checkResult(self, result):
         self.assertNotEqual(result.resultList, [], 'resultList should not be empty')
