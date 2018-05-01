@@ -196,9 +196,6 @@ class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
         """
         return [parsedCmd.butler]
 
-    def precall(self, parsedCmd):
-        return True
-
     def __call__(self, butler):
         """
         Parameters
@@ -409,6 +406,13 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         filterNameString = comma.join(self.config.filterNames)
         stdFilterNameString = comma.join(self.config.stdFilterNames)
 
+        atmosphereTableName = 'NoTableWasUsed'
+        if self.config.atmosphereTableName is not None:
+            atmosphereTableName = self.config.atmosphereTableName
+
+        lutSchema.addField('tablename', type=str, doc='Atmosphere table name',
+                           size=len(atmosphereTableName))
+        lutSchema.addField('elevation', type=float, doc="Telescope elevation used for LUT")
         lutSchema.addField('filternames', type=str, doc='filterNames in LUT',
                            size=len(filterNameString))
         lutSchema.addField('stdfilternames', type=str, doc='Standard filterNames in LUT',
@@ -453,7 +457,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                            size=len(self.fgcmLutMaker.filterNames))
         lutSchema.addField('lambdab', type='ArrayD', doc='Wavelength for passband (no atm)',
                            size=len(self.fgcmLutMaker.filterNames))
-        lutSchema.addField('atmlambda', type='ArrayD', doc='Atmosphere wavelengths',
+        lutSchema.addField('atmlambda', type='ArrayD', doc='Atmosphere wavelengths (A)',
                            size=self.fgcmLutMaker.atmLambda.size)
         lutSchema.addField('atmstdtrans', type='ArrayD', doc='Standard Atmosphere Throughput',
                            size=self.fgcmLutMaker.atmStdTrans.size)
@@ -469,6 +473,8 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         # first fill the first index
         rec = lutCat.addNew()
 
+        rec['tablename'] = atmosphereTableName
+        rec['elevation'] = self.fgcmLutMaker.atmosphereTable.elevation
         rec['filternames'] = filterNameString
         rec['stdfilternames'] = stdFilterNameString
         rec['pmb'][:] = self.fgcmLutMaker.pmb
