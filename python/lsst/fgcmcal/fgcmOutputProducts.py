@@ -200,7 +200,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 modGen = fgcm.ModtranGenerator(elevation)
                 lambdaRange = np.array([atmLambda[0], atmLambda[-1]]) / 10.
                 lambdaStep = (atmLambda[1] - atmLambda[0]) / 10.
-            except ValueError, IOError:
+            except (ValueError, IOError) as e:
                 raise RuntimeError("FGCM look-up-table generated without modtran, "
                                    "but modtran not configured to run.")
 
