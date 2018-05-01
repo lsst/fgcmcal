@@ -9,14 +9,12 @@ import numpy as np
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.afw.table as afwTable
-import lsst.afw.cameraGeom as afwCameraGeom
-from lsst.afw.image import Filter
 from lsst.afw.image import TransmissionCurve
 
 import fgcm
 
 __all__ = ['FgcmOutputProductsConfig', 'FgcmOutputProductsTask']
+
 
 class FgcmOutputProductsConfig(pexConfig.Config):
     """Config for FgcmOutputProductsTask"""
@@ -29,6 +27,7 @@ class FgcmOutputProductsConfig(pexConfig.Config):
 
     def setDefaults(self):
         pass
+
 
 class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmOutputProductsTask
@@ -201,7 +200,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 modGen = fgcm.ModtranGenerator(elevation)
                 lambdaRange = np.array([atmLambda[0], atmLambda[-1]]) / 10.
                 lambdaStep = (atmLambda[1] - atmLambda[0]) / 10.
-            except (ValueError, IOError) as e:
+            except (ValueError, IOError):
                 raise RuntimeError("FGCM look-up-table generated without modtran, "
                                    "but modtran not configured to run.")
 
@@ -229,7 +228,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                 zenith=zenith[i],
                                 lambdaRange=lambdaRange,
                                 lambdaStep=lambdaStep)
-                atmVals = modAtmAll['COMBINED']
+                atmVals = modAtm['COMBINED']
 
             # Now need to create something to persist...
             curve = TransmissionCurve.makeSpatiallyConstant(throughput=atmVals,
@@ -239,5 +238,3 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
             butler.put(curve, "transmission_atmosphere_fgcm",
                        dataId={visitDataRefName: visit})
-
-
