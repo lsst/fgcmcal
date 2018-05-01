@@ -158,7 +158,7 @@ class FgcmcalTestBase(object):
                 '--doraise']
         args.extend(self.otherArgs)
 
-        resultfgcmcal.FgcmOutputProductsTask.parseAndRun(args=args, config=self.config)
+        result = fgcmcal.FgcmOutputProductsTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
 
         butler = dafPersistence.butler.Butler(self.testDir)
