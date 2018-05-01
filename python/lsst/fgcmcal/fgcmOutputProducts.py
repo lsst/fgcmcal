@@ -191,6 +191,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # Make the atmosphere table if possible
         try:
             atmTable = fgcm.FgcmAtmosphereTable.initWithTableName(atmosphereTableName)
+            atmTable.loadTable()
         except IOError:
             atmTable = None
 
