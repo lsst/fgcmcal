@@ -2,4 +2,4 @@
 # See COPYRIGHT file at the top of the source tree.
 from lsst.fgcmcal.fgcmOutputProducts import FgcmOutputProductsTask
 
-FgcmOutputProducts.parseAndRun()
+FgcmOutputProductsTask.parseAndRun()
