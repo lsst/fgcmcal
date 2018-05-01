@@ -38,6 +38,9 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # Set numpy seed for stability
         np.random.seed(seed=1000)
 
+        visitDataRefName = 'visit'
+        ccdDataRefName = 'ccd'
+
         # First test making the LUT
         self.config = fgcmcal.FgcmMakeLutConfig()
         self.config.filterNames = ['r', 'i']
@@ -59,6 +62,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.requiredBands = ['r', 'i']
         self.config.referenceBand = 'i'
         self.config.checkAllCcds = True
+        self.config.visitDataRefName = visitDataRefName
+        self.config.ccdDataRefName = ccdDataRefName
         self.otherArgs = []
 
         nVisit = 11
@@ -105,7 +110,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config = fgcmcal.FgcmOutputProductsConfig()
         self.config.cycleNumber = 0
 
-        self._runFgcmOutputProducts()
+        self._runFgcmOutputProducts(visitDataRefName)
 
 
 
