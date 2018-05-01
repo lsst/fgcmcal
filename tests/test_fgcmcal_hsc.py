@@ -2,7 +2,6 @@
 
 from __future__ import division, absolute_import, print_function
 
-import inspect
 import unittest
 import os
 import tempfile
@@ -16,6 +15,7 @@ import fgcmcalTestBase
 import lsst.fgcmcal as fgcmcal
 
 ROOT = os.path.abspath(os.path.dirname(__file__))
+
 
 class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase):
     @classmethod
@@ -58,7 +58,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # Now the star building
         self.config = fgcmcal.FgcmBuildStarsConfig()
-        self.config.filterToBand = {'r':'r', 'i':'i'}
+        self.config.filterToBand = {'r': 'r', 'i': 'i'}
         self.config.requiredBands = ['r', 'i']
         self.config.referenceBand = 'i'
         self.config.checkAllCcds = True
@@ -77,7 +77,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.outfileBase = 'TestFgcm'
         self.config.bands = ['r', 'i']
         self.config.fitFlag = (1, 1)
-        self.config.filterToBand = {'r':'r', 'i':'i'}
+        self.config.filterToBand = {'r': 'r', 'i': 'i'}
         self.config.maxIter = 1
         self.config.nCore = 1
         self.config.cycleNumber = 0
@@ -113,12 +113,13 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self._runFgcmOutputProducts(visitDataRefName)
 
 
-
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
 
+
 def setup_module(module):
     lsst.utils.tests.init()
+
 
 if __name__ == "__main__":
     lsst.utils.tests.init()
