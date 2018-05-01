@@ -468,10 +468,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'ccdField': 'CCD',
                       'seeingField': 'PSFSIGMA',
                       'deepFlag': 'DEEPFLAG',  # unused
-                      'bands': self.config.bands,
-                      'fitBands': fitBands,
-                      'extraBands': extraBands,
-                      'filterToBand': self.config.filterToBand,
+                      'bands': list(self.config.bands),
+                      'fitBands': list(fitBands),
+                      'extraBands': list(extraBands),
+                      'filterToBand': dict(self.config.filterToBand),
                       'logLevel': 'INFO',  # FIXME
                       'nCore': self.config.nCore,
                       'nStarPerRun': self.config.nStarPerRun,
