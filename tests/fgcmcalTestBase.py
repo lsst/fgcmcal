@@ -3,7 +3,6 @@
 from __future__ import division, absolute_import, print_function
 
 import os
-import inspect
 import shutil
 import numpy as np
 
@@ -12,6 +11,7 @@ import lsst.afw.geom as afwGeom
 import lsst.log
 
 import lsst.fgcmcal as fgcmcal
+
 
 class FgcmcalTestBase(object):
     """
@@ -38,10 +38,6 @@ class FgcmcalTestBase(object):
 
         lsst.log.setLevel("daf.persistence.butler", lsst.log.FATAL)
         lsst.log.setLevel("CameraMapper", lsst.log.FATAL)
-
-    def tearDown(self):
-        if getattr(self, 'config', None) is not None:
-            del self.config
 
     def _runFgcmMakeLut(self, nBand, i0Std, i0Recon, i10Std, i10Recon):
         """
@@ -191,7 +187,8 @@ class FgcmcalTestBase(object):
         self.assertEqual(result.resultList[0].exitStatus, 0)
 
     def tearDown(self):
+        if getattr(self, 'config', None) is not None:
+            del self.config
+
         if os.path.exists(self.testDir):
             shutil.rmtree(self.testDir, True)
-
-
