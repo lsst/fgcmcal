@@ -179,9 +179,6 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         # we want to combine the butler with any (or no!) dataRefs
         return [(parsedCmd.butler, parsedCmd.id.refList)]
 
-    def precall(self, parsedCmd):
-        return True
-
     def __call__(self, args):
         """
         Parameters
