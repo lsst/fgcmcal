@@ -21,7 +21,7 @@ __all__ = ['FgcmOutputProductsConfig', 'FgcmOutputProductsTask']
 class FgcmOutputProductsConfig(pexConfig.Config):
     """Config for FgcmOutputProductsTask"""
 
-    cycleNumber = pexConfig.ListField(
+    cycleNumber = pexConfig.Field(
         doc="Fit cycle as basis for products to output",
         dtype=int,
         default=None,
