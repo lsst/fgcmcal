@@ -67,7 +67,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self._runFgcmBuildStars(nVisit, nStar, nObs)
 
-        # And finally the fit cycle
+        # And the fit cycle
         self.config = fgcmcal.FgcmFitCycleConfig()
         self.config.outfileBase = 'TestFgcm'
         self.config.bands = ['r', 'i']
@@ -100,6 +100,12 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nGoodZp = 27
 
         self._runFgcmFitCycle(nZp, nGoodZp)
+
+        # And output the products
+        self.config = fgcmcal.FgcmOutputProductsConfig()
+        self.config.cycleNumber = 0
+
+        self._runFgcmOutputProducts()
 
 
 
