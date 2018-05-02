@@ -806,6 +806,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                            parCat['compapercorrslopeerr'].size),
                                           ('COMPAPERCORRRANGE', 'f8',
                                            parCat['compapercorrrange'].size),
+                                          ('COMPMODELERREXPTIMEPIVOT', 'f8',
+                                           parCat['compmodelerrexptimepivot'].size),
+                                          ('COMPMODELERRFWHMPIVOT', 'f8',
+                                           parCat['compmodelerrfwhmpivot'].size),
+                                          ('COMPMODELERRSKYPIVOT', 'f8',
+                                           parCat['compmodelerrskypivot'].size),
+                                          ('COMPMODELERRPARS', 'f8',
+                                           parCat['compmodelerrpars'].size),
                                           ('COMPEXPGRAY', 'f8',
                                            parCat['compexpgray'].size),
                                           ('COMPVARGRAY', 'f8',
@@ -837,6 +845,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             inParams['COMPAPERCORRSLOPE'][:] = parCat['compapercorrslope'][0, :]
             inParams['COMPAPERCORRSLOPEERR'][:] = parCat['compapercorrslopeerr'][0, :]
             inParams['COMPAPERCORRRANGE'][:] = parCat['compapercorrrange'][0, :]
+            inParams['COMPMODELERREXPTIMEPIVOT'][:] = parCat['compmodelerrexptimepivot'][0, :]
+            inParams['COMPMODELERRFWHMPIVOT'][:] = parCat['compmodelerrfwhmpivot'][0, :]
+            inParams['COMPMODELERRSKYPIVOT'][:] = parCat['compmodelerrskypivot'][0, :]
+            inParams['COMPMODELERRPARS'][:] = parCat['compmodelerrpars'][0, :]
             inParams['COMPEXPGRAY'][:] = parCat['compexpgray'][0, :]
             inParams['COMPVARGRAY'][:] = parCat['compvargray'][0, :]
             inParams['COMPNGOODSTARPEREXP'][:] = parCat['compngoodstarperexp'][0, :]
@@ -990,6 +1002,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['COMPAPERCORRSLOPEERR'].size)
         parSchema.addField('compapercorrrange', type='ArrayD', doc='Aperture correction range',
                            size=pars['COMPAPERCORRRANGE'].size)
+        parSchema.addField('compmodelerrexptimepivot', type='ArrayD', doc='Model error exptime pivot',
+                           size=pars['COMPMODELERREXPTIMEPIVOT'].size)
+        parSchema.addField('compmodelerrfwhmpivot', type='ArrayD', doc='Model error fwhm pivot',
+                           size=pars['COMPMODELERRFWHMPIVOT'].size)
+        parSchema.addField('compmodelerrskypivot', type='ArrayD', doc='Model error sky pivot',
+                           size=pars['COMPMODELERRSKYPIVOT'].size)
+        parSchema.addField('compmodelerrpars', type='ArrayD', doc='Model error parameters',
+                           size=pars['COMPMODELERRPARS'].size)
         parSchema.addField('compexpgray', type='ArrayD', doc='Computed exposure gray',
                            size=pars['COMPEXPGRAY'].size)
         parSchema.addField('compvargray', type='ArrayD', doc='Computed exposure variance',
@@ -1045,6 +1065,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                     'parpwvintercept', 'parpwvperslope', 'parqesysintercept',
                     'parqesysslope', 'parretrievedpwvnightlyoffset', 'compapercorrpivot',
                     'compapercorrslope', 'compapercorrslopeerr', 'compapercorrrange',
+                    'compmodelerrexptimepivot', 'compmodelerrfwhmpivot',
+                    'compmodelerrskypivot', 'compmodelerrpars',
                     'compexpgray', 'compvargray', 'compngoodstarperexp', 'compsigfgcm',
                     'compretrievedpwv', 'compretrievedpwvraw', 'compretrievedpwvflag',
                     'compretrievedtaunight']
