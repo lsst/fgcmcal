@@ -261,6 +261,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=int,
         default=None,
     )
+    modelMagErrors = pexConfig.Field(
+        doc="Should FGCM model the magnitude errors from sky/fwhm? (False means trust inputs)",
+        dtype=bool,
+        default=False,
+    )
 
     def setDefaults(self):
         pass
@@ -520,6 +525,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'pwvRetrievalSmoothBlock': 25,
                       'useRetrievedTauInit': False,
                       'tauRetrievalMinCCDPerNight': 500,
+                      'modelMagErrors': self.config.modelMagErrors,
                       'printOnly': False,
                       'outputStars': False,
                       'clobber': True,
