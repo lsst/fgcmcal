@@ -11,10 +11,13 @@ Requirements
 This cookbook assumes access to
 [lsst-dev](https://developer.lsst.io/services/lsst-dev.html) and the existence
 of the HSC RC dataset from PDR1.  This is regularly reprocessed, starting with
-[DM-10404](https://jira.lsstcorp.org/browse/DM-10404) and now on
-[DM-13795](https://jira.lsstcorp.org/browse/DM-13795) (part of the Epic
-"Periodic dataset reprocessing = FY18a".  The `lsst-dev` path where the
-current reprocessing lives is `/datasets/hsc/repo/rerun/RC/weekly_tag/ticket/`.
+[DM-10404](https://jira.lsstcorp.org/browse/DM-10404).  See Epic "Dataset
+Reprocessing Campaigns (FY18b-1)"
+[DM-13926](https://jira.lsstcorp.org/browse/DM-13926) for the list of tickets
+with the most recent reprocessing.  On `lsst-dev` the recent reprocessing can
+be listed at `/datasets/hsc/repo/rerun/RC/`.  However, I do recommend checking
+the tickets at the linked Epic to confirm that the most recent processing
+actually has been completed.
 
 Setup
 -----
@@ -25,17 +28,31 @@ The environment should be set up as follows:
 setup lsst_distrib
 setup -j -r /path/to/thirdparty/fgcm/.
 setup -j -r /path/to/lsst-dm/fgcmcal/.
+
+export RCRERUN=RC/w_2018_17/DM-14055
+export COOKBOOKRERUN=fgcm_cookbook
 ```
+
+The `RCRERUN` env variable should be set to the most recent completed rerun
+(see above).  The `COOKBOOKRERUN` env variable can be set to something
+different if you have already run the cookbook with an older version of the
+code and don't want to delete the previous run.
+
+Finally, there is the expectation below that the `USER` environment variable is
+set to your username (bash default), and that your private rerun directory is
+`/datasets/hsc/repo/rerun/private/${USER}`.
+
 
 Running FGCM
 ------------
 
-There are three stages to running an FGCM calibration on a dataset:
+There are four stages to running an FGCM calibration on a dataset:
 
 1. Construct an atmosphere and instrument look-up table (LUT)
 2. Ingest and match individual star observations from visit/ccd sets
 3. Run the calibration for 3-4 "fit cycles", each of which contains 25-100 fit
 iterations.
+4. One more task will output the per-visit atmospheres for use downstream.
 
 ## Constructing a Look-Up Table (LUT)
 
@@ -75,22 +92,23 @@ and compute the atmosphere table once.
 
 ### Running `fgcmMakeLut.py`
 
-This is a very simple command-line task (where you substitute your username for
-`USER`).  E.g.,
+This is a very simple command-line task (assuming that your username is in the
+environment variable ${USER}).  E.g.,
 
 ```bash
 fgcmMakeLut.py /datasets/hsc/repo --rerun \
-RC/w_2018_12/DM-13795:private/USER/fgcm_cookbook/lut --configfile \
+${RCRERUN}:private/${USER}/${COOKBOOKRERUN}/lut --configfile \
 $FGCMCAL_DIR/cookbook/fgcmMakeLutHscFromTable.py
 ```
 
 ## Ingesting and Matching Star Observations
 
 In order to make the fit cycles tractable without redoing processor-intensive
-steps, all data are collated and star observations are matched and indexed before the fit
-runs are started.  Depending on how many visits are being processed, and where
-the data are located, this step can take quite a while.  (In the future, with a
-database backend for the butler, I believe this step will be much faster).
+steps, all data are collated and star observations are matched and indexed
+before the fit runs are started.  Depending on how many visits are being
+processed, and where the data are located, this step can take quite a while.
+(In the future, with a database backend for the butler, I believe this step
+will be much faster).
 
 The FGCM code can run on a list of visits specified by the `--id` parameter on
 the command line, or it can search the input repository for all visits with
@@ -108,7 +126,7 @@ This is also a simple command-line task.  E.g.,
 
 ```bash
 fgcmBuildStars.py /datasets/hsc/repo --rerun \
-private/USER/fgcm_cookbook/lut:private/USER/fgcm_cookbook/wide \
+private/${USER}/${COOKBOOKRERUN}/lut:private/${USER}/${COOKBOOKRERUN}/wide \
 --configfile $FGCMCAL_DIR/cookbook/fgcmBuildStarsHsc.py --id field=SSP_WIDE ccd=13 \
 filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y
 ```
@@ -150,9 +168,9 @@ output rerun and go from there.
 
 ```bash
 fgcmFitCycle.py /datasets/hsc/repo --rerun \
-private/USER/fgcm_cookbook/wide:private/USER/fgcm_cookbook/fit1 \
+private/${USER}/${COOKBOOKRERUN}/wide:private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile $FGCMCAL_DIR/cookbook/fgcmFitCycleHscCookbook_cycle00_config.py \
-|& tee fgcm_cookbook_cycle00.log
+|& tee ${COOKBOOKRERUN}_cycle00.log
 ```
 
 ### Subsequent Fit Cycles
@@ -168,10 +186,12 @@ my experience, the fit does not improve if you go beyond ~50 iterations.  The
 best way to get the fit to improve is to remove non-photometric exposures.
 
 ```bash
-fgcmFitCycle.py /datasets/hsc/repo --rerun private/USER/fgcm_cookbook/fit1 \
+fgcmFitCycle.py /datasets/hsc/repo --rerun private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile fgcmFitCycleHscCookbook_cycle01_config.py |& tee \
-fgcm_cookbook_cycle01.log
+${COOKBOOKRERUN}_cycle01.log
 ```
+
+
 
 ## Outputs
 
@@ -230,7 +250,36 @@ please see the [FGCM paper](http://adsabs.harvard.edu/abs/2018AJ....155...41B).
 * `_zeropoints.png`: All zeropoints as a function of MJD from first exposure of
   calibration run.
 
-### Data Products
+## Outputs and Data Products
+
+FGCM has both internal data products that are produced for each fit cycle, as
+well as the ability to output photometric calibration data in a way that can be
+used by downstream processing in the stack.
+
+### Making Stack Output Products
+
+At the current moment, there is only support for building atmosphere
+transmission curves for use in downstream processing.  "Coming soon" are
+zeropoint calibration files for use in the stack.
+
+To build the output products you use the `fgcmOutputProducts.py` command-line
+task.  The only config variable is the cycle number that the user has deemed to
+be converged and should be output.
+
+```bash
+fgcmOutputProducts.py /datasets/hsc/repo --rerun \
+private/${USER}/${COOKBOOKRERUN}/wide:private/${USER}/${COOKBOOKRERUN}/fit1 \
+--configfile $FGCM_CAL_DIR/cookbook/fgcmOutputProductsHsc.py \
+--config cycleNumber=1 |& tee ${COOKBOOKRERUN}_output.log
+```
+
+In the output repo you will now find a while bunch of
+`transmission/atmosphere_VISIT.fits` files of the
+`lsst.afw.image.TransmissionCurve` type.  Note that even if you have frozen the
+atmosphere parameters to the "standard" values, these will be computed
+specifically for the airmass of each individual observation.
+
+### FGCM-Specific Data Products
 
 The data products that are of use to the end user, and grabbed from the butler,
 e.g.:
@@ -243,6 +292,6 @@ zeropoints = butler.get('fgcmZeropoints', dataId={'fgcmcycle': last_cycle_run})
   first-order chromatic corrections (`FGCM_I10`) per visit/ccd.  Quality of
   exposure is given by `FGCM_FLAG`, see FGCM paper for details.
 * `fgcmAtmosphereParameters-%(fgcmcycle)02d.fits`: Atmosphere model parameters
-  (per visit) that can be used as input to MODTRAN to generate atmosphere
+  (per visit) that can be used as input to MODTRAN or `fgcm` to generate atmosphere
   transmission.
 * Other data products are used as an input to the next fit cycle.
