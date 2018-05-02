@@ -273,8 +273,9 @@ private/${USER}/${COOKBOOKRERUN}/wide:private/${USER}/${COOKBOOKRERUN}/fit1 \
 --config cycleNumber=1 |& tee ${COOKBOOKRERUN}_output.log
 ```
 
-In the output repo you will now find a while bunch of
-`transmission/atmosphere_VISIT.fits` files of the
+In the output repo
+(`/datasets/hsc/repo/rerun/private/${USER}/${COOKBOOKRERUN}/fit1/transmission/`) you will now
+find a whole bunch of `atmosphere_VISIT.fits` files of the
 `lsst.afw.image.TransmissionCurve` type.  Note that even if you have frozen the
 atmosphere parameters to the "standard" values, these will be computed
 specifically for the airmass of each individual observation.
