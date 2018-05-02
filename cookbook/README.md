@@ -269,7 +269,7 @@ be converged and should be output.
 ```bash
 fgcmOutputProducts.py /datasets/hsc/repo --rerun \
 private/${USER}/${COOKBOOKRERUN}/wide:private/${USER}/${COOKBOOKRERUN}/fit1 \
---configfile $FGCM_CAL_DIR/cookbook/fgcmOutputProductsHsc.py \
+--configfile $FGCMCAL_DIR/cookbook/fgcmOutputProductsHsc.py \
 --config cycleNumber=1 |& tee ${COOKBOOKRERUN}_output.log
 ```
 
