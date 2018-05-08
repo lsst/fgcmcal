@@ -422,11 +422,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         if configName is None:
             return
         if clobber:
-            butler.put(self.config, configName, doBackup=doBackup)
-        elif butler.datasetExists(configName, write=True):
+            butler.put(self.config, configName, doBackup=doBackup, fgcmcycle=self.config.cycleNumber)
+        elif butler.datasetExists(configName, write=True, fgcmcycle=self.config.cycleNumber):
             # this may be subject to a race condition; see #2789
             try:
-                oldConfig = butler.get(configName, immediate=True)
+                oldConfig = butler.get(configName, immediate=True, fgcmcycle=self.config.cycleNumber)
             except Exception as exc:
                 raise type(exc)("Unable to read stored config file %s (%s); consider using --clobber-config" %
                                 (configName, exc))
