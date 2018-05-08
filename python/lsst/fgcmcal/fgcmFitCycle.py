@@ -288,12 +288,13 @@ class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
         """
         return [parsedCmd.butler]
 
-    # This will override the saving of the config, which would fail because
-    # it requires the %(fgcmcycle)d dataId key.
-    #def precall(self, parsedCmd):
-    #    return True
+    # This overrides the pipe_base config saving which would fail because it
+    # requires the %(fgcmcycle)d dataId key.
+    def precall(self, parsedCmd):
+        self.writeFgcmConfig(parsedCmd.butler, clobber=self.clobberConfig, doBackup=self.doBackup)
+        return True
 
-    def writeConfig(self, butler, clobber=False, doBackup=True):
+    def writeFgcmConfig(self, butler, clobber=False, doBackup=True):
         """Write the configuration used for processing the data, or check that an existing
         one is equal to the new one if present.  This is an override of the regular
         version from pipe_base that knows about fgcmcycle.
