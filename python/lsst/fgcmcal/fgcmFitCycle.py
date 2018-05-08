@@ -442,7 +442,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         else:
             butler.put(self.config, configName, fgcmcycle=self.config.cycleNumber)
 
-
     def _fgcmFitCycle(self, butler):
         """
         Run the fit cycle
