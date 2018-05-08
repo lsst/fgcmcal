@@ -288,8 +288,51 @@ class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
         """
         return [parsedCmd.butler]
 
-    def precall(self, parsedCmd):
-        return True
+    # This will override the saving of the config, which would fail because
+    # it requires the %(fgcmcycle)d dataId key.
+    #def precall(self, parsedCmd):
+    #    return True
+
+    def writeConfig(self, butler, clobber=False, doBackup=True):
+        """Write the configuration used for processing the data, or check that an existing
+        one is equal to the new one if present.  This is an override of the regular
+        version from pipe_base that knows about fgcmcycle.
+
+        Parameters
+        ----------
+        butler : `lsst.daf.persistence.Butler`
+            Data butler used to write the config. The config is written to dataset type
+            `CmdLineTask._getConfigName`.
+        clobber : `bool`, optional
+            A boolean flag that controls what happens if a config already has been saved:
+            - `True`: overwrite or rename the existing config, depending on ``doBackup``.
+            - `False`: raise `TaskError` if this config does not match the existing config.
+        doBackup : bool, optional
+            Set to `True` to backup the config files if clobbering.
+        """
+        configName = self._getConfigName()
+        if configName is None:
+            return
+        if clobber:
+            butler.put(self.config, configName, doBackup=doBackup)
+        elif butler.datasetExists(configName, write=True):
+            # this may be subject to a race condition; see #2789
+            try:
+                oldConfig = butler.get(configName, immediate=True)
+            except Exception as exc:
+                raise type(exc)("Unable to read stored config file %s (%s); consider using --clobber-config" %
+                                (configName, exc))
+
+            def logConfigMismatch(msg):
+                self.log.fatal("Comparing configuration: %s", msg)
+
+            if not self.config.compare(oldConfig, shortcut=False, output=logConfigMismatch):
+                raise TaskError(
+                    ("Config does not match existing task config %r on disk; tasks configurations " +
+                     "must be consistent within the same output repo (override with --clobber-config)") %
+                    (configName,))
+        else:
+            butler.put(self.config, configName, fgcmcycle=self.config.cycleNumber)
 
     def __call__(self, butler):
         """
