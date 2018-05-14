@@ -24,7 +24,7 @@ config.utBoundary = 0.0
 # MJD dates on which the mirror was washed
 config.washMjds = (0.0, )
 # Dividing point between observing epochs (years, camera events, etc.)
-config.epochMjds = (0.0, 100000.0)
+config.epochMjds=[0.0, 57000.0, 57200.0, 100000.0]
 # Latitude of the observatory
 config.latitude = 19.8256
 # Gain of the camera (used to dead-reckon absolute scale)

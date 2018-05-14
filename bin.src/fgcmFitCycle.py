@@ -3,4 +3,3 @@
 from lsst.fgcmcal.fgcmFitCycle import FgcmFitCycleTask
 
 FgcmFitCycleTask.parseAndRun()
-

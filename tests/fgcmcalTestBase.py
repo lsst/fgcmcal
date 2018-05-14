@@ -3,14 +3,15 @@
 from __future__ import division, absolute_import, print_function
 
 import os
-import inspect
 import shutil
 import numpy as np
 
 import lsst.daf.persistence as dafPersistence
+import lsst.afw.geom as afwGeom
 import lsst.log
 
 import lsst.fgcmcal as fgcmcal
+
 
 class FgcmcalTestBase(object):
     """
@@ -37,10 +38,6 @@ class FgcmcalTestBase(object):
 
         lsst.log.setLevel("daf.persistence.butler", lsst.log.FATAL)
         lsst.log.setLevel("CameraMapper", lsst.log.FATAL)
-
-    def tearDown(self):
-        if getattr(self, 'config', None) is not None:
-            del self.config
 
     def _runFgcmMakeLut(self, nBand, i0Std, i0Recon, i10Std, i10Recon):
         """
@@ -132,7 +129,6 @@ class FgcmcalTestBase(object):
         cwd = os.getcwd()
         os.chdir(self.testDir)
 
-        args = [self.inputDir, '--output', self.testDir, '--doraise']
         result = fgcmcal.FgcmFitCycleTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
 
@@ -148,12 +144,51 @@ class FgcmcalTestBase(object):
         gd, = np.where(zps['fgcmflag'] == 1)
         self.assertEqual(nGoodZp, len(gd))
 
+    def _runFgcmOutputProducts(self, visitDataRefName):
+        """
+        """
+
+        if self.logLevel is not None:
+            self.otherArgs.extend(['--loglevel', 'fgcmcal=%s'%self.logLevel])
+
+        args = [self.inputDir, '--output', self.testDir,
+                '--doraise']
+        args.extend(self.otherArgs)
+
+        result = fgcmcal.FgcmOutputProductsTask.parseAndRun(args=args, config=self.config)
+        self._checkResult(result)
+
+        butler = dafPersistence.butler.Butler(self.testDir)
+
+        visitCatalog = butler.get('fgcmVisitCatalog')
+        lutCat = butler.get('fgcmLookUpTable')
+
+        testTrans = butler.get('transmission_atmosphere_fgcm',
+                               dataId={visitDataRefName: visitCatalog[0]['visit']})
+        testResp = testTrans.sampleAt(position=afwGeom.Point2D(0, 0),
+                                      wavelengths=lutCat[0]['atmlambda'])
+
+        # The fit to be roughly consistent with the standard, although the
+        # airmass is taken into account even with the "frozen" atmosphere.
+        # This is also a rough comparison, because the interpolation does
+        # not work well with such a coarse look-up table used for the test.
+        self.assertFloatsAlmostEqual(testResp, lutCat[0]['atmstdtrans'], atol=0.06)
+
+        # The second should be close to the first, but there is the airmass
+        # difference so they aren't identical
+        testTrans2 = butler.get('transmission_atmosphere_fgcm',
+                                dataId={visitDataRefName: visitCatalog[1]['visit']})
+        testResp2 = testTrans2.sampleAt(position=afwGeom.Point2D(0, 0),
+                                        wavelengths=lutCat[0]['atmlambda'])
+        self.assertFloatsAlmostEqual(testResp, testResp2, atol=1e-4)
+
     def _checkResult(self, result):
         self.assertNotEqual(result.resultList, [], 'resultList should not be empty')
         self.assertEqual(result.resultList[0].exitStatus, 0)
 
     def tearDown(self):
+        if getattr(self, 'config', None) is not None:
+            del self.config
+
         if os.path.exists(self.testDir):
             shutil.rmtree(self.testDir, True)
-
-

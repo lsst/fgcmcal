@@ -261,6 +261,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=int,
         default=None,
     )
+    modelMagErrors = pexConfig.Field(
+        doc="Should FGCM model the magnitude errors from sky/fwhm? (False means trust inputs)",
+        dtype=bool,
+        default=False,
+    )
 
     def setDefaults(self):
         pass
@@ -283,8 +288,10 @@ class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
         """
         return [parsedCmd.butler]
 
-    def precall(self, parsedCmd):
-        return True
+    # This overrides the pipe_base config saving which would fail because it
+    # requires the %(fgcmcycle)d dataId key.
+    # def precall(self, parsedCmd):
+    #    return True
 
     def __call__(self, butler):
         """
@@ -394,6 +401,47 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         return []
 
+    def writeConfig(self, butler, clobber=False, doBackup=True):
+        """Write the configuration used for processing the data, or check that an existing
+        one is equal to the new one if present.  This is an override of the regular
+        version from pipe_base that knows about fgcmcycle.
+
+        Parameters
+        ----------
+        butler : `lsst.daf.persistence.Butler`
+            Data butler used to write the config. The config is written to dataset type
+            `CmdLineTask._getConfigName`.
+        clobber : `bool`, optional
+            A boolean flag that controls what happens if a config already has been saved:
+            - `True`: overwrite or rename the existing config, depending on ``doBackup``.
+            - `False`: raise `TaskError` if this config does not match the existing config.
+        doBackup : bool, optional
+            Set to `True` to backup the config files if clobbering.
+        """
+        configName = self._getConfigName()
+        if configName is None:
+            return
+        if clobber:
+            butler.put(self.config, configName, doBackup=doBackup, fgcmcycle=self.config.cycleNumber)
+        elif butler.datasetExists(configName, write=True, fgcmcycle=self.config.cycleNumber):
+            # this may be subject to a race condition; see #2789
+            try:
+                oldConfig = butler.get(configName, immediate=True, fgcmcycle=self.config.cycleNumber)
+            except Exception as exc:
+                raise type(exc)("Unable to read stored config file %s (%s); consider using --clobber-config" %
+                                (configName, exc))
+
+            def logConfigMismatch(msg):
+                self.log.fatal("Comparing configuration: %s", msg)
+
+            if not self.config.compare(oldConfig, shortcut=False, output=logConfigMismatch):
+                raise pipeBase.TaskError(
+                    ("Config does not match existing task config %r on disk; tasks configurations " +
+                     "must be consistent within the same output repo (override with --clobber-config)") %
+                    (configName,))
+        else:
+            butler.put(self.config, configName, fgcmcycle=self.config.cycleNumber)
+
     def _fgcmFitCycle(self, butler):
         """
         Run the fit cycle
@@ -468,10 +516,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'ccdField': 'CCD',
                       'seeingField': 'PSFSIGMA',
                       'deepFlag': 'DEEPFLAG',  # unused
-                      'bands': self.config.bands,
-                      'fitBands': fitBands,
-                      'extraBands': extraBands,
-                      'filterToBand': self.config.filterToBand,
+                      'bands': list(self.config.bands),
+                      'fitBands': list(fitBands),
+                      'extraBands': list(extraBands),
+                      'filterToBand': dict(self.config.filterToBand),
                       'logLevel': 'INFO',  # FIXME
                       'nCore': self.config.nCore,
                       'nStarPerRun': self.config.nStarPerRun,
@@ -520,6 +568,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'pwvRetrievalSmoothBlock': 25,
                       'useRetrievedTauInit': False,
                       'tauRetrievalMinCCDPerNight': 500,
+                      'modelMagErrors': self.config.modelMagErrors,
                       'printOnly': False,
                       'outputStars': False,
                       'clobber': True,
@@ -806,6 +855,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                            parCat['compapercorrslopeerr'].size),
                                           ('COMPAPERCORRRANGE', 'f8',
                                            parCat['compapercorrrange'].size),
+                                          ('COMPMODELERREXPTIMEPIVOT', 'f8',
+                                           parCat['compmodelerrexptimepivot'].size),
+                                          ('COMPMODELERRFWHMPIVOT', 'f8',
+                                           parCat['compmodelerrfwhmpivot'].size),
+                                          ('COMPMODELERRSKYPIVOT', 'f8',
+                                           parCat['compmodelerrskypivot'].size),
+                                          ('COMPMODELERRPARS', 'f8',
+                                           parCat['compmodelerrpars'].size),
                                           ('COMPEXPGRAY', 'f8',
                                            parCat['compexpgray'].size),
                                           ('COMPVARGRAY', 'f8',
@@ -837,6 +894,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             inParams['COMPAPERCORRSLOPE'][:] = parCat['compapercorrslope'][0, :]
             inParams['COMPAPERCORRSLOPEERR'][:] = parCat['compapercorrslopeerr'][0, :]
             inParams['COMPAPERCORRRANGE'][:] = parCat['compapercorrrange'][0, :]
+            inParams['COMPMODELERREXPTIMEPIVOT'][:] = parCat['compmodelerrexptimepivot'][0, :]
+            inParams['COMPMODELERRFWHMPIVOT'][:] = parCat['compmodelerrfwhmpivot'][0, :]
+            inParams['COMPMODELERRSKYPIVOT'][:] = parCat['compmodelerrskypivot'][0, :]
+            inParams['COMPMODELERRPARS'][:] = parCat['compmodelerrpars'][0, :]
             inParams['COMPEXPGRAY'][:] = parCat['compexpgray'][0, :]
             inParams['COMPVARGRAY'][:] = parCat['compvargray'][0, :]
             inParams['COMPNGOODSTARPEREXP'][:] = parCat['compngoodstarperexp'][0, :]
@@ -990,6 +1051,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['COMPAPERCORRSLOPEERR'].size)
         parSchema.addField('compapercorrrange', type='ArrayD', doc='Aperture correction range',
                            size=pars['COMPAPERCORRRANGE'].size)
+        parSchema.addField('compmodelerrexptimepivot', type='ArrayD', doc='Model error exptime pivot',
+                           size=pars['COMPMODELERREXPTIMEPIVOT'].size)
+        parSchema.addField('compmodelerrfwhmpivot', type='ArrayD', doc='Model error fwhm pivot',
+                           size=pars['COMPMODELERRFWHMPIVOT'].size)
+        parSchema.addField('compmodelerrskypivot', type='ArrayD', doc='Model error sky pivot',
+                           size=pars['COMPMODELERRSKYPIVOT'].size)
+        parSchema.addField('compmodelerrpars', type='ArrayD', doc='Model error parameters',
+                           size=pars['COMPMODELERRPARS'].size)
         parSchema.addField('compexpgray', type='ArrayD', doc='Computed exposure gray',
                            size=pars['COMPEXPGRAY'].size)
         parSchema.addField('compvargray', type='ArrayD', doc='Computed exposure variance',
@@ -1045,6 +1114,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                     'parpwvintercept', 'parpwvperslope', 'parqesysintercept',
                     'parqesysslope', 'parretrievedpwvnightlyoffset', 'compapercorrpivot',
                     'compapercorrslope', 'compapercorrslopeerr', 'compapercorrrange',
+                    'compmodelerrexptimepivot', 'compmodelerrfwhmpivot',
+                    'compmodelerrskypivot', 'compmodelerrpars',
                     'compexpgray', 'compvargray', 'compngoodstarperexp', 'compsigfgcm',
                     'compretrievedpwv', 'compretrievedpwvraw', 'compretrievedpwvflag',
                     'compretrievedtaunight']

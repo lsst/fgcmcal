@@ -2,7 +2,6 @@
 
 from __future__ import division, absolute_import, print_function
 
-import inspect
 import unittest
 import os
 import tempfile
@@ -16,6 +15,7 @@ import fgcmcalTestBase
 import lsst.fgcmcal as fgcmcal
 
 ROOT = os.path.abspath(os.path.dirname(__file__))
+
 
 class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase):
     @classmethod
@@ -38,6 +38,9 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # Set numpy seed for stability
         np.random.seed(seed=1000)
 
+        visitDataRefName = 'visit'
+        ccdDataRefName = 'ccd'
+
         # First test making the LUT
         self.config = fgcmcal.FgcmMakeLutConfig()
         self.config.filterNames = ['r', 'i']
@@ -55,10 +58,12 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # Now the star building
         self.config = fgcmcal.FgcmBuildStarsConfig()
-        self.config.filterToBand = {'r':'r', 'i':'i'}
+        self.config.filterToBand = {'r': 'r', 'i': 'i'}
         self.config.requiredBands = ['r', 'i']
         self.config.referenceBand = 'i'
         self.config.checkAllCcds = True
+        self.config.visitDataRefName = visitDataRefName
+        self.config.ccdDataRefName = ccdDataRefName
         self.otherArgs = []
 
         nVisit = 11
@@ -67,12 +72,12 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self._runFgcmBuildStars(nVisit, nStar, nObs)
 
-        # And finally the fit cycle
+        # And the fit cycle
         self.config = fgcmcal.FgcmFitCycleConfig()
         self.config.outfileBase = 'TestFgcm'
         self.config.bands = ['r', 'i']
         self.config.fitFlag = (1, 1)
-        self.config.filterToBand = {'r':'r', 'i':'i'}
+        self.config.filterToBand = {'r': 'r', 'i': 'i'}
         self.config.maxIter = 1
         self.config.nCore = 1
         self.config.cycleNumber = 0
@@ -101,13 +106,20 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self._runFgcmFitCycle(nZp, nGoodZp)
 
+        # And output the products
+        self.config = fgcmcal.FgcmOutputProductsConfig()
+        self.config.cycleNumber = 0
+
+        self._runFgcmOutputProducts(visitDataRefName)
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
 
+
 def setup_module(module):
     lsst.utils.tests.init()
+
 
 if __name__ == "__main__":
     lsst.utils.tests.init()
