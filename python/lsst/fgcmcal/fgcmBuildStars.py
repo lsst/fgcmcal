@@ -573,24 +573,24 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 goodSrc = self.sourceSelector.selectSources(sources)
 
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
-                tempCat.table.preallocate(len(goodSrc.sourceCat))
-                tempCat.extend(goodSrc.sourceCat, mapper=sourceMapper)
+                tempCat.table.preallocate(goodSrc.selected.sum())
+                tempCat.extend(sources[goodSrc.selected], mapper=sourceMapper)
                 tempCat[visitKey][:] = visit['visit']
                 tempCat[ccdKey][:] = ccdId
                 # Compute "magnitude" by scaling flux with exposure time.
                 # Add an arbitrary zeropoint that needs to be investigated.
-                scaledFlux = goodSrc.sourceCat[fluxKey] * visit['scaling'][ccdIndex]
+                scaledFlux = sources[fluxKey][goodSrc.selected] * visit['scaling'][ccdIndex]
                 tempCat[magKey][:] = (self.config.zeropointDefault -
                                       2.5 * np.log10(scaledFlux) +
                                       2.5 * np.log10(expTime))
                 # magErr is computed with original (unscaled) flux
-                tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (goodSrc.sourceCat[fluxErrKey] /
-                                                               goodSrc.sourceCat[fluxKey])
+                tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrKey][goodSrc.selected] /
+                                                               sources[fluxKey][goodSrc.selected])
 
                 if self.config.applyJacobian:
-                    tempCat[magKey][:] -= 2.5 * np.log10(goodSrc.sourceCat[jacobianKey])
-                    # Need to divide scaling by mean of the jacobian of the sources!
+                    tempCat[magKey][:] -= 2.5 * np.log10(sources[jacobianKey][goodSrc.selected])
                     # FIXME
+                    # Divide scaling by mean of the jacobian of the sources
 
                 fullCatalog.extend(tempCat)
 
