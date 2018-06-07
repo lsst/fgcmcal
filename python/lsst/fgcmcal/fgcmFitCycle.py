@@ -266,6 +266,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=bool,
         default=False,
     )
+    outputStandards = pexConfig.Field(
+        doc="Output standard stars? (Usually only for final iteration)",
+        dtype=bool,
+        default=False,
+    )
 
     def setDefaults(self):
         pass
@@ -1084,7 +1089,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=fgcmFitCycle.fgcmPars.parSuperStarFlat.size)
 
         parCat = afwTable.BaseCatalog(parSchema)
-        parCat.table.preallocate(1)
+        parCat.reserve(1)
 
         rec = parCat.addNew()
 
@@ -1140,11 +1145,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         flagStarCat = afwTable.BaseCatalog(flagStarSchema)
         flagStarStruct = fgcmFitCycle.fgcmStars.getFlagStarIndices()
-        flagStarCat.table.preallocate(flagStarStruct.size)
+        flagStarCat.reserve(flagStarStruct.size)
         for i in xrange(flagStarStruct.size):
             rec = flagStarCat.addNew()
 
-        flagStarCat = flagStarCat.copy(deep=True)
+        if not flagStarCat.isContiguous():
+            flagStarCat = flagStarCat.copy(deep=True)
 
         flagStarCat['objid'][:] = flagStarStruct['OBJID']
         flagStarCat['objflag'][:] = flagStarStruct['OBJFLAG']
@@ -1187,12 +1193,13 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         zptSchema.addField('filtername', type=str, size=2, doc='Filter name')
 
         zptCat = afwTable.BaseCatalog(zptSchema)
-        zptCat.table.preallocate(fgcmFitCycle.fgcmZpts.zpStruct.size)
+        zptCat.reserve(fgcmFitCycle.fgcmZpts.zpStruct.size)
         for filterName in fgcmFitCycle.fgcmZpts.zpStruct['FILTERNAME']:
             rec = zptCat.addNew()
             rec['filtername'] = filterName.decode('utf-8')
 
-        zptCat = zptCat.copy(deep=True)
+        if not zptCat.isContiguous():
+            zptCat = zptCat.copy(deep=True)
 
         # FIXME: will need to port over the visitDataRefName from the build stars config...
         zptCat['visit'][:] = fgcmFitCycle.fgcmZpts.zpStruct['VISIT']
@@ -1229,11 +1236,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         atmSchema.addField('seczenith', type=np.float64, doc='Secant(zenith) (~ airmass)')
 
         atmCat = afwTable.BaseCatalog(atmSchema)
-        atmCat.table.preallocate(fgcmFitCycle.fgcmZpts.atmStruct.size)
+        atmCat.reserve(fgcmFitCycle.fgcmZpts.atmStruct.size)
         for i in xrange(fgcmFitCycle.fgcmZpts.atmStruct.size):
             rec = atmCat.addNew()
 
-        atmCat = atmCat.copy(deep=True)
+        if not atmCat.isContiguous():
+            atmCat = atmCat.copy(deep=True)
 
         atmCat['visit'][:] = fgcmFitCycle.fgcmZpts.atmStruct['VISIT']
         atmCat['pmb'][:] = fgcmFitCycle.fgcmZpts.atmStruct['PMB']
@@ -1244,6 +1252,37 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         atmCat['seczenith'][:] = fgcmFitCycle.fgcmZpts.atmStruct['SECZENITH']
 
         butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
+
+        if self.config.outputStandards:
+            stdSchema = afwTable.Schema()
+            stdSchema.addField('fgcm_id', type=np.int64, doc='FGCM Star id')
+            # For now, just use the degrees and figure out correct type later
+            stdSchema.addField('ra', type=np.float64, doc='Right ascension')
+            stdSchema.addField('dec', type=np.float64, doc='Declination')
+            stdSchema.addField('ngood', type='ArrayI', doc='Number of good observations',
+                               size=len(self.config.bands))
+            stdSchema.addField('mag_std', type='ArrayF', doc='Standard magnitude',
+                               size=len(self.config.bands))
+            stdSchema.addField('magerr_std', type='ArrayF', doc='Standard magnitude error',
+                               size=len(self.config.bands))
+
+            outCat = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmParameters)
+            stdCat = afwTable.BaseCatalog(stdSchema)
+            stdCat.reserve(outCat.size)
+            for i in range(outCat.size):
+                rec = stdCat.addNew()
+
+            if not stdCat.isContiguous():
+                stdCat = stdCat.copy(deep=True)
+
+            stdCat['fgcm_id'][:] = outCat['FGCM_ID']
+            stdCat['ra'][:] = outCat['RA']
+            stdCat['dec'][:] = outCat['DEC']
+            stdCat['ngood'][:, :] = outCat['NGOOD'][:, :]
+            stdCat['mag_std'][:, :] = outCat['MAG_STD'][:, :]
+            stdCat['magerr_std'][:, :] = outCat['MAGERR_STD'][:, :]
+
+            butler.put(stdCat, 'fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
 
         # Output the config for the next cycle
         # We need to make a copy since the input one has been frozen
