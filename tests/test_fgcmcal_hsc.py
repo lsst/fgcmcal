@@ -99,6 +99,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.nStarPerRun = 50
         self.config.nExpPerRun = 2
         self.config.colorSplitIndices = (0, 1)
+        self.config.outputStandards = True
         self.otherArgs = []
 
         nZp = 1232

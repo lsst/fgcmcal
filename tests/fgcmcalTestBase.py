@@ -144,6 +144,10 @@ class FgcmcalTestBase(object):
         gd, = np.where(zps['fgcmflag'] == 1)
         self.assertEqual(nGoodZp, len(gd))
 
+        stds = butler.get('fgcmStandardStars', fgcmcycle=0)
+
+        print(len(stds))
+
     def _runFgcmOutputProducts(self, visitDataRefName):
         """
         """
