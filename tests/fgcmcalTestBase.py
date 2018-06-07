@@ -114,7 +114,7 @@ class FgcmcalTestBase(object):
         starObs = butler.get('fgcmStarObservations')
         self.assertEqual(nObs, len(starObs))
 
-    def _runFgcmFitCycle(self, nZp, nGoodZp):
+    def _runFgcmFitCycle(self, nZp, nGoodZp, nStdStars):
         """
         """
 
@@ -146,7 +146,7 @@ class FgcmcalTestBase(object):
 
         stds = butler.get('fgcmStandardStars', fgcmcycle=0)
 
-        print(len(stds))
+        self.assertEqual(nStdStars, len(stds))
 
     def _runFgcmOutputProducts(self, visitDataRefName):
         """

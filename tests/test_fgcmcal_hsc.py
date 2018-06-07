@@ -104,8 +104,9 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         nZp = 1232
         nGoodZp = 27
+        nStdStars = 472
 
-        self._runFgcmFitCycle(nZp, nGoodZp)
+        self._runFgcmFitCycle(nZp, nGoodZp, nStdStars)
 
         # And output the products
         self.config = fgcmcal.FgcmOutputProductsConfig()
