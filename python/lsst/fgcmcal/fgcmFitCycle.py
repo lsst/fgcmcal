@@ -507,6 +507,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             parts = ccut.split(',')
             starColorCutList.append([parts[0], parts[1], float(parts[2]), float(parts[3])])
 
+        if self.config.maxIter == 0:
+            resetParameters = False
+        else:
+            resetParameters = True
+
         # create a configuration dictionary for fgcmFitCycle
         configDict = {'outfileBase': self.config.outfileBase,
                       'logger': self.log,
@@ -578,7 +583,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'outputStars': False,
                       'clobber': True,
                       'useSedLUT': False,
-                      'resetParameters': True}
+                      'resetParameters': resetParameters}
 
         """
         # set up the look-up-table
