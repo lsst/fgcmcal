@@ -1266,7 +1266,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             stdSchema.addField('magerr_std', type='ArrayF', doc='Standard magnitude error',
                                size=len(self.config.bands))
 
-            outCat = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmParameters)
+            outCat = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
             stdCat = afwTable.BaseCatalog(stdSchema)
             stdCat.reserve(outCat.size)
             for i in range(outCat.size):
