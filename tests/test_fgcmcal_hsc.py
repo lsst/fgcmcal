@@ -77,6 +77,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.outfileBase = 'TestFgcm'
         self.config.bands = ['r', 'i']
         self.config.fitFlag = (1, 1)
+        self.config.requiredFlag = (1, 1)
         self.config.filterToBand = {'r': 'r', 'i': 'i'}
         self.config.maxIter = 1
         self.config.nCore = 1
