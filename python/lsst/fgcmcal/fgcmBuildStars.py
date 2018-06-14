@@ -82,8 +82,8 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=str,
         default=(),
     )
-    referenceBand = pexConfig.Field(
-        doc="Reference band for primary matches",
+    referenceBands = pexConfig.ListField(
+        doc="Reference bands for primary matches",
         dtype=str,
         default=None
     )
@@ -648,7 +648,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                       'coarseNSide': self.config.coarseNside,
                       'densNSide': self.config.densityCutNside,
                       'densMaxPerPixel': self.config.densityCutMaxPerPixel,
-                      'referenceBand': self.config.referenceBand,
+                      'referenceBands': self.config.referenceBands,
                       'zpDefault': self.config.zeropointDefault}
 
         # initialize the FgcmMakeStars object
