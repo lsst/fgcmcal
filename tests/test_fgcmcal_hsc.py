@@ -60,7 +60,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config = fgcmcal.FgcmBuildStarsConfig()
         self.config.filterToBand = {'r': 'r', 'i': 'i'}
         self.config.requiredBands = ['r', 'i']
-        self.config.referenceBand = 'i'
+        self.config.referenceBands = ['i']
         self.config.checkAllCcds = True
         self.config.visitDataRefName = visitDataRefName
         self.config.ccdDataRefName = ccdDataRefName
