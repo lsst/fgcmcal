@@ -535,7 +535,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'deepFlag': 'DEEPFLAG',  # unused
                       'bands': list(self.config.bands),
                       'fitBands': list(fitBands),
-                      'notFitBands': list(extraBands),
+                      'notFitBands': list(notFitBands),
                       'requiredBands': list(requiredBands),
                       'filterToBand': dict(self.config.filterToBand),
                       'logLevel': 'INFO',  # FIXME
@@ -622,7 +622,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
             parLutFilterNames = np.array(parCat[0]['lutfilternames'].split(','))
             parFitBands = np.array(parCat[0]['fitbands'].split(','))
-            parExtraBands = np.array(parCat[0]['extrabands'].split(','))
+            parNotFitBands = np.array(parCat[0]['notfitbands'].split(','))
 
             # FIXME: check that these are the same as in the config, to be sure
 
@@ -630,7 +630,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                            ('LUTFILTERNAMES', parLutFilterNames.dtype.str,
                                             parLutFilterNames.size),
                                            ('FITBANDS', parFitBands.dtype.str, parFitBands.size),
-                                           ('EXTRABANDS', parExtraBands.dtype.str, parExtraBands.size),
+                                           ('NOTFITBANDS', parNotFitBands.dtype.str, parNotFitBands.size),
                                            ('LNTAUUNIT', 'f8'),
                                            ('LNTAUSLOPEUNIT', 'f8'),
                                            ('ALPHAUNIT', 'f8'),
@@ -646,7 +646,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             inParInfo['NCCD'] = parCat['nccd']
             inParInfo['LUTFILTERNAMES'][:] = parLutFilterNames
             inParInfo['FITBANDS'][:] = parFitBands
-            inParInfo['EXTRABANDS'][:] = parExtraBands
+            inParInfo['NOTFITBANDS'][:] = parNotFitBands
             inParInfo['LNTAUUNIT'] = parCat['lntauunit']
             inParInfo['LNTAUSLOPEUNIT'] = parCat['lntauslopeunit']
             inParInfo['ALPHAUNIT'] = parCat['alphaunit']
@@ -821,8 +821,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                           for n in parInfo['LUTFILTERNAMES'][0]])
         fitBandString = comma.join([n.decode('utf-8')
                                     for n in parInfo['FITBANDS'][0]])
-        extraBandString = comma.join([n.decode('utf-8')
-                                      for n in parInfo['EXTRABANDS'][0]])
+        notFitBandString = comma.join([n.decode('utf-8')
+                                       for n in parInfo['NOTFITBANDS'][0]])
 
         # parameter info section
         parSchema.addField('nccd', type=np.int32, doc='Number of CCDs')
@@ -830,8 +830,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=len(lutFilterNameString))
         parSchema.addField('fitbands', type=str, doc='Bands that were fit',
                            size=len(fitBandString))
-        parSchema.addField('extrabands', type=str, doc='Bands that were not fit',
-                           size=len(extraBandString))
+        parSchema.addField('notfitbands', type=str, doc='Bands that were not fit',
+                           size=len(notFitBandString))
         parSchema.addField('lntauunit', type=np.float64, doc='Step units for ln(AOD)')
         parSchema.addField('lntauslopeunit', type=np.float64,
                            doc='Step units for ln(AOD) slope')
@@ -922,7 +922,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['nccd'] = parInfo['NCCD']
         rec['lutfilternames'] = lutFilterNameString
         rec['fitbands'] = fitBandString
-        rec['extrabands'] = extraBandString
+        rec['notfitbands'] = notFitBandString
         rec['lntauunit'] = parInfo['LNTAUUNIT']
         rec['lntauslopeunit'] = parInfo['LNTAUSLOPEUNIT']
         rec['alphaunit'] = parInfo['ALPHAUNIT']
