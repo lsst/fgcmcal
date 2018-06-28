@@ -82,8 +82,8 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=str,
         default=(),
     )
-    referenceBand = pexConfig.Field(
-        doc="Reference band for primary matches",
+    referenceBands = pexConfig.ListField(
+        doc="Reference bands for primary matches",
         dtype=str,
         default=None
     )
@@ -648,7 +648,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                       'coarseNSide': self.config.coarseNside,
                       'densNSide': self.config.densityCutNside,
                       'densMaxPerPixel': self.config.densityCutMaxPerPixel,
-                      'referenceBand': self.config.referenceBand,
+                      'referenceBands': self.config.referenceBands,
                       'zpDefault': self.config.zeropointDefault}
 
         # initialize the FgcmMakeStars object
@@ -685,11 +685,11 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             fgcmStarIdCat.addNew()
 
         # fill the catalog
-        fgcmStarIdCat['fgcm_id'][:] = fgcmMakeStars.objIndexCat['FGCM_ID']
-        fgcmStarIdCat['ra'][:] = fgcmMakeStars.objIndexCat['RA']
-        fgcmStarIdCat['dec'][:] = fgcmMakeStars.objIndexCat['DEC']
-        fgcmStarIdCat['obsarrindex'][:] = fgcmMakeStars.objIndexCat['OBSARRINDEX']
-        fgcmStarIdCat['nobs'][:] = fgcmMakeStars.objIndexCat['NOBS']
+        fgcmStarIdCat['fgcm_id'][:] = fgcmMakeStars.objIndexCat['fgcm_id']
+        fgcmStarIdCat['ra'][:] = fgcmMakeStars.objIndexCat['ra']
+        fgcmStarIdCat['dec'][:] = fgcmMakeStars.objIndexCat['dec']
+        fgcmStarIdCat['obsarrindex'][:] = fgcmMakeStars.objIndexCat['obsarrindex']
+        fgcmStarIdCat['nobs'][:] = fgcmMakeStars.objIndexCat['nobs']
 
         butler.put(fgcmStarIdCat, 'fgcmStarIds')
 
@@ -702,7 +702,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         for i in xrange(fgcmMakeStars.obsIndexCat.size):
             fgcmStarIndicesCat.addNew()
 
-        fgcmStarIndicesCat['obsindex'][:] = fgcmMakeStars.obsIndexCat['OBSINDEX']
+        fgcmStarIndicesCat['obsindex'][:] = fgcmMakeStars.obsIndexCat['obsindex']
 
         butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
 

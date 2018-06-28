@@ -60,7 +60,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config = fgcmcal.FgcmBuildStarsConfig()
         self.config.filterToBand = {'r': 'r', 'i': 'i'}
         self.config.requiredBands = ['r', 'i']
-        self.config.referenceBand = 'i'
+        self.config.referenceBands = ['i']
         self.config.checkAllCcds = True
         self.config.visitDataRefName = visitDataRefName
         self.config.ccdDataRefName = ccdDataRefName
@@ -77,6 +77,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.outfileBase = 'TestFgcm'
         self.config.bands = ['r', 'i']
         self.config.fitFlag = (1, 1)
+        self.config.requiredFlag = (1, 1)
         self.config.filterToBand = {'r': 'r', 'i': 'i'}
         self.config.maxIter = 1
         self.config.nCore = 1
@@ -99,12 +100,14 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.nStarPerRun = 50
         self.config.nExpPerRun = 2
         self.config.colorSplitIndices = (0, 1)
+        self.config.outputStandards = True
         self.otherArgs = []
 
         nZp = 1232
         nGoodZp = 27
+        nStdStars = 472
 
-        self._runFgcmFitCycle(nZp, nGoodZp)
+        self._runFgcmFitCycle(nZp, nGoodZp, nStdStars)
 
         # And output the products
         self.config = fgcmcal.FgcmOutputProductsConfig()

@@ -35,6 +35,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=int,
         default=(0,),
     )
+    requiredFlag = pexConfig.ListField(
+        doc="Flag for bands to require to be a calibration star",
+        dtype=int,
+        default=(0,),
+    )
     filterToBand = pexConfig.DictField(
         doc="filterName to band mapping",
         keytype=str,
@@ -266,6 +271,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=bool,
         default=False,
     )
+    outputStandards = pexConfig.Field(
+        doc="Output standard stars? (Usually only for final iteration)",
+        dtype=bool,
+        default=False,
+    )
 
     def setDefaults(self):
         pass
@@ -490,9 +500,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         #  check config variables for valid ranges
 
         fitFlag = np.array(self.config.fitFlag, dtype=np.bool)
+        requiredFlag = np.array(self.config.requiredFlag, dtype=np.bool)
 
         fitBands = [b for i, b in enumerate(self.config.bands) if fitFlag[i]]
-        extraBands = [b for i, b in enumerate(self.config.bands) if not fitFlag[i]]
+        notFitBands = [b for i, b in enumerate(self.config.bands) if not fitFlag[i]]
+        requiredBands = [b for i, b in enumerate(self.config.bands) if requiredFlag[i]]
 
         camera = butler.get('camera')
 
@@ -501,6 +513,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         for ccut in self.config.starColorCuts:
             parts = ccut.split(',')
             starColorCutList.append([parts[0], parts[1], float(parts[2]), float(parts[3])])
+
+        if self.config.maxIter == 0:
+            resetParameters = False
+        else:
+            resetParameters = True
 
         # create a configuration dictionary for fgcmFitCycle
         configDict = {'outfileBase': self.config.outfileBase,
@@ -518,7 +535,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'deepFlag': 'DEEPFLAG',  # unused
                       'bands': list(self.config.bands),
                       'fitBands': list(fitBands),
-                      'extraBands': list(extraBands),
+                      'notFitBands': list(notFitBands),
+                      'requiredBands': list(requiredBands),
                       'filterToBand': dict(self.config.filterToBand),
                       'logLevel': 'INFO',  # FIXME
                       'nCore': self.config.nCore,
@@ -550,8 +568,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'illegalValue': self.config.illegalValue,
                       'starColorCuts': starColorCutList,
                       'aperCorrFitNBins': self.config.aperCorrFitNBins,
-                      'sedFitBandFudgeFactors': np.array(self.config.sedFudgeFactors)[fitFlag],
-                      'sedExtraBandFudgeFactors': np.array(self.config.sedFudgeFactors)[~fitFlag],
+                      'sedFudgeFactors': np.array(self.config.sedFudgeFactors),
                       'colorSplitIndices': np.array(self.config.colorSplitIndices),
                       'sigFgcmMaxErr': self.config.sigFgcmMaxErr,
                       'sigFgcmMaxEGray': self.config.sigFgcmMaxEGray,
@@ -573,202 +590,15 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'outputStars': False,
                       'clobber': True,
                       'useSedLUT': False,
-                      'resetParameters': True}
-
-        """
-        # set up the look-up-table
-        lutCat = butler.get('fgcmLookUpTable')
-
-        # first we need the lutIndexVals
-        # dtype is set for py2/py3/fits/fgcm compatibility
-        lutFilterNames = np.array(lutCat[0]['filternames'].split(','), dtype='a')
-        lutStdFilterNames = np.array(lutCat[0]['stdfilternames'].split(','), dtype='a')
-
-        # FIXME: check that lutBands equal listed bands!
-
-        lutIndexVals = np.zeros(1, dtype=[('FILTERNAMES', lutFilterNames.dtype.str,
-                                           lutFilterNames.size),
-                                          ('STDFILTERNAMES', lutStdFilterNames.dtype.str,
-                                           lutStdFilterNames.size),
-                                          ('PMB', 'f8', lutCat[0]['pmb'].size),
-                                          ('PMBFACTOR', 'f8', lutCat[0]['pmbfactor'].size),
-                                          ('PMBELEVATION', 'f8'),
-                                          ('LAMBDANORM', 'f8'),
-                                          ('PWV', 'f8', lutCat[0]['pwv'].size),
-                                          ('O3', 'f8', lutCat[0]['o3'].size),
-                                          ('TAU', 'f8', lutCat[0]['tau'].size),
-                                          ('ALPHA', 'f8', lutCat[0]['alpha'].size),
-                                          ('ZENITH', 'f8', lutCat[0]['zenith'].size),
-                                          ('NCCD', 'i4')])
-
-        lutIndexVals['FILTERNAMES'][:] = lutFilterNames
-        lutIndexVals['STDFILTERNAMES'][:] = lutStdFilterNames
-        lutIndexVals['PMB'][:] = lutCat[0]['pmb']
-        lutIndexVals['PMBFACTOR'][:] = lutCat[0]['pmbfactor']
-        lutIndexVals['PMBELEVATION'] = lutCat[0]['pmbelevation']
-        lutIndexVals['LAMBDANORM'] = lutCat[0]['lambdanorm']
-        lutIndexVals['PWV'][:] = lutCat[0]['pwv']
-        lutIndexVals['O3'][:] = lutCat[0]['o3']
-        lutIndexVals['TAU'][:] = lutCat[0]['tau']
-        lutIndexVals['ALPHA'][:] = lutCat[0]['alpha']
-        lutIndexVals['ZENITH'][:] = lutCat[0]['zenith']
-        lutIndexVals['NCCD'] = lutCat[0]['nccd']
-
-        # now we need the Standard Values
-        lutStd = np.zeros(1, dtype=[('PMBSTD', 'f8'),
-                                    ('PWVSTD', 'f8'),
-                                    ('O3STD', 'f8'),
-                                    ('TAUSTD', 'f8'),
-                                    ('ALPHASTD', 'f8'),
-                                    ('ZENITHSTD', 'f8'),
-                                    ('LAMBDARANGE', 'f8', 2),
-                                    ('LAMBDASTEP', 'f8'),
-                                    ('LAMBDASTD', 'f8', lutFilterNames.size),
-                                    ('LAMBDASTDFILTER', 'f8', lutStdFilterNames.size),
-                                    ('I0STD', 'f8', lutFilterNames.size),
-                                    ('I1STD', 'f8', lutFilterNames.size),
-                                    ('I10STD', 'f8', lutFilterNames.size),
-                                    ('LAMBDAB', 'f8', lutFilterNames.size),
-                                    ('ATMLAMBDA', 'f8', lutCat[0]['atmlambda'].size),
-                                    ('ATMSTDTRANS', 'f8', lutCat[0]['atmstdtrans'].size)])
-        lutStd['PMBSTD'] = lutCat[0]['pmbstd']
-        lutStd['PWVSTD'] = lutCat[0]['pwvstd']
-        lutStd['O3STD'] = lutCat[0]['o3std']
-        lutStd['TAUSTD'] = lutCat[0]['taustd']
-        lutStd['ALPHASTD'] = lutCat[0]['alphastd']
-        lutStd['ZENITHSTD'] = lutCat[0]['zenithstd']
-        lutStd['LAMBDARANGE'][:] = lutCat[0]['lambdarange'][:]
-        lutStd['LAMBDASTEP'] = lutCat[0]['lambdastep']
-        lutStd['LAMBDASTD'][:] = lutCat[0]['lambdastd']
-        lutStd['LAMBDASTDFILTER'][:] = lutCat[0]['lambdastdfilter']
-        lutStd['I0STD'][:] = lutCat[0]['i0std']
-        lutStd['I1STD'][:] = lutCat[0]['i1std']
-        lutStd['I10STD'][:] = lutCat[0]['i10std']
-        lutStd['LAMBDAB'][:] = lutCat[0]['lambdab']
-        lutStd['ATMLAMBDA'][:] = lutCat[0]['atmlambda'][:]
-        lutStd['ATMSTDTRANS'][:] = lutCat[0]['atmstdtrans'][:]
-
-        lutTypes = []
-        for row in lutCat:
-            lutTypes.append(row['luttype'])
-
-        # And the flattened look-up-table
-        lutFlat = np.zeros(lutCat[0]['lut'].size, dtype=[('I0', 'f4'),
-                                                         ('I1', 'f4')])
-
-        try:
-            lutFlat['I0'][:] = lutCat[lutTypes.index('I0')]['lut'][:]
-            lutFlat['I1'][:] = lutCat[lutTypes.index('I1')]['lut'][:]
-        except:
-            # need to raise exception
-            pass
-
-        lutDerivFlat = np.zeros(lutCat[0]['lut'].size, dtype=[('D_PWV', 'f4'),
-                                                              ('D_O3', 'f4'),
-                                                              ('D_LNTAU', 'f4'),
-                                                              ('D_ALPHA', 'f4'),
-                                                              ('D_SECZENITH', 'f4'),
-                                                              ('D_PWV_I1', 'f4'),
-                                                              ('D_O3_I1', 'f4'),
-                                                              ('D_LNTAU_I1', 'f4'),
-                                                              ('D_ALPHA_I1', 'f4'),
-                                                              ('D_SECZENITH_I1', 'f4')])
-
-        try:
-            for name in lutDerivFlat.dtype.names:
-                lutDerivFlat[name][:] = lutCat[lutTypes.index(name)]['lut'][:]
-        except:
-            # raise a helpful exception
-            pass
-
-        # and clear out the memory from the big object
-        lutCat = None
-
-        fgcmLut = fgcm.FgcmLUT(lutIndexVals, lutFlat, lutDerivFlat, lutStd,
-                               filterToBand=self.config.filterToBand)
-                               """
+                      'resetParameters': resetParameters}
 
         fgcmLut, lutIndexVals, lutStd = self._loadFgcmLut(butler,
                                                           filterToBand=self.config.filterToBand)
 
-        """
-        # and clear out the memory of the big created objects
-        lutFlat = None
-        lutDerivFlat = None
-        """
-
         # next we need the exposure/visit information
-        """
-        visitCat = butler.get('fgcmVisitCatalog')
-
-        fgcmExpInfo = np.zeros(len(visitCat), dtype=[('VISIT', 'i8'),
-                                                     ('MJD', 'f8'),
-                                                     ('EXPTIME', 'f8'),
-                                                     ('SEEING', 'f8'),
-                                                     ('DEEPFLAG', 'i2'),
-                                                     ('TELHA', 'f8'),
-                                                     ('TELRA', 'f8'),
-                                                     ('TELDEC', 'f8'),
-                                                     ('PMB', 'f8'),
-                                                     ('FILTERNAME', 'a2')])
-        fgcmExpInfo['VISIT'][:] = visitCat['visit']
-        fgcmExpInfo['MJD'][:] = visitCat['mjd']
-        fgcmExpInfo['EXPTIME'][:] = visitCat['exptime']
-        fgcmExpInfo['SEEING'][:] = visitCat['fwhm']
-        fgcmExpInfo['DEEPFLAG'][:] = visitCat['deepflag']
-        fgcmExpInfo['TELHA'][:] = visitCat['telha']
-        fgcmExpInfo['TELRA'][:] = visitCat['telra']
-        fgcmExpInfo['TELDEC'][:] = visitCat['teldec']
-        fgcmExpInfo['PMB'][:] = visitCat['pmb']
-        # Note that we have to go through asAstropy() to get a string
-        #  array out of an afwTable
-        fgcmExpInfo['FILTERNAME'][:] = visitCat.asAstropy()['filtername']
-        """
 
         fgcmExpInfo = self._loadVisitCatalog(butler)
 
-        """
-        # and we need to know the ccd offsets from the camera geometry
-        ccdOffsets = np.zeros(lutIndexVals['NCCD'], dtype=[('CCDNUM', 'i4'),
-                                                           ('DELTA_RA', 'f8'),
-                                                           ('DELTA_DEC', 'f8'),
-                                                           ('RA_SIZE', 'f8'),
-                                                           ('DEC_SIZE', 'f8'),
-                                                           ('X_SIZE', 'i4'),
-                                                           ('Y_SIZE', 'i4')])
-
-        camera = butler.get('camera')
-
-        extent = afwGeom.Extent2D(self.config.pixelScale, self.config.pixelScale)
-
-        for i, detector in enumerate(camera):
-            # new version, using proper rotations
-            #  but I worry this only works with HSC, as there's a unit inconsistency
-
-            camPoint = detector.getCenter(afwCameraGeom.PIXELS)
-            bbox = detector.getBBox()
-            orient = detector.getOrientation()
-
-            ccdOffsets['CCDNUM'][i] = detector.getId()
-
-            xform = orient.makePixelFpTransform(extent)
-            pointXform = xform.applyForward(camPoint)
-            # this requires a pixelScale
-            # NOTE that this now works properly with HSC, but I need to work on
-            # generalizing this properly
-            ccdOffsets['DELTA_RA'][i] = -pointXform.getY() * self.config.pixelScale / 3600.0
-            ccdOffsets['DELTA_DEC'][i] = -pointXform.getX() * self.config.pixelScale / 3600.0
-
-            # but this does not (for the delta)
-            boxXform = xform.applyForward(afwGeom.Point2D(bbox.getMaxX(), bbox.getMaxY()))
-            ccdOffsets['RA_SIZE'][i] = 2. * np.abs(boxXform.getY() -
-                                                   pointXform.getY()) / 3600.0
-            ccdOffsets['DEC_SIZE'][i] = 2. * np.abs(boxXform.getX() -
-                                                    pointXform.getX()) / 3600.0
-
-            ccdOffsets['X_SIZE'][i] = bbox.getMaxX()
-            ccdOffsets['Y_SIZE'][i] = bbox.getMaxY()
-            """
         ccdOffsets = self._loadCcdOffsets(butler)
 
         noFitsDict = {'lutIndex': lutIndexVals,
@@ -792,7 +622,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
             parLutFilterNames = np.array(parCat[0]['lutfilternames'].split(','))
             parFitBands = np.array(parCat[0]['fitbands'].split(','))
-            parExtraBands = np.array(parCat[0]['extrabands'].split(','))
+            parNotFitBands = np.array(parCat[0]['notfitbands'].split(','))
 
             # FIXME: check that these are the same as in the config, to be sure
 
@@ -800,7 +630,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                            ('LUTFILTERNAMES', parLutFilterNames.dtype.str,
                                             parLutFilterNames.size),
                                            ('FITBANDS', parFitBands.dtype.str, parFitBands.size),
-                                           ('EXTRABANDS', parExtraBands.dtype.str, parExtraBands.size),
+                                           ('NOTFITBANDS', parNotFitBands.dtype.str, parNotFitBands.size),
                                            ('LNTAUUNIT', 'f8'),
                                            ('LNTAUSLOPEUNIT', 'f8'),
                                            ('ALPHAUNIT', 'f8'),
@@ -816,7 +646,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             inParInfo['NCCD'] = parCat['nccd']
             inParInfo['LUTFILTERNAMES'][:] = parLutFilterNames
             inParInfo['FITBANDS'][:] = parFitBands
-            inParInfo['EXTRABANDS'][:] = parExtraBands
+            inParInfo['NOTFITBANDS'][:] = parNotFitBands
             inParInfo['LNTAUUNIT'] = parCat['lntauunit']
             inParInfo['LNTAUSLOPEUNIT'] = parCat['lntauslopeunit']
             inParInfo['ALPHAUNIT'] = parCat['alphaunit']
@@ -991,8 +821,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                           for n in parInfo['LUTFILTERNAMES'][0]])
         fitBandString = comma.join([n.decode('utf-8')
                                     for n in parInfo['FITBANDS'][0]])
-        extraBandString = comma.join([n.decode('utf-8')
-                                      for n in parInfo['EXTRABANDS'][0]])
+        notFitBandString = comma.join([n.decode('utf-8')
+                                       for n in parInfo['NOTFITBANDS'][0]])
 
         # parameter info section
         parSchema.addField('nccd', type=np.int32, doc='Number of CCDs')
@@ -1000,8 +830,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=len(lutFilterNameString))
         parSchema.addField('fitbands', type=str, doc='Bands that were fit',
                            size=len(fitBandString))
-        parSchema.addField('extrabands', type=str, doc='Bands that were not fit',
-                           size=len(extraBandString))
+        parSchema.addField('notfitbands', type=str, doc='Bands that were not fit',
+                           size=len(notFitBandString))
         parSchema.addField('lntauunit', type=np.float64, doc='Step units for ln(AOD)')
         parSchema.addField('lntauslopeunit', type=np.float64,
                            doc='Step units for ln(AOD) slope')
@@ -1084,7 +914,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=fgcmFitCycle.fgcmPars.parSuperStarFlat.size)
 
         parCat = afwTable.BaseCatalog(parSchema)
-        parCat.table.preallocate(1)
+        parCat.reserve(1)
 
         rec = parCat.addNew()
 
@@ -1092,7 +922,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['nccd'] = parInfo['NCCD']
         rec['lutfilternames'] = lutFilterNameString
         rec['fitbands'] = fitBandString
-        rec['extrabands'] = extraBandString
+        rec['notfitbands'] = notFitBandString
         rec['lntauunit'] = parInfo['LNTAUUNIT']
         rec['lntauslopeunit'] = parInfo['LNTAUSLOPEUNIT']
         rec['alphaunit'] = parInfo['ALPHAUNIT']
@@ -1140,11 +970,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         flagStarCat = afwTable.BaseCatalog(flagStarSchema)
         flagStarStruct = fgcmFitCycle.fgcmStars.getFlagStarIndices()
-        flagStarCat.table.preallocate(flagStarStruct.size)
+        flagStarCat.reserve(flagStarStruct.size)
         for i in xrange(flagStarStruct.size):
             rec = flagStarCat.addNew()
 
-        flagStarCat = flagStarCat.copy(deep=True)
+        if not flagStarCat.isContiguous():
+            flagStarCat = flagStarCat.copy(deep=True)
 
         flagStarCat['objid'][:] = flagStarStruct['OBJID']
         flagStarCat['objflag'][:] = flagStarStruct['OBJFLAG']
@@ -1187,12 +1018,13 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         zptSchema.addField('filtername', type=str, size=2, doc='Filter name')
 
         zptCat = afwTable.BaseCatalog(zptSchema)
-        zptCat.table.preallocate(fgcmFitCycle.fgcmZpts.zpStruct.size)
+        zptCat.reserve(fgcmFitCycle.fgcmZpts.zpStruct.size)
         for filterName in fgcmFitCycle.fgcmZpts.zpStruct['FILTERNAME']:
             rec = zptCat.addNew()
             rec['filtername'] = filterName.decode('utf-8')
 
-        zptCat = zptCat.copy(deep=True)
+        if not zptCat.isContiguous():
+            zptCat = zptCat.copy(deep=True)
 
         # FIXME: will need to port over the visitDataRefName from the build stars config...
         zptCat['visit'][:] = fgcmFitCycle.fgcmZpts.zpStruct['VISIT']
@@ -1229,11 +1061,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         atmSchema.addField('seczenith', type=np.float64, doc='Secant(zenith) (~ airmass)')
 
         atmCat = afwTable.BaseCatalog(atmSchema)
-        atmCat.table.preallocate(fgcmFitCycle.fgcmZpts.atmStruct.size)
+        atmCat.reserve(fgcmFitCycle.fgcmZpts.atmStruct.size)
         for i in xrange(fgcmFitCycle.fgcmZpts.atmStruct.size):
             rec = atmCat.addNew()
 
-        atmCat = atmCat.copy(deep=True)
+        if not atmCat.isContiguous():
+            atmCat = atmCat.copy(deep=True)
 
         atmCat['visit'][:] = fgcmFitCycle.fgcmZpts.atmStruct['VISIT']
         atmCat['pmb'][:] = fgcmFitCycle.fgcmZpts.atmStruct['PMB']
@@ -1244,6 +1077,37 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         atmCat['seczenith'][:] = fgcmFitCycle.fgcmZpts.atmStruct['SECZENITH']
 
         butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
+
+        if self.config.outputStandards:
+            stdSchema = afwTable.Schema()
+            stdSchema.addField('fgcm_id', type=np.int64, doc='FGCM Star id')
+            # For now, just use the degrees and figure out correct type later
+            stdSchema.addField('ra', type=np.float64, doc='Right ascension')
+            stdSchema.addField('dec', type=np.float64, doc='Declination')
+            stdSchema.addField('ngood', type='ArrayI', doc='Number of good observations',
+                               size=len(self.config.bands))
+            stdSchema.addField('mag_std', type='ArrayF', doc='Standard magnitude',
+                               size=len(self.config.bands))
+            stdSchema.addField('magerr_std', type='ArrayF', doc='Standard magnitude error',
+                               size=len(self.config.bands))
+
+            outCat = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
+            stdCat = afwTable.BaseCatalog(stdSchema)
+            stdCat.reserve(outCat.size)
+            for i in range(outCat.size):
+                rec = stdCat.addNew()
+
+            if not stdCat.isContiguous():
+                stdCat = stdCat.copy(deep=True)
+
+            stdCat['fgcm_id'][:] = outCat['FGCM_ID']
+            stdCat['ra'][:] = outCat['RA']
+            stdCat['dec'][:] = outCat['DEC']
+            stdCat['ngood'][:, :] = outCat['NGOOD'][:, :]
+            stdCat['mag_std'][:, :] = outCat['MAG_STD'][:, :]
+            stdCat['magerr_std'][:, :] = outCat['MAGERR_STD'][:, :]
+
+            butler.put(stdCat, 'fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
 
         # Output the config for the next cycle
         # We need to make a copy since the input one has been frozen
