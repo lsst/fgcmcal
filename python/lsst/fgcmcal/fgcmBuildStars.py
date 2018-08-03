@@ -144,7 +144,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector.doFlags = True
         sourceSelector.doUnresolved = True
         sourceSelector.doSignalToNoise = True
-        #sourceSelector.doIsolated = True
+        sourceSelector.doIsolated = True
 
         sourceSelector.signalToNoise.fluxField = 'slot_ApFlux_flux'
         sourceSelector.signalToNoise.errField = 'slot_ApFlux_fluxSigma'
@@ -572,11 +572,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 goodSrc = self.sourceSelector.selectSources(sources)
 
-                # We need an additional isolation selection which wasn't in the old
-                # source selector
-                selected = ((goodSrc.selection) &
-                            (sources['parent'] == 0) &
-                            (sources['deblend_nChild'] == 0))
+                selected = goodSrc.selection
 
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
                 tempCat.table.preallocate(selected.sum())
