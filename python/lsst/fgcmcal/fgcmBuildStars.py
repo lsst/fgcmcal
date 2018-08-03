@@ -144,7 +144,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector.doFlags = True
         sourceSelector.doUnresolved = True
         sourceSelector.doSignalToNoise = True
-        sourceSelector.doIsolated = True
+        #sourceSelector.doIsolated = True
 
         sourceSelector.signalToNoise.fluxField = 'slot_ApFlux_flux'
         sourceSelector.signalToNoise.errField = 'slot_ApFlux_fluxSigma'
@@ -572,23 +572,29 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 goodSrc = self.sourceSelector.selectSources(sources)
 
+                # We need an additional isolation selection which wasn't in the old
+                # source selector
+                selected = ((goodSrc.selection) &
+                            (sources['parent'] == 0) &
+                            (sources['deblend_nChild'] == 0))
+
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
-                tempCat.table.preallocate(goodSrc.selected.sum())
-                tempCat.extend(sources[goodSrc.selected], mapper=sourceMapper)
+                tempCat.table.preallocate(selected.sum())
+                tempCat.extend(sources[selected], mapper=sourceMapper)
                 tempCat[visitKey][:] = visit['visit']
                 tempCat[ccdKey][:] = ccdId
                 # Compute "magnitude" by scaling flux with exposure time.
                 # Add an arbitrary zeropoint that needs to be investigated.
-                scaledFlux = sources[fluxKey][goodSrc.selected] * visit['scaling'][ccdIndex]
+                scaledFlux = sources[fluxKey][selected] * visit['scaling'][ccdIndex]
                 tempCat[magKey][:] = (self.config.zeropointDefault -
                                       2.5 * np.log10(scaledFlux) +
                                       2.5 * np.log10(expTime))
                 # magErr is computed with original (unscaled) flux
-                tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrKey][goodSrc.selected] /
-                                                               sources[fluxKey][goodSrc.selected])
+                tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrKey][selected] /
+                                                               sources[fluxKey][selected])
 
                 if self.config.applyJacobian:
-                    tempCat[magKey][:] -= 2.5 * np.log10(sources[jacobianKey][goodSrc.selected])
+                    tempCat[magKey][:] -= 2.5 * np.log10(sources[jacobianKey][selected])
                     # FIXME
                     # Divide scaling by mean of the jacobian of the sources
 
