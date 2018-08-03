@@ -582,7 +582,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
            Throughput (max 1.0) at throughputLambda
         """
 
-        c = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
+        c = detector.getCenter(afwCameraGeom.FOCAL_PLANE).getPoint()
 
         throughput = self._opticsTransmission.sampleAt(position=c,
                                                        wavelengths=throughputLambda)
