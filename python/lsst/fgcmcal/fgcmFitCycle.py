@@ -1331,7 +1331,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             # new version, using proper rotations
             #  but I worry this only works with HSC, as there's a unit inconsistency
 
-            camPoint = detector.getCenter(afwCameraGeom.PIXELS)
+            camPoint = detector.getCenter(afwCameraGeom.PIXELS).getPoint()
             bbox = detector.getBBox()
             orient = detector.getOrientation()
 
