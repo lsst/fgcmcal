@@ -137,6 +137,8 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector = self.sourceSelector["science"]
         sourceSelector.setDefaults()
 
+        fluxFlagName = self.fluxField[0: -len('flux')] + 'flag'
+
         sourceSelector.flags.bad = ['base_PixelFlags_flag_edge',
                                     'base_PixelFlags_flag_interpolatedCenter',
                                     'base_PixelFlags_flag_saturatedCenter',
@@ -145,7 +147,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
                                     'base_PixelFlags_flag_interpolated',
                                     'base_PixelFlags_flag_saturated',
                                     'slot_Centroid_flag',
-                                    self.fluxField + '_flag']
+                                    fluxFlagName]
 
         sourceSelector.doFlags = True
         sourceSelector.doUnresolved = True
