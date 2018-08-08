@@ -26,6 +26,12 @@ __all__ = ['FgcmBuildStarsConfig', 'FgcmBuildStarsTask']
 class FgcmBuildStarsConfig(pexConfig.Config):
     """Config for FgcmBuildStarsTask"""
 
+    fluxField = pexConfig.Field(
+        doc=("Name of the source flux field to use.  The associated flag field\n"
+             "('<name>_flag') will be implicitly included in badFlags"),
+        dtype=str,
+        default='slot_CalibFlux_flux',
+    )
     remake = pexConfig.Field(
         doc="Remake visit catalog and stars even if they are already in the butler tree.",
         dtype=bool,
@@ -131,6 +137,8 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector = self.sourceSelector["science"]
         sourceSelector.setDefaults()
 
+        fluxFlagName = self.fluxField[0: -len('flux')] + 'flag'
+
         sourceSelector.flags.bad = ['base_PixelFlags_flag_edge',
                                     'base_PixelFlags_flag_interpolatedCenter',
                                     'base_PixelFlags_flag_saturatedCenter',
@@ -139,15 +147,15 @@ class FgcmBuildStarsConfig(pexConfig.Config):
                                     'base_PixelFlags_flag_interpolated',
                                     'base_PixelFlags_flag_saturated',
                                     'slot_Centroid_flag',
-                                    'slot_ApFlux_flag']
+                                    fluxFlagName]
 
         sourceSelector.doFlags = True
         sourceSelector.doUnresolved = True
         sourceSelector.doSignalToNoise = True
         sourceSelector.doIsolated = True
 
-        sourceSelector.signalToNoise.fluxField = 'slot_ApFlux_flux'
-        sourceSelector.signalToNoise.errField = 'slot_ApFlux_fluxSigma'
+        sourceSelector.signalToNoise.fluxField = self.fluxField
+        sourceSelector.signalToNoise.errField = self.fluxField + 'Sigma'
         sourceSelector.signalToNoise.minimum = 10.0
         sourceSelector.signalToNoise.maximum = 1000.0
 
@@ -545,10 +553,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 if not started:
                     # get the keys for quicker look-up
 
-                    # Calibration is based on ApFlux.  Maybe this should be configurable
-                    # in the future.
-                    fluxKey = sources.getApFluxKey()
-                    fluxErrKey = sources.getApFluxErrKey()
+                    # Calibration is based on configuration fluxField
+                    fluxKey = sources.schema[self.config.fluxField].asKey()
+                    fluxErrKey = sources.schema[self.config.fluxField + 'Sigma'].asKey()
 
                     if self.config.applyJacobian:
                         jacobianKey = sources.schema[self.config.jacobianName].asKey()
