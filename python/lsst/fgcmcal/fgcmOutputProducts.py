@@ -10,6 +10,7 @@ import numpy as np
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.afw.image import TransmissionCurve
+from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask
 
 import fgcm
 
@@ -24,9 +25,25 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         dtype=int,
         default=None,
     )
+    doReferenceCalibration = pexConfig.Field(
+        doc="Apply 'absolute' calibration from reference catalog",
+        dtype=bool,
+        default=False,
+    )
+    photoRefObjLoader = pexConfig.ConfigurableField(
+        default=LoadIndexedReferenceObjectsTask,
+        doc="reference object loader for 'absolute' photometric calibration",
+    )
+    photoCal = pexConfig.ConfigurableField(
+        default=PhotoCalTask,
+        doc="perform 'absolute' calibration",
+    )
 
     def setDefaults(self):
-        pass
+        pexConfig.Config.setDefaults(self)
+        self.photoCal.applyColorTerms = True
+        self.photoCal.fluxField = 'slot_calibFlux_flux'  # NOT THIS
+        # also need to set _flags for this ...
 
 
 class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
