@@ -145,15 +145,15 @@ class FgcmBuildStarsConfig(pexConfig.Config):
                                     'base_PixelFlags_flag_interpolated',
                                     'base_PixelFlags_flag_saturated',
                                     'slot_Centroid_flag',
-                                    fluxField + '_flag']
+                                    self.fluxField + '_flag']
 
         sourceSelector.doFlags = True
         sourceSelector.doUnresolved = True
         sourceSelector.doSignalToNoise = True
         sourceSelector.doIsolated = True
 
-        sourceSelector.signalToNoise.fluxField = fluxField + '_flux'
-        sourceSelector.signalToNoise.errField = fluxField + '_fluxSigma'
+        sourceSelector.signalToNoise.fluxField = self.fluxField
+        sourceSelector.signalToNoise.errField = self.fluxField + 'Sigma'
         sourceSelector.signalToNoise.minimum = 10.0
         sourceSelector.signalToNoise.maximum = 1000.0
 
@@ -552,8 +552,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     # get the keys for quicker look-up
 
                     # Calibration is based on configuration fluxField
-                    fluxKey = sources.schema[self.config.fluxField + '_flux'].asKey()
-                    fluxErrKey = sources.schema[self.config.fluxField + '_fluxSigma'].asKey()
+                    fluxKey = sources.schema[self.config.fluxField].asKey()
+                    fluxErrKey = sources.schema[self.config.fluxField + 'Sigma'].asKey()
 
                     if self.config.applyJacobian:
                         jacobianKey = sources.schema[self.config.jacobianName].asKey()
