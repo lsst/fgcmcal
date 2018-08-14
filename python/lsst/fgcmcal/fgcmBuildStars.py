@@ -155,7 +155,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector.doIsolated = True
 
         sourceSelector.signalToNoise.fluxField = self.fluxField
-        sourceSelector.signalToNoise.errField = self.fluxField + 'Sigma'
+        sourceSelector.signalToNoise.errField = self.fluxField + 'Err'
         sourceSelector.signalToNoise.minimum = 10.0
         sourceSelector.signalToNoise.maximum = 1000.0
 
@@ -555,7 +555,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                     # Calibration is based on configuration fluxField
                     fluxKey = sources.schema[self.config.fluxField].asKey()
-                    fluxErrKey = sources.schema[self.config.fluxField + 'Sigma'].asKey()
+                    fluxErrKey = sources.schema[self.config.fluxField + 'Err'].asKey()
 
                     if self.config.applyJacobian:
                         jacobianKey = sources.schema[self.config.jacobianName].asKey()
