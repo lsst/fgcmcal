@@ -205,10 +205,10 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         exitStatus = 0
         if self.doRaise:
-            results = task.run(butler, dataRefList)
+            results = task.runDataRef(butler, dataRefList)
         else:
             try:
-                results = task.run(butler, dataRefList)
+                results = task.runDataRef(butler, dataRefList)
             except Exception as e:
                 exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
@@ -288,7 +288,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         return None
 
     @pipeBase.timeMethod
-    def run(self, butler, dataRefs):
+    def runDataRef(self, butler, dataRefs):
         """
         Cross-match and make star list for FGCM Input
 

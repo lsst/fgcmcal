@@ -16,6 +16,7 @@ import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
 import lsst.afw.geom as afwGeom
 import lsst.afw.cameraGeom as afwCameraGeom
+import lsst.geom
 
 import fgcm
 
@@ -319,10 +320,10 @@ class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
 
         exitStatus = 0
         if self.doRaise:
-            results = task.run(butler)
+            results = task.runDataRef(butler)
         else:
             try:
-                results = task.run(butler)
+                results = task.runDataRef(butler)
             except Exception as e:
                 exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
@@ -394,7 +395,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         return None
 
     @pipeBase.timeMethod
-    def run(self, butler):
+    def runDataRef(self, butler):
         """
         Run a single fit cycle for FGCM
 
@@ -1079,32 +1080,32 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
 
         if self.config.outputStandards:
-            stdSchema = afwTable.Schema()
-            stdSchema.addField('fgcm_id', type=np.int64, doc='FGCM Star id')
-            # For now, just use the degrees and figure out correct type later
-            stdSchema.addField('ra', type=np.float64, doc='Right ascension')
-            stdSchema.addField('dec', type=np.float64, doc='Declination')
+            stdSchema = afwTable.SourceTable.makeMinimalSchema()
             stdSchema.addField('ngood', type='ArrayI', doc='Number of good observations',
                                size=len(self.config.bands))
-            stdSchema.addField('mag_std', type='ArrayF', doc='Standard magnitude',
+            stdSchema.addField('mag_std_noabs', type='ArrayF',
+                               doc='Standard magnitude (no absolute calibration)',
                                size=len(self.config.bands))
-            stdSchema.addField('magerr_std', type='ArrayF', doc='Standard magnitude error',
+            stdSchema.addField('magerr_std', type='ArrayF',
+                               doc='Standard magnitude error',
                                size=len(self.config.bands))
 
             outCat = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
-            stdCat = afwTable.BaseCatalog(stdSchema)
+            stdCat = afwTable.SourceCatalog(stdSchema)
+
             stdCat.reserve(outCat.size)
             for i in range(outCat.size):
                 rec = stdCat.addNew()
 
+            # Sometimes the reserve doesn't actually make a contiguous catalog (sigh)
             if not stdCat.isContiguous():
                 stdCat = stdCat.copy(deep=True)
 
-            stdCat['fgcm_id'][:] = outCat['FGCM_ID']
-            stdCat['ra'][:] = outCat['RA']
-            stdCat['dec'][:] = outCat['DEC']
+            stdCat['id'][:] = outCat['FGCM_ID']
+            stdCat['coord_ra'][:] = outCat['RA'] * lsst.geom.degrees
+            stdCat['coord_dec'][:] = outCat['DEC'] * lsst.geom.degrees
             stdCat['ngood'][:, :] = outCat['NGOOD'][:, :]
-            stdCat['mag_std'][:, :] = outCat['MAG_STD'][:, :]
+            stdCat['mag_std_noabs'][:, :] = outCat['MAG_STD'][:, :]
             stdCat['magerr_std'][:, :] = outCat['MAGERR_STD'][:, :]
 
             butler.put(stdCat, 'fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
@@ -1126,6 +1127,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         self.log.info("Be sure to look at:")
         self.log.info("   config.expGrayPhotometricCut")
         self.log.info("   config.expGrayHighCut")
+        self.log.info("If you are satisfied with the fit, please set:")
+        self.log.info("   config.maxIter = 0")
+        self.log.info("   config.outputStandards = True")
 
         # tear down and clear memory
 
