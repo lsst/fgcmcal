@@ -285,7 +285,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         fitCycleTask = FgcmFitCycleTask(butler=butler, config=fitCycleConfig)
         fitCycleTask.runDataRef(butler)
 
-    def _computeRelativeOffsets(self, butler):
+    def _computeReferenceOffsets(self, butler):
         """
         Compute offsets relative to a reference catalog.
 
