@@ -338,7 +338,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         gdpix, = np.where(h >= self.config.referencePixelizationMinStars)
 
         self.log.info("Found %d pixels (nside=%d) with at least %d good stars" %
-                      (gdpix.size, self.config.referencePixelizationMinStars))
+                      (gdpix.size,
+                       self.config.referencePixelizationNside,
+                       self.config.referencePixelizationMinStars))
 
         if gdpix.size < self.config.referencePixelizationNPixels:
             self.log.warn("Found fewer good pixels (%d) than preferred in configuration (%d)" %
