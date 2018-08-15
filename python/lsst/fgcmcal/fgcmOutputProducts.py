@@ -318,9 +318,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         # We have to make a table for each pixel with flux/fluxErr
         sourceMapper = afwTable.SchemaMapper(stars.schema)
-        sourceMapper.addMapping(stars.schema.find('id').key)
-        sourceMapper.addMapping(stars.schema.find('coord_ra').key)
-        sourceMapper.addMapping(stars.schema.find('coord_dec').key)
+        sourceMapper.addMinimalSchema(afwTable.SourceTable.makeMinimalSchema())
         sourceMapper.editOutputSchema().addField('flux', type=np.float64, doc="flux")
         sourceMapper.editOutputSchema().addField('fluxErr', type=np.float64, doc="flux error")
         sourceMapper.editOutputSchema().addField('flag_GoodStar', type='Flag', doc="Good flag")
