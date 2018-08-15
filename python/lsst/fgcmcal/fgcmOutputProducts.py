@@ -350,16 +350,16 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             gdpix = np.random.choice(gdpix, size=self.config.referencePixelizationNPixels, replace=False)
 
         results = np.zeros(gdpix.size, dtype=[('hpix', 'i4'),
-                                              ('nstar', 'i4', len(bands)),
-                                              ('nmatch', 'i4', len(bands)),
-                                              ('zp', 'f4', len(bands)),
-                                              ('zpErr', 'f4', len(bands))])
+                                              ('nstar', 'i4', len(self.bands)),
+                                              ('nmatch', 'i4', len(self.bands)),
+                                              ('zp', 'f4', len(self.bands)),
+                                              ('zpErr', 'f4', len(self.bands))])
         results['hpix'] = ipring[rev[rev[gdpix]]]
 
         # We need a boolean index to deal with catalogs...
         selected = np.zeros(len(stars), dtype=np.bool)
 
-        refFluxFields = [None] * len(bands)
+        refFluxFields = [None] * len(self.bands)
 
         for p, pix in enumerate(gdpix):
             i1a = rev[rev[pix]: rev[pix + 1]]
@@ -368,7 +368,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             selected[:] = False
             selected[i1a] = True
 
-            for b, band in enumerate(bands):
+            for b, band in enumerate(self.bands):
 
                 sourceCat = afwTable.SourceCatalog(sourceMapper.getOutputSchema())
                 sourceCat.reserve(len(use))
