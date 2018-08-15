@@ -6,29 +6,39 @@ import sys
 import traceback
 
 import numpy as np
+import healpy as hp
+import esutil
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.afw.image import TransmissionCurve
 from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask
+from lsst.pipe.tasks.photoCal import PhotoCalConfig, PhotoCalTask
+from .fgcmFitCycle import FgcmFitCycleConfig, FgcmFitCycleTask
+import lsst.geom
+import lsst.afw.image as afwImage
+import lsst.afw.table as afwTable
+
 
 import fgcm
 
 __all__ = ['FgcmOutputProductsConfig', 'FgcmOutputProductsTask']
 
-
 class FgcmOutputProductsConfig(pexConfig.Config):
     """Config for FgcmOutputProductsTask"""
 
     cycleNumber = pexConfig.Field(
-        doc="Fit cycle as basis for products to output",
+        doc="Final fit cycle from FGCM fit",
         dtype=int,
         default=None,
     )
+
+    # The following fields refer to calibrating from a reference
+    # catalog, but in the future this might need to be expanded
     doReferenceCalibration = pexConfig.Field(
         doc="Apply 'absolute' calibration from reference catalog",
         dtype=bool,
-        default=False,
+        default=True,
     )
     photoRefObjLoader = pexConfig.ConfigurableField(
         default=LoadIndexedReferenceObjectsTask,
@@ -36,14 +46,43 @@ class FgcmOutputProductsConfig(pexConfig.Config):
     )
     photoCal = pexConfig.ConfigurableField(
         default=PhotoCalTask,
-        doc="perform 'absolute' calibration",
+        doc="task to perform 'absolute' calibration",
+    )
+    referencePixelizationNside = pexConfig.Field(
+        doc="Healpix nside to pixelize catalog to compare to reference",
+        dtype=int,
+        default=64,
+    )
+    referencePixelizationMinStars = pexConfig.Field(
+        doc="Minimum number of stars per pixel to select for comparison",
+        dtype=int,
+        default=200,
+    )
+    referenceMinMatch = pexConfig.Field(
+        doc="Minimum number of stars matched to reference catalog to be used in statistics",
+        dtype=int,
+        default=50,
+    )
+    referencePixelizationNPixels = pexConfig.Field(
+        doc="Number of pixels to sample to do comparison",
+        dtype=int,
+        default=100,
     )
 
     def setDefaults(self):
         pexConfig.Config.setDefaults(self)
+
         self.photoCal.applyColorTerms = True
-        self.photoCal.fluxField = 'slot_calibFlux_flux'  # NOT THIS
-        # also need to set _flags for this ...
+        self.photoCal.fluxField = 'flux'
+        self.photoCal.magErrFloor = 0.003
+        self.photoCal.match.referenceSelection.doSignalToNoise = True
+        self.photoCal.match.referenceSelection.signalToNoise.minimum = 10.0
+        self.photoCal.match.sourceSelection.doSignalToNoise = True
+        self.photoCal.match.sourceSelection.signalToNoise.minimum = 10.0
+        self.photoCal.match.sourceSelection.doFlags = True
+        self.photoCal.match.sourceSelection.flags.good = ['flag_goodStar']
+        self.photoCal.match.sourceSelection.flags.bad = []
+        self.photoCal.match.sourceSelection.doUnresolved = False
 
 
 class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
@@ -142,6 +181,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         butler : lsst.daf.persistence.Butler
         """
 
+        # We need the ref obj loader to get the flux field
+        self.makeSubtask("refObjLoader", butler=butler)
+
         pipeBase.CmdLineTask.__init__(self, **kwargs)
 
     @classmethod
@@ -174,13 +216,225 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # the visit and ccd dataset tags
         if not butler.datasetExists('fgcmBuildStars_config'):
             raise RuntimeError("Cannot find fgcmBuildStars_config, which is prereq for fgcmOutputProducts")
+
+        fgcmBuildStarsConfig = butler.get('fgcmBuildStars_config')
+        self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
+        self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
+
+        # Make sure that the fit config exists, to retrieve bands and other info
+        if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber):
+            raise RuntimeError("Cannot find fgcmFitCycle_config from cycle %d " % (self.config.cycleNumber) +
+                               "which is required for fgcmOutputProducts.")
+
+        fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
+        self.bands = fitCycleConfig.bands
+
+        # And make sure that the atmosphere was output properly
         if not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber):
             raise RuntimeError("The specified fgcm cycle (%d) has not been run on this repo." %
                                (self.config.cycleNumber))
 
+        # And make sure this is the last cycle
+        if butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber + 1):
+            raise RuntimeError("The task fgcmOutputProducts should only be run on the final fit cycle products")
+
+        # Check if we need to run one final cycle to generate standards
+        if not butler.datasetExists('fgcmStandardStars', fgcmcycle=self.config.cycleNumber):
+            self.log.info("Standard stars will be generated using final fgcmFitCycle settings")
+            self._generateFgcmStandardStars(butler)
+            # Increment the cycle number
+            self.useCycle = self.config.cycleNumber + 1
+        else:
+            self.useCycle = self.config.cycleNumber
+
+        # And make sure that the atmosphere was output properly
+        if not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.useCycle):
+            raise RuntimeError("The latest fgcm cycle (%d) has not been run on this repo." %
+                               (self.useCycle))
+
+        if self.config.doReferenceCalibration:
+            offsets = self._computeReferenceOffsets(butler)
+        else:
+            offsets = np.zeros(len(self.bands))
+
+        # Output the standard stars in stack format
+        self._outputStandardStars(butler, offsets)
+
+        # Output the atmospheres
         self._outputAtmospheres(butler)
 
+        # Output the gray zeropoints
+
         return []
+
+    def _generateFgcmStandardStars(self, butler):
+        """
+        Call fgcmFitCycle with settings to output the standard stars.
+
+        Parameters
+        ----------
+        butler: lsst.daf.persistence.Butler
+        """
+
+        fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
+        fitCycleConfig.cycleNumber += 1
+        fitCycleConfig.maxIter = 0
+        fitCycleConfig.outputStandards = True
+
+        fitCycleTask = FgcmFitCycleTask(butler=butler, config=fitCycleConfig)
+        fitCycleTask.runDataRef(butler)
+
+    def _computeRelativeOffsets(self, butler):
+        """
+        Compute offsets relative to a reference catalog.
+
+        Parameters
+        ----------
+        butler: lsst.daf.persistence.Butler
+
+        Returns
+        -------
+        offsets: np.array of floats
+           Per band zeropoint offsets
+        """
+
+        # Load the stars
+        stars = butler.get('fgcmStandardStars', fgcmcycle=self.useCycle)
+
+        # Only use stars that are observed in all the bands
+        minObs = stars['ngood'].min(axis=1)
+
+        # Depending on how things work, this might need to be configurable
+        # However, I think that best results will occur when we use the same
+        # pixels to do the calibration for all the bands, so I think this
+        # is the right choice.
+
+        goodStars = (minObs >= 1)
+        stars = stars[goodStars]
+
+        self.log.info("Found %d stars with at least 1 good observation in each band" %
+                      (len(stars)))
+
+        # We have to make a table for each pixel with flux/fluxErr
+        sourceMapper = afwTable.SchemaMapper(stars.schema)
+        sourceMapper.addMapping(stars.schema.find('id'))
+        sourceMapper.addMapping(stars.schema.find('coord_ra'))
+        sourceMapper.addMapping(stars.schema.find('coord_dec'))
+        sourceMapper.editOutputSchema().addField('flux', type=np.float64, doc="flux")
+        sourceMapper.editOutputSchema().addField('fluxErr', type=np.float64, doc="flux error")
+        sourceMapper.editOutputSchema().addField('flag_GoodStar', type=bool, doc="Good flag")
+
+        # The exposure is used to record the filter name
+        exposure = afwImage.ExposureF()
+
+        # Split up the stars (units are radians)
+        theta = np.pi / 2. - stars['coord_dec']
+        phi = stars['coord_ra']
+
+        ipring = hp.ang2pix(self.config.referencePixelizationNside, theta, phi)
+        h, rev = esutil.stat.histogram(ipring, rev=True)
+
+        gdpix, = np.where(h >= self.config.referencePixelizationMinStars)
+
+        self.log.info("Found %d pixels (nside=%d) with at least %d good stars" %
+                      (gdpix.size, self.config.referencePixelizationMinStars))
+
+        if gdpix.size < self.config.referencePixelizationNPixels:
+            self.log.warn("Found fewer good pixels (%d) than preferred in configuration (%d)" %
+                          (gdpix.size, self.config.referencePixelizationNPixels))
+        else:
+            # Sample out the pixels we want to use
+            gdpix = np.random.choice(gdpix, size=self.config.referencePixelizationNPixels, replace=False)
+
+        results = np.zeros(gdpix.size, dtype=[('hpix', 'i4'),
+                                              ('nstar', 'i4', len(bands)),
+                                              ('nmatch', 'i4', len(bands)),
+                                              ('zp', 'f4', len(bands)),
+                                              ('zpErr', 'f4', len(bands))])
+        results['hpix'] = ipring[rev[rev[gdpix]]]
+
+        # We need a boolean index to deal with catalogs...
+        selected = np.zeros(len(stars), dtype=np.bool)
+
+        refFluxFields = [None] * len(bands)
+
+        for p, pix in enumerate(gdpix):
+            i1a = rev[rev[pix]: rev[pix + 1]]
+
+            # Need to convert to a boolean array
+            selected[:] = False
+            selected[i1a] = True
+
+            for b, band in enumerate(bands):
+
+                sourceCat = afwTable.SourceCatalog(sourceMapper.getOutputSchema())
+                sourceCat.reserve(len(use))
+                sourceCat.extend(sources[selected], mapper=sourceMapper)
+                sourceCat['flux'] = afwImage.fluxFromABMag(stars['mag_std_noabs'][selected, b])
+                sourceCat['fluxErr'] = afwImage.fluxErrFromABMagErr(stars['magerr_std'][selected, b], stars['mag_std_noabs'][selected, b])
+
+                # Make sure we only use stars that have valid measurements
+                # (This is perhaps redundant with requirements above that the
+                # stars be observed in all bands, but it can't hurt)
+                goodStar = (stars['mag_std_noabs'][selected, b] < 99.0)
+                sourceCat['flag_goodStar'][goodStar] = True
+
+                exposure.setFilter(afwImage.Filter(band))
+
+                if refFluxFields[b] is None:
+                    # Need to find the flux field in the reference catalog
+                    # to work around limitations of DirectMatch in PhotoCal
+                    ctr = lsst.geom.SpherePoint(sourceCat['coord_ra'][0],
+                                                sourceCat['coord_dec'][0])
+                    rad = 0.05 * lsst.geom.degrees
+                    refDataTest = self.refObjLoader.loadSkyCircle(ctr, rad, band)
+                    refFluxFields[b] = refDataTest.fluxField
+
+                calConfig = self.config.photoCal.config
+                calConfig.match.referenceSelection.signalToNoise.fluxField = refFluxFields[b]
+                calConfig.match.referenceSelection.signalToNoise.errField = refFluxField + 'Err'
+
+                calTask = self.config.photoCal(self.config.photoRefObjLoader,
+                                               config=calConfig,
+                                               schema=sourceCat.getSchema())
+                try:
+                    struct = calTask.run(exposure, sourceCat)
+                except:
+                    self.log.warn("Calibration task failed on pixel %d for %s with %d stars." %
+                                  (ipring[i1a[0]], band, len(sourceCat)))
+                    continue
+
+                results['nstar'][p, b] = len(use)
+                results['nmatch'][p, b] = len(struct.arrays.refMag)
+                results['zp'][p, b] = struct.zp
+                results['zpErr'][p, b] = struct.sigma
+
+        # And compute the summary statistics
+        offsets = np.zeros(len(self.bands))
+
+        for b, band in enumerate(self.bands):
+            # make configurable
+            ok, = np.where(results['nmatch'][:, b] >= self.config.referenceMinMatch)
+            offsets[b] = np.median(results['zp'][ok, b])
+            madSigma = 1.4826 * np.median(np.abs(results['zp'][ok, b] - offsets[b]))
+            self.log.info("Reference catalog offset for %s band: %.6f +/- %.6f" %
+                          (offsets[b], madSigma))
+
+        return offsets
+
+    def _outputStandardStars(self, butler, offsets):
+        """
+        Output standard stars in indexed reference catalog format.
+
+        Parameters
+        ----------
+        butler: lsst.daf.persistence.Butler
+        offsets: np.array of floats
+           Per band zeropoint offsets
+        """
+
+        pass
+
 
     def _outputAtmospheres(self, butler):
         """
