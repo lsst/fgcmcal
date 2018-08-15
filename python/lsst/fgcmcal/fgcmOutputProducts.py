@@ -369,7 +369,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             for b, band in enumerate(self.bands):
 
                 sourceCat = afwTable.SourceCatalog(sourceMapper.getOutputSchema())
-                sourceCat.reserve(len(use))
+                sourceCat.reserve(len(i1a))
                 sourceCat.extend(sources[selected], mapper=sourceMapper)
                 sourceCat['flux'] = afwImage.fluxFromABMag(stars['mag_std_noabs'][selected, b])
                 sourceCat['fluxErr'] = afwImage.fluxErrFromABMagErr(stars['magerr_std'][selected, b], stars['mag_std_noabs'][selected, b])
@@ -405,7 +405,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                   (ipring[i1a[0]], band, len(sourceCat)))
                     continue
 
-                results['nstar'][p, b] = len(use)
+                results['nstar'][p, b] = len(i1a)
                 results['nmatch'][p, b] = len(struct.arrays.refMag)
                 results['zp'][p, b] = struct.zp
                 results['zpErr'][p, b] = struct.sigma
