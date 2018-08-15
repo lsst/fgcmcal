@@ -41,11 +41,11 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         default=True,
     )
     photoRefObjLoader = pexConfig.ConfigurableField(
-        default=LoadIndexedReferenceObjectsTask,
+        target=LoadIndexedReferenceObjectsTask,
         doc="reference object loader for 'absolute' photometric calibration",
     )
     photoCal = pexConfig.ConfigurableField(
-        default=PhotoCalTask,
+        target=PhotoCalTask,
         doc="task to perform 'absolute' calibration",
     )
     referencePixelizationNside = pexConfig.Field(
