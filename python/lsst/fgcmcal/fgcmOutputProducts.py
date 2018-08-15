@@ -323,7 +323,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         sourceMapper.addMapping(stars.schema.find('coord_dec').key)
         sourceMapper.editOutputSchema().addField('flux', type=np.float64, doc="flux")
         sourceMapper.editOutputSchema().addField('fluxErr', type=np.float64, doc="flux error")
-        sourceMapper.editOutputSchema().addField('flag_GoodStar', type=bool, doc="Good flag")
+        sourceMapper.editOutputSchema().addField('flag_GoodStar', type='Flag', doc="Good flag")
 
         # The exposure is used to record the filter name
         exposure = afwImage.ExposureF()
