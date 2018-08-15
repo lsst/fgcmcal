@@ -40,7 +40,7 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         dtype=bool,
         default=True,
     )
-    photoRefObjLoader = pexConfig.ConfigurableField(
+    refObjLoader = pexConfig.ConfigurableField(
         target=LoadIndexedReferenceObjectsTask,
         doc="reference object loader for 'absolute' photometric calibration",
     )
@@ -114,7 +114,7 @@ class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
         None if self.doReturnResults is False
         An empty list if self.doReturnResults is True
         """
-        task = self.TaskClass(config=self.config, log=self.log)
+        task = self.TaskClass(butler=butler, config=self.config, log=self.log)
 
         exitStatus = 0
         if self.doRaise:
@@ -181,10 +181,11 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         butler : lsst.daf.persistence.Butler
         """
 
-        # We need the ref obj loader to get the flux field
-        self.makeSubtask("refObjLoader", butler=butler)
-
         pipeBase.CmdLineTask.__init__(self, **kwargs)
+
+        if self.config.doReferenceCalibration:
+            # We need the ref obj loader to get the flux field
+            self.makeSubtask("refObjLoader", butler=butler)
 
     @classmethod
     def _makeArgumentParser(cls):
@@ -394,7 +395,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 calConfig.match.referenceSelection.signalToNoise.fluxField = refFluxFields[b]
                 calConfig.match.referenceSelection.signalToNoise.errField = refFluxField + 'Err'
 
-                calTask = self.config.photoCal(self.config.photoRefObjLoader,
+                calTask = self.config.photoCal(self.config.refObjLoader,
                                                config=calConfig,
                                                schema=sourceCat.getSchema())
                 try:
