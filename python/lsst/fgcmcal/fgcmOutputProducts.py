@@ -370,7 +370,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
                 sourceCat = afwTable.SourceCatalog(sourceMapper.getOutputSchema())
                 sourceCat.reserve(len(i1a))
-                sourceCat.extend(sources[selected], mapper=sourceMapper)
+                sourceCat.extend(stars[selected], mapper=sourceMapper)
                 sourceCat['flux'] = afwImage.fluxFromABMag(stars['mag_std_noabs'][selected, b])
                 sourceCat['fluxErr'] = afwImage.fluxErrFromABMagErr(stars['magerr_std'][selected, b], stars['mag_std_noabs'][selected, b])
 
