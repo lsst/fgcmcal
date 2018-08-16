@@ -10,6 +10,8 @@ import numpy as np
 import lsst.utils
 import lsst.pex.exceptions
 
+from lsst.meas.extensions.astrometryNet import LoadAstrometryNetObjectsTask
+
 import fgcmcalTestBase
 
 import lsst.fgcmcal as fgcmcal
@@ -22,6 +24,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
     def setUpClass(cls):
         try:
             cls.dataDir = lsst.utils.getPackageDir('testdata_jointcal')
+            os.environ['ASTROMETRY_NET_DATA_DIR'] = os.path.join(cls.dataDir, 'hsc_and_index')
         except lsst.pex.exceptions.NotFoundError:
             raise unittest.SkipTest("testdata_jointcal not setup")
 
@@ -112,6 +115,29 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # And output the products
         self.config = fgcmcal.FgcmOutputProductsConfig()
         self.config.cycleNumber = 0
+        self.config.photoCal.photoCatName = 'sdss-dr9-fink-v5b'
+        self.config.photoCal.colorterms.data = {}
+        self.config.photoCal.colorterms.data['sdss*'] = lsst.pipe.tasks.colorterms.ColortermDict()
+        self.config.photoCal.colorterms.data['sdss*'].data = {}
+        self.config.photoCal.colorterms.data['sdss*'].data['g'] = lsst.pipe.tasks.colorterms.Colorterm()
+        self.config.photoCal.colorterms.data['sdss*'].data['g'].primary = 'g'
+        self.config.photoCal.colorterms.data['sdss*'].data['g'].secondary = 'r'
+        self.config.photoCal.colorterms.data['sdss*'].data['g'].c0 = -0.00816446
+        self.config.photoCal.colorterms.data['sdss*'].data['g'].c1 = -0.08366937
+        self.config.photoCal.colorterms.data['sdss*'].data['g'].c2 = -0.00726883
+        self.config.photoCal.colorterms.data['sdss*'].data['r'] = lsst.pipe.tasks.colorterms.Colorterm()
+        self.config.photoCal.colorterms.data['sdss*'].data['r'].primary = 'r'
+        self.config.photoCal.colorterms.data['sdss*'].data['r'].secondary = 'i'
+        self.config.photoCal.colorterms.data['sdss*'].data['r'].c0 = 0.0013181
+        self.config.photoCal.colorterms.data['sdss*'].data['r'].c1 = 0.01284177
+        self.config.photoCal.colorterms.data['sdss*'].data['r'].c2 = -0.03068248
+        self.config.photoCal.colorterms.data['sdss*'].data['i'] = lsst.pipe.tasks.colorterms.Colorterm()
+        self.config.photoCal.colorterms.data['sdss*'].data['i'].primary = 'i'
+        self.config.photoCal.colorterms.data['sdss*'].data['i'].secondary = 'z'
+        self.config.photoCal.colorterms.data['sdss*'].data['i'].c0 = 0.00130204
+        self.config.photoCal.colorterms.data['sdss*'].data['i'].c1 = -0.16922042
+        self.config.photoCal.colorterms.data['sdss*'].data['i'].c2 = -0.01374245
+        self.config.refObjLoader.retarget(target=LoadAstrometryNetObjectsTask)
 
         self._runFgcmOutputProducts(visitDataRefName)
 
