@@ -4,6 +4,7 @@ from __future__ import division, absolute_import, print_function
 
 import sys
 import traceback
+import copy
 
 import numpy as np
 import healpy as hp
@@ -79,9 +80,11 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         self.photoCal.match.referenceSelection.signalToNoise.minimum = 10.0
         self.photoCal.match.sourceSelection.doSignalToNoise = True
         self.photoCal.match.sourceSelection.signalToNoise.minimum = 10.0
+        self.photoCal.match.sourceSelection.signalToNoise.fluxField = 'flux'
+        self.photoCal.match.sourceSelection.signalToNoise.errField = 'fluxErr'
         self.photoCal.match.sourceSelection.doFlags = True
-        self.photoCal.match.sourceSelection.flags.good = ['flag_goodStar']
-        self.photoCal.match.sourceSelection.flags.bad = []
+        self.photoCal.match.sourceSelection.flags.good = []
+        self.photoCal.match.sourceSelection.flags.bad = ['flag_badStar']
         self.photoCal.match.sourceSelection.doUnresolved = False
 
 
@@ -321,7 +324,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         sourceMapper.addMinimalSchema(afwTable.SourceTable.makeMinimalSchema())
         sourceMapper.editOutputSchema().addField('flux', type=np.float64, doc="flux")
         sourceMapper.editOutputSchema().addField('fluxErr', type=np.float64, doc="flux error")
-        sourceMapper.editOutputSchema().addField('flag_goodStar', type='Flag', doc="Good flag")
+        badStarKey = sourceMapper.editOutputSchema().addField('flag_badStar', 
+                                                              type='Flag', doc="bad flag")
 
         # The exposure is used to record the filter name
         exposure = afwImage.ExposureF()
@@ -377,33 +381,29 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 # Make sure we only use stars that have valid measurements
                 # (This is perhaps redundant with requirements above that the
                 # stars be observed in all bands, but it can't hurt)
-                goodStar = (stars['mag_std_noabs'][selected, b] < 99.0)
-                sourceCat['flag_goodStar'][goodStar] = True
+                badStar = (stars['mag_std_noabs'][selected, b] > 90.0)
+                for rec in sourceCat[badStar]:
+                    rec.set(badStarKey, True)
 
                 exposure.setFilter(afwImage.Filter(band))
 
                 if refFluxFields[b] is None:
                     # Need to find the flux field in the reference catalog
                     # to work around limitations of DirectMatch in PhotoCal
-                    ctr = lsst.geom.SpherePoint(sourceCat['coord_ra'][0],
-                                                sourceCat['coord_dec'][0])
+                    ctr = stars[0].getCoord()
                     rad = 0.05 * lsst.geom.degrees
                     refDataTest = self.refObjLoader.loadSkyCircle(ctr, rad, band)
                     refFluxFields[b] = refDataTest.fluxField
 
-                calConfig = self.config.photoCal.config
+                # Make a copy of the config so that we can modify it
+                calConfig = copy.copy(self.config.photoCal.value)
                 calConfig.match.referenceSelection.signalToNoise.fluxField = refFluxFields[b]
-                calConfig.match.referenceSelection.signalToNoise.errField = refFluxField + 'Err'
+                calConfig.match.referenceSelection.signalToNoise.errField = refFluxFields[b] + 'Err'
+                calTask = self.config.photoCal.target(refObjLoader=self.refObjLoader,
+                                                      config=calConfig,
+                                                      schema=sourceCat.getSchema())
 
-                calTask = self.config.photoCal(self.config.refObjLoader,
-                                               config=calConfig,
-                                               schema=sourceCat.getSchema())
-                try:
-                    struct = calTask.run(exposure, sourceCat)
-                except:
-                    self.log.warn("Calibration task failed on pixel %d for %s with %d stars." %
-                                  (ipring[i1a[0]], band, len(sourceCat)))
-                    continue
+                struct = calTask.run(exposure, sourceCat)
 
                 results['nstar'][p, b] = len(i1a)
                 results['nmatch'][p, b] = len(struct.arrays.refMag)
@@ -419,7 +419,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             offsets[b] = np.median(results['zp'][ok, b])
             madSigma = 1.4826 * np.median(np.abs(results['zp'][ok, b] - offsets[b]))
             self.log.info("Reference catalog offset for %s band: %.6f +/- %.6f" %
-                          (offsets[b], madSigma))
+                          (band, offsets[b], madSigma))
 
         return offsets
 
