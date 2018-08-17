@@ -19,7 +19,8 @@ from .fgcmFitCycle import FgcmFitCycleConfig, FgcmFitCycleTask
 import lsst.geom
 import lsst.afw.image as afwImage
 import lsst.afw.table as afwTable
-
+from lsst.meas.algorithms import IndexerRegistry
+from lsst.meas.algorithms import DatasetConfig
 
 import fgcm
 
@@ -38,6 +39,16 @@ class FgcmOutputProductsConfig(pexConfig.Config):
     # catalog, but in the future this might need to be expanded
     doReferenceCalibration = pexConfig.Field(
         doc="Apply 'absolute' calibration from reference catalog",
+        dtype=bool,
+        default=True,
+    )
+    doRefcatOutput = pexConfig.Field(
+        doc="Output standard stars in reference catalog format",
+        dtype=bool,
+        default=True,
+    )
+    doAtmosphereOutput = pexConfig.Field(
+        doc="Output atmospheres in transmission format",
         dtype=bool,
         default=True,
     )
@@ -68,6 +79,10 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         doc="Number of pixels to sample to do comparison",
         dtype=int,
         default=100,
+    )
+    datasetConfig = pexConfig.ConfigField(
+        dtype=DatasetConfig,
+        doc="Configuration for writing/reading ingested catalog",
     )
 
     def setDefaults(self):
@@ -190,6 +205,10 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             # We need the ref obj loader to get the flux field
             self.makeSubtask("refObjLoader", butler=butler)
 
+        if self.config.doRefcatOutput:
+            self.indexer = IndexerRegistry[self.config.datasetConfig.indexer.name](
+                self.config.datasetConfig.indexer.active)
+
     @classmethod
     def _makeArgumentParser(cls):
         """Create an argument parser"""
@@ -262,14 +281,17 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             offsets = np.zeros(len(self.bands))
 
         # Output the standard stars in stack format
-        self._outputStandardStars(butler, offsets)
+        if self.config.doRefcatOutput:
+            self._outputStandardStars(butler, offsets)
 
         # Output the atmospheres
-        self._outputAtmospheres(butler)
+        if self.config.doAtmosphereOutput:
+            self._outputAtmospheres(butler)
 
         # Output the gray zeropoints
 
-        return []
+        # We return the zp offsets
+        return pipeBase.Struct(offsets=offsets)
 
     def _generateFgcmStandardStars(self, butler):
         """
@@ -434,7 +456,79 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
            Per band zeropoint offsets
         """
 
-        pass
+        # Load the stars (this is the full set of stars, no cuts)
+        stars = butler.get('fgcmStandardStars', fgcmcycle=self.useCycle)
+
+        # We assume these are returned in radians, because the units interface
+        # required a loop over a giant catalog.
+        # TODO: figure out check of native units
+        indices = np.array(self.indexer.index_points(np.degrees(stars['coord_ra']),
+                                                     np.degrees(stars['coord_dec'])))
+
+        formattedCat = self._formatCatalog(stars, offsets)
+
+        # Write the master schema
+        dataId = self.indexer.make_data_id('master_schema',
+                                           self.config.datasetConfig.ref_dataset_name)
+        butler.put(afwTable.SourceCatalog(formattedCat.schema), 'ref_cat', dataId=dataId)
+
+        # Break up the pixels using a histogram
+        h, rev = esutil.stat.histogram(indices, rev=True)
+        gd, = np.where(h > 0)
+        selected = np.zeros(len(formattedCat), dtype=np.bool)
+        for i in gd:
+            i1a = rev[rev[i]: rev[i + 1]]
+
+            # Turn into a boolean array
+            selected[:] = False
+            selected[i1a] = True
+
+            # Write the individual pixel
+            dataId = self.indexer.make_data_id(indices[i1a[0]],
+                                               self.config.datasetConfig.ref_dataset_name)
+            butler.put(formattedCat[selected], 'ref_cat', dataId=dataId)
+
+        # And save the dataset configuration
+        dataId = self.indexer.make_data_id(None, self.config.datasetConfig.ref_dataset_name)
+        butler.put(self.config.datasetConfig, 'ref_cat_config', dataId=dataId)
+
+    def _formatCatalog(self, fgcmStarCat, offsets):
+        """
+        Turn an FGCM-formatted star catalog, applying zp offsets.
+
+        parameters
+        ----------
+        fgcmStarCat: SourceCatalog
+           SourceCatalog as output by fgcmcal
+        offsets: list with len(self.bands) entries
+           Zeropoint offsets to apply
+
+        returns
+        -------
+        formattedCat: SourceCatalog
+           SourceCatalog suitable for ref_cat
+        """
+
+        sourceMapper = afwTable.SchemaMapper(fgcmStarCat.schema)
+        sourceMapper.addMinimalSchema(afwTable.SourceTable.makeMinimalSchema())
+        for band in self.bands:
+            sourceMapper.editOutputSchema().addField('%s_flux' % (band), type=np.float64)
+            sourceMapper.editOutputSchema().addField('%s_fluxErr' % (band), type=np.float64)
+            sourceMapper.editOutputSchema().addField('%s_nGood' % (band), type=np.float64)
+
+        formattedCat = afwTable.SourceCatalog(sourceMapper.getOutputSchema())
+        formattedCat.reserve(len(fgcmStarCat))
+        formattedCat.extend(fgcmStarCat, mapper=sourceMapper)
+
+        for b, band in enumerate(self.bands):
+            mag = fgcmStarCat['mag_std_noabs'][:, b] + offsets[b]
+            flux = afwImage.fluxFromABMag(mag)
+            fluxErr = afwImage.fluxErrFromABMagErr(fgcmStarCat['magerr_std'][:, b], mag)
+            formattedCat['%s_flux' % (band)][:] = flux
+            formattedCat['%s_fluxErr' % (band)][:] = fluxErr
+            formattedCat['%s_nGood' % (band)][:] = fgcmStarCat['ngood'][:, b]
+
+        return formattedCat
 
 
     def _outputAtmospheres(self, butler):
