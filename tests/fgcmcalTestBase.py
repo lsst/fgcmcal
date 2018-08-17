@@ -9,6 +9,8 @@ import numpy as np
 import lsst.daf.persistence as dafPersistence
 import lsst.afw.geom as afwGeom
 import lsst.log
+from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask, LoadIndexedReferenceObjectsConfig
+import lsst.afw.image as afwImage
 
 import lsst.fgcmcal as fgcmcal
 
@@ -159,10 +161,44 @@ class FgcmcalTestBase(object):
                 '--doraise']
         args.extend(self.otherArgs)
 
-        result = fgcmcal.FgcmOutputProductsTask.parseAndRun(args=args, config=self.config)
+        result = fgcmcal.FgcmOutputProductsTask.parseAndRun(args=args, config=self.config,
+                                                            doReturnResults=True)
         self._checkResult(result)
 
+        # Extract the offsets from the results
+        offsets = result.resultList[0].results.offsets
+
+        self.assertFloatsAlmostEqual(offsets[0], 13.67634487, rtol=1e-6)
+        self.assertFloatsAlmostEqual(offsets[1], 13.96205235, rtol=1e-6)
+
         butler = dafPersistence.butler.Butler(self.testDir)
+
+        # Test the reference catalog stars
+
+        # Read in the raw stars...
+        rawStars = butler.get('fgcmStandardStars', fgcmcycle=0)
+
+        # Read in the new reference catalog...
+        config = LoadIndexedReferenceObjectsConfig()
+        config.ref_dataset_name = 'fgcm_stars'
+        task = LoadIndexedReferenceObjectsTask(butler, config=config)
+        # Read in a giant radius to get them all
+        refStruct = task.loadSkyCircle(rawStars[0].getCoord(), 5.0 * lsst.geom.degrees,
+                                       filterName='r')
+
+        # Make sure all the stars are there
+        self.assertEqual(len(rawStars), len(refStruct.refCat))
+
+        # And make sure the numbers are consistent
+        test, = np.where(rawStars['id'][0] == refStruct.refCat['id'])
+
+        mag = rawStars['mag_std_noabs'][0, 0] + offsets[0]
+        flux = afwImage.fluxFromABMag(mag)
+        fluxErr = afwImage.fluxErrFromABMagErr(rawStars['magerr_std'][0, 0], mag)
+        self.assertFloatsAlmostEqual(flux, refStruct.refCat['r_flux'][test[0]], rtol=1e-6)
+        self.assertFloatsAlmostEqual(fluxErr, refStruct.refCat['r_fluxErr'][test[0]], rtol=1e-6)
+
+        # Test the transmission output
 
         visitCatalog = butler.get('fgcmVisitCatalog')
         lutCat = butler.get('fgcmLookUpTable')
