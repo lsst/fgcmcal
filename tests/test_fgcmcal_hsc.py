@@ -104,6 +104,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.nExpPerRun = 2
         self.config.colorSplitIndices = (0, 1)
         self.config.outputStandards = True
+        self.config.superStarSubCcd = True
+        self.config.superStarSubCcdChebyshevOrder = 1
         self.otherArgs = []
 
         nZp = 1232
@@ -139,7 +141,9 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.photoCal.colorterms.data['sdss*'].data['i'].c2 = -0.01374245
         self.config.refObjLoader.retarget(target=LoadAstrometryNetObjectsTask)
 
-        self._runFgcmOutputProducts(visitDataRefName)
+        filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
+
+        self._runFgcmOutputProducts(visitDataRefName, ccdDataRefName, filterMapping)
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
