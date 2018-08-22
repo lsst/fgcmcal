@@ -72,11 +72,6 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=int,
         default=8,
     )
-    zeropointDefault = pexConfig.Field(
-        doc="Zeropoint default (arbitrary?)",
-        dtype=float,
-        default=25.0,
-    )
     filterToBand = pexConfig.DictField(
         doc="filterName to band mapping",
         keytype=str,
@@ -587,8 +582,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 # Compute "magnitude" by scaling flux with exposure time.
                 # Add an arbitrary zeropoint that needs to be investigated.
                 scaledFlux = sources[fluxKey][goodSrc.selected] * visit['scaling'][ccdIndex]
-                tempCat[magKey][:] = (self.config.zeropointDefault -
-                                      2.5 * np.log10(scaledFlux) +
+                tempCat[magKey][:] = (-2.5 * np.log10(scaledFlux) +
                                       2.5 * np.log10(expTime))
                 # magErr is computed with original (unscaled) flux
                 tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrKey][goodSrc.selected] /
@@ -655,8 +649,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                       'coarseNSide': self.config.coarseNside,
                       'densNSide': self.config.densityCutNside,
                       'densMaxPerPixel': self.config.densityCutMaxPerPixel,
-                      'referenceBands': self.config.referenceBands,
-                      'zpDefault': self.config.zeropointDefault}
+                      'referenceBands': self.config.referenceBands}
 
         # initialize the FgcmMakeStars object
         fgcmMakeStars = fgcm.FgcmMakeStars(starConfig)
