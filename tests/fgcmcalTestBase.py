@@ -150,7 +150,7 @@ class FgcmcalTestBase(object):
 
         self.assertEqual(nStdStars, len(stds))
 
-    def _runFgcmOutputProducts(self, visitDataRefName):
+    def _runFgcmOutputProducts(self, visitDataRefName, ccdDataRefName, filterMapping):
         """
         """
 
@@ -197,6 +197,8 @@ class FgcmcalTestBase(object):
         fluxErr = afwImage.fluxErrFromABMagErr(rawStars['magerr_std'][0, 0], mag)
         self.assertFloatsAlmostEqual(flux, refStruct.refCat['r_flux'][test[0]], rtol=1e-6)
         self.assertFloatsAlmostEqual(fluxErr, refStruct.refCat['r_fluxErr'][test[0]], rtol=1e-6)
+
+        # Test the joincal_photoCalib output
 
         # Test the transmission output
 
