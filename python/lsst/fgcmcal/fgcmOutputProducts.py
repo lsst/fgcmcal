@@ -18,6 +18,7 @@ from lsst.pipe.tasks.photoCal import PhotoCalConfig, PhotoCalTask
 from .fgcmFitCycle import FgcmFitCycleConfig, FgcmFitCycleTask
 import lsst.geom
 import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 from lsst.meas.algorithms import IndexerRegistry
 from lsst.meas.algorithms import DatasetConfig
@@ -49,6 +50,11 @@ class FgcmOutputProductsConfig(pexConfig.Config):
     )
     doAtmosphereOutput = pexConfig.Field(
         doc="Output atmospheres in transmission format",
+        dtype=bool,
+        default=True,
+    )
+    doZeropointOutput = pexConfig.Field(
+        doc="Output zeropoints in jointcal_photoCalib format",
         dtype=bool,
         default=True,
     )
@@ -244,6 +250,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         fgcmBuildStarsConfig = butler.get('fgcmBuildStars_config')
         self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
         self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
+        self.filterToBand = fgcmBuildStarsConfig.filterToBand
 
         # Make sure that the fit config exists, to retrieve bands and other info
         if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber):
@@ -252,6 +259,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
         self.bands = fitCycleConfig.bands
+        self.superStarSubCcd = fitCycleConfig.superStarSubCcd
+        self.chebyshevOrder = fitCycleConfig.superStarSubCcdChebyshevOrder
 
         # And make sure that the atmosphere was output properly
         if not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber):
@@ -285,11 +294,13 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         if self.config.doRefcatOutput:
             self._outputStandardStars(butler, offsets)
 
+        # Output the gray zeropoints
+        if self.config.doZeropointOutput:
+            self._outputZeropoints(butler, offsets)
+
         # Output the atmospheres
         if self.config.doAtmosphereOutput:
             self._outputAtmospheres(butler)
-
-        # Output the gray zeropoints
 
         # We return the zp offsets
         return pipeBase.Struct(offsets=offsets)
@@ -531,6 +542,73 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         return formattedCat
 
+    def _outputZeropoints(self, butler, offsets):
+        """
+        Output the zeropoints in jointcal_photoCalib format.
+
+        Parameters
+        ----------
+        butler: lsst.daf.persistence.Butler
+        """
+
+        ## FIXME need offset
+
+        zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.useCycle)
+
+        # Only output those that we have a calibration
+        selected = (zptCat['fgcmflag'] < 16)
+
+        # Get the mapping from filtername to dataId filter name
+        filterMapping = {}
+        nFound = 0
+        for rec in zptCat[selected]:
+            if rec['filtername'] in filterMapping:
+                continue
+            dataId = {self.visitDataRefName: int(rec['visit']),
+                      self.ccdDataRefName: int(rec['ccd'])}
+            dataRef = butler.dataRef('raw', dataId=dataId)
+            filterMapping[rec['filtername']] = dataRef.dataId['filter']
+            nFound += 1
+            if nFound == len(self.filterToBand):
+                break
+
+        # Make a fixed variable to hold the parameters to build a ChebyshevBoundedField
+        orderPlus1 = self.chebyshevOrder + 1
+
+        pars = np.zeros((orderPlus1, orderPlus1))
+
+        for rec in zptCat[selected]:
+
+            if self.superStarSubCcd:
+                # Spatially varying zeropoint
+                bbox = lsst.geom.Box2I(lsst.geom.Point2I(0.0, 0.0),
+                                       lsst.geom.Point2I(*rec['fgcmfzptchebxymax']))
+
+                pars[:, :] = rec['fgcmfzptcheb'].reshape(orderPlus1, orderPlus1)
+
+                # Apply absolute relative calibration offset to 0/0 term
+
+                field = afwMath.ChebyshevBoundedField(bbox, pars)
+                calibMean = field.mean()
+
+                calibErr = (np.log(10.) / 2.5) * calibMean * rec['fgcmzpterr']
+
+                photoCalib = afwImage.PhotoCalib(field, calibErr)
+
+            else:
+                # Spatially constant zeropoint
+
+                # Apply absolute relative calibration offset
+
+                calibMean = 10.**(rec['fgcmzpt'] / (-2.5))
+                calibErr = (np.log(10.) / 2.5) * calibMean * rec['fgcmzpterr']
+                photoCalib = afwImage.PhotoCalib(calibMean, calibErr)
+
+            butler.put(photoCalib, 'jointcal_photoCalib',
+                       dataId={self.visitDataRefName: int(rec['visit']),
+                               self.ccdDataRefName: int(rec['ccd']),
+                               'filter': filterMapping[rec['filtername']],
+                               'tract': 0})
 
     def _outputAtmospheres(self, butler):
         """
@@ -549,10 +627,6 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         elevation = lutCat[0]['elevation']
         atmLambda = lutCat[0]['atmlambda']
         lutCat = None
-
-        # Get the fgcmBuildStarsConfig for visit name
-        fgcmBuildStarsConfig = butler.get("fgcmBuildStars_config")
-        visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
 
         # Make the atmosphere table if possible
         try:
@@ -604,4 +678,4 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                                             throughputAtMax=atmVals[-1])
 
             butler.put(curve, "transmission_atmosphere_fgcm",
-                       dataId={visitDataRefName: visit})
+                       dataId={self.visitDataRefName: visit})
