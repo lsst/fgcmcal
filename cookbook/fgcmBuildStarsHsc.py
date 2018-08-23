@@ -11,16 +11,14 @@ config.isolationRadius = 2.0
 # Measure the stellar density with healpix nside=densityCutNside
 config.densityCutNside = 128
 # If there are more than densityCutMaxPerPixel stars per pixel, sample them
-config.densityCutMaxPerPixel = 1000
-# Arbitrary number to make magnitudes on some sort of human-readable scale
-config.zeropointDefault = 25.0
+config.densityCutMaxPerPixel = 1500
 # Dictionary that maps "filters" (instrumental configurations) to "bands"
 # (abstract names).  All filters must be listed in the LUT.
 config.filterToBand = {'g':'g', 'r':'r', 'i':'i', 'z':'z', 'y':'y'}
 # Which bands are required to be observed to be considered a calibration star
 config.requiredBands = ['g','r','i','z']
 # The reference band is used for initial star selection
-config.referenceBand = 'i'
+config.referenceBands = ['i']
 # The reference CCD is a good CCD used to select visit to speed up the scanning
 config.referenceCCD = 13
 # If smatch matching is available, use this nside.  Not used with default LSST stack.
