@@ -143,7 +143,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.refObjLoader.retarget(target=LoadAstrometryNetObjectsTask)
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([8.711213, 8.996923])
+        zpOffsets = np.array([8.685698, 8.971399])
 
         self._runFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                     filterMapping, zpOffsets,

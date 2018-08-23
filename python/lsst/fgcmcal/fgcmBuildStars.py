@@ -111,7 +111,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     applyJacobian = pexConfig.Field(
         doc="Apply Jacobian correction?",
         dtype=bool,
-        default=True
+        default=False
     )
     jacobianName = pexConfig.Field(
         doc="Name of field with jacobian correction",
