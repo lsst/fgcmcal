@@ -6,6 +6,7 @@ import unittest
 import os
 import tempfile
 import numpy as np
+import copy
 
 import lsst.utils
 import lsst.pex.exceptions
@@ -142,8 +143,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.refObjLoader.retarget(target=LoadAstrometryNetObjectsTask)
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
+        zpOffsets = np.array([8.711213, 8.996923])
 
-        self._runFgcmOutputProducts(visitDataRefName, ccdDataRefName, filterMapping)
+        self._runFgcmOutputProducts(visitDataRefName, ccdDataRefName,
+                                    filterMapping, zpOffsets,
+                                    904014, 12, 'i', 1)
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
