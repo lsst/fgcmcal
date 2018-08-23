@@ -554,6 +554,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         ## FIXME need offset
 
         zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.useCycle)
+        visitCat = butler.get('fgcmVisitCatalog')
 
         # Only output those that we have a calibration
         selected = (zptCat['fgcmflag'] < 16)
@@ -572,6 +573,22 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             if nFound == len(self.filterToBand):
                 break
 
+        # Get a mapping from filtername to the offsets
+        offsetMapping = {}
+        for f in self.filterToBand:
+            offsetMapping[f] = offsets[self.bands.index(self.filterToBand[f])]
+
+        # Get a mapping from "ccd" to the ccd index used for the scaling
+        camera = butler.get('camera')
+        ccdMapping = {}
+        for ccdIndex, detector in enumerate(camera):
+            ccdMapping[detector.getId()] = ccdIndex
+
+        # And a mapping to get the flat-field scaling values
+        scalingMapping = {}
+        for rec in visitCat:
+            scalingMapping[rec['visit']] = rec['scaling']
+
         # Make a fixed variable to hold the parameters to build a ChebyshevBoundedField
         orderPlus1 = self.chebyshevOrder + 1
 
@@ -584,7 +601,11 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 bbox = lsst.geom.Box2I(lsst.geom.Point2I(0.0, 0.0),
                                        lsst.geom.Point2I(*rec['fgcmfzptchebxymax']))
 
-                pars[:, :] = rec['fgcmfzptcheb'].reshape(orderPlus1, orderPlus1)
+                # Take the zeropoint, apply the absolute relative calibration offset,
+                # and whatever flat-field scaling was applied
+                pars[:, :] = (rec['fgcmfzptcheb'].reshape(orderPlus1, orderPlus1) *
+                              10.**(offsetMapping[rec['filtername']] / (-2.5)) *
+                              scalingMapping[rec['visit']][ccdMapping[rec['ccd']]])
 
                 # Apply absolute relative calibration offset to 0/0 term
 
@@ -598,9 +619,12 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             else:
                 # Spatially constant zeropoint
 
-                # Apply absolute relative calibration offset
+                # Take the zeropoint, apply the absolute relative calibration offset,
+                # and whatever flat-field scaling was applied
 
-                calibMean = 10.**(rec['fgcmzpt'] / (-2.5))
+                calibMean = (10.**(rec['fgcmzpt'] / (-2.5)) *
+                             10.**(offsetMapping[rec['filtername']] / (-2.5)) *
+                             scalingMapping[rec['visit']][ccdMapping[rec['ccd']]])
                 calibErr = (np.log(10.) / 2.5) * calibMean * rec['fgcmzpterr']
                 photoCalib = afwImage.PhotoCalib(calibMean, calibErr)
 
