@@ -525,6 +525,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         else:
             resetParameters = True
 
+        # Mirror area in cm**2
+        mirrorArea = np.pi*(camera.telescopeDiameter*100./2.)**2.
+
         # create a configuration dictionary for fgcmFitCycle
         configDict = {'outfileBase': self.config.outfileBase,
                       'logger': self.log,
@@ -532,7 +535,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'obsFile': None,
                       'indexFile': None,
                       'lutFile': None,
-                      'mirrorArea': np.pi*(camera.telescopeDiameter/2.)**2.,
+                      'mirrorArea': mirrorArea,
                       'cameraGain': self.config.cameraGain,
                       'ccdStartIndex': camera[0].getId(),
                       'expField': 'VISIT',
