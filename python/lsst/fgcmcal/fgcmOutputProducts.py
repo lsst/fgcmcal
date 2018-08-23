@@ -14,8 +14,8 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.afw.image import TransmissionCurve
 from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask
-from lsst.pipe.tasks.photoCal import PhotoCalConfig, PhotoCalTask
-from .fgcmFitCycle import FgcmFitCycleConfig, FgcmFitCycleTask
+from lsst.pipe.tasks.photoCal import PhotoCalTask
+from .fgcmFitCycle import FgcmFitCycleTask
 import lsst.geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -26,6 +26,7 @@ from lsst.meas.algorithms import DatasetConfig
 import fgcm
 
 __all__ = ['FgcmOutputProductsConfig', 'FgcmOutputProductsTask']
+
 
 class FgcmOutputProductsConfig(pexConfig.Config):
     """Config for FgcmOutputProductsTask"""
@@ -269,7 +270,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         # And make sure this is the last cycle
         if butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber + 1):
-            raise RuntimeError("The task fgcmOutputProducts should only be run on the final fit cycle products")
+            raise RuntimeError("The task fgcmOutputProducts should only be run"
+                               "on the final fit cycle products")
 
         # Check if we need to run one final cycle to generate standards
         if not butler.datasetExists('fgcmStandardStars', fgcmcycle=self.config.cycleNumber):
@@ -358,7 +360,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         sourceMapper.addMinimalSchema(afwTable.SourceTable.makeMinimalSchema())
         sourceMapper.editOutputSchema().addField('flux', type=np.float64, doc="flux")
         sourceMapper.editOutputSchema().addField('fluxErr', type=np.float64, doc="flux error")
-        badStarKey = sourceMapper.editOutputSchema().addField('flag_badStar', 
+        badStarKey = sourceMapper.editOutputSchema().addField('flag_badStar',
                                                               type='Flag', doc="bad flag")
 
         # The exposure is used to record the filter name
@@ -410,7 +412,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 sourceCat.reserve(len(i1a))
                 sourceCat.extend(stars[selected], mapper=sourceMapper)
                 sourceCat['flux'] = afwImage.fluxFromABMag(stars['mag_std_noabs'][selected, b])
-                sourceCat['fluxErr'] = afwImage.fluxErrFromABMagErr(stars['magerr_std'][selected, b], stars['mag_std_noabs'][selected, b])
+                sourceCat['fluxErr'] = afwImage.fluxErrFromABMagErr(stars['magerr_std'][selected, b],
+                                                                    stars['mag_std_noabs'][selected, b])
 
                 # Make sure we only use stars that have valid measurements
                 # (This is perhaps redundant with requirements above that the
@@ -550,8 +553,6 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         ----------
         butler: lsst.daf.persistence.Butler
         """
-
-        ## FIXME need offset
 
         zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.useCycle)
         visitCat = butler.get('fgcmVisitCatalog')

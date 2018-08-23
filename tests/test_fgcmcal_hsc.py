@@ -6,7 +6,6 @@ import unittest
 import os
 import tempfile
 import numpy as np
-import copy
 
 import lsst.utils
 import lsst.pex.exceptions
