@@ -506,6 +506,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # map to ra/dec
         sourceMapper.addMapping(sourceSchema.find('coord_ra').key, 'ra')
         sourceMapper.addMapping(sourceSchema.find('coord_dec').key, 'dec')
+        sourceMapper.addMapping(sourceSchema.find(self.config.jacobianName).key,
+                                'jacobian')
 
         # and add the fields we want
         sourceMapper.editOutputSchema().addField(
@@ -552,11 +554,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     fluxKey = sources.schema[self.config.fluxField].asKey()
                     fluxErrKey = sources.schema[self.config.fluxField + 'Err'].asKey()
 
-                    if self.config.applyJacobian:
-                        jacobianKey = sources.schema[self.config.jacobianName].asKey()
-                    else:
-                        jacobianKey = None
-
                     outputSchema = sourceMapper.getOutputSchema()
                     visitKey = outputSchema['visit'].asKey()
                     ccdKey = outputSchema['ccd'].asKey()
@@ -589,9 +586,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                                                sources[fluxKey][goodSrc.selected])
 
                 if self.config.applyJacobian:
-                    tempCat[magKey][:] -= 2.5 * np.log10(sources[jacobianKey][goodSrc.selected])
-                    # FIXME
-                    # Divide scaling by mean of the jacobian of the sources
+                    tempCat[magKey][:] -= 2.5 * np.log10(tempCat['jacobian'][:])
 
                 fullCatalog.extend(tempCat)
 
