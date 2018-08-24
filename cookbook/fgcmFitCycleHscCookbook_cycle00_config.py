@@ -9,6 +9,8 @@ config.bands = ('g', 'r', 'i', 'z', 'y')
 # Flag to specify if these should be part of the fit, or generated from the atmosphere
 # parameters.
 config.fitFlag = (1, 1, 1, 1, 1)
+# Flag for bands that are required to be a calibration star.
+config.requiredFlag = (1, 1, 1, 1, 1)
 # Dictionary that maps "filters" (instrumental configurations) to "bands"
 # (abstract names).  All filters must be listed in the LUT.
 config.filterToBand = {'g':'g', 'r':'r', 'i':'i', 'z':'z', 'y':'y'}
@@ -53,3 +55,8 @@ config.colorSplitIndices = (0, 2)
 config.freezeStdAtmosphere = True
 # Precompute "superstar" in initial cycle (==00) based on bright star observations?  Recommended for HSC.
 config.precomputeSuperStarInitialCycle = True
+# Do sub-ccd calibration of the superstar flat (recommended for HSC)
+config.superStarSubCcd = True
+# Chebyshev order of sub-ccd superstar fits
+config.superStarSubCcdChebyshevOrder = 2
+
