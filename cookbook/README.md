@@ -29,7 +29,7 @@ setup lsst_distrib
 setup -j -r /path/to/thirdparty/fgcm/.
 setup -j -r /path/to/lsst-dm/fgcmcal/.
 
-export RCRERUN=RC/w_2018_17/DM-14055
+export RCRERUN=RC/w_2018_32/DM-15184
 export COOKBOOKRERUN=fgcm_cookbook
 ```
 
@@ -191,7 +191,19 @@ fgcmFitCycle.py /datasets/hsc/repo --rerun private/${USER}/${COOKBOOKRERUN}/fit1
 ${COOKBOOKRERUN}_cycle01.log
 ```
 
+### Final fit cycle
 
+After the user had concluded that the fit has converged to her satisfaction,
+one last run should be made with zero iterations and with `outputStandards =
+True`.  This will ensure the final products have consistently applied superstar
+flats and internal aperture corrections.
+
+```bash
+fgcmFitCycle.py /datasets/hsc/repo --rerun private/${USER}/${COOKBOOKRERUN}/fit1 \
+--configfile fgcmFitCycleHscCookbook_cycle02_config.py \
+--config maxIter=0 --config outputStandars=True |& tee \
+${COOKBOOKRERUN}_cycle02.log
+```
 
 ## Outputs
 
@@ -258,9 +270,21 @@ used by downstream processing in the stack.
 
 ### Making Stack Output Products
 
-At the current moment, there is only support for building atmosphere
-transmission curves for use in downstream processing.  "Coming soon" are
-zeropoint calibration files for use in the stack.
+The final task can output atmosphere transmission curves derived from the model
+fit for each visit (`doAtmosphereOutput'); output a reference catalog of
+"standard stars" that may be used for single-ccd calibration
+(`doRefcatOutput`); and `jointcal_photoCalib` files for each visit/ccd
+(`doZeropointOutput`).  All of these options are on by default.
+
+One key thing is that FGCM does not use any absolute reference sources, so the
+overall throughput for each band is unconstrained.  Therefore, to get the
+output reference catalog and zeropoints on a physical scale, we must use
+calspec standards (preferred, and deferred to the future) or a reference
+catalog.  At the moment, this uses the same PS1 catalog that is used as a
+reference for the `PhotoCal` and `jointcal` tasks.  This is set with
+`doReferenceCalibration`, and the default is on.  Please see the [sample
+config](fgcmOutputProductsHsc.py) for example usage of setting up the reference
+catalog.
 
 To build the output products you use the `fgcmOutputProducts.py` command-line
 task.  The only config variable is the cycle number that the user has deemed to
@@ -270,15 +294,31 @@ be converged and should be output.
 fgcmOutputProducts.py /datasets/hsc/repo --rerun \
 private/${USER}/${COOKBOOKRERUN}/wide:private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile $FGCMCAL_DIR/cookbook/fgcmOutputProductsHsc.py \
---config cycleNumber=1 |& tee ${COOKBOOKRERUN}_output.log
+--config cycleNumber=2 |& tee ${COOKBOOKRERUN}_output.log
 ```
 
 In the output repo
-(`/datasets/hsc/repo/rerun/private/${USER}/${COOKBOOKRERUN}/fit1/transmission/`) you will now
+`/datasets/hsc/repo/rerun/private/${USER}/${COOKBOOKRERUN}/fit1/transmission/` you will now
 find a whole bunch of `atmosphere_VISIT.fits` files of the
 `lsst.afw.image.TransmissionCurve` type.  Note that even if you have frozen the
 atmosphere parameters to the "standard" values, these will be computed
 specifically for the airmass of each individual observation.
+
+In the output repo
+`/datasets/hsc/repo/rerun/private/erykoff/rc2_w_2018_32/fit1/ref_cats/fgcm_stars/'
+you will find a sharded reference catalog suitable to use for any observations
+overlapping the survey images that have been calibrated.
+
+And in the output repo
+`/datasets/hsc/repo/rerun/private/erykoff/rc2_w_2018_32/fit1/jointcal-results`
+you will find all of the `jointcal_photoCalib` spatially-variable zeropoint
+files that can be used in coaddition.  At the moment, these combine information
+from the WCS Jacobian distortions as well as the spatially variable
+transmission (due to the illumination correction derived by FGCM).  In the
+future, the Jacobian information will be factored out.
+
+Note that all the files are set to tract `0000`, as FGCM has no concept of tracts
+and patches.
 
 ### FGCM-Specific Data Products
 
