@@ -471,7 +471,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
            Per band zeropoint offsets
         """
 
-        self.log.info("Outputing standard stars to %s" % (self.config.datasetConfig.ref_dataset_name))
+        self.log.info("Outputting standard stars to %s" % (self.config.datasetConfig.ref_dataset_name))
 
         # Load the stars (this is the full set of stars, no cuts)
         stars = butler.get('fgcmStandardStars', fgcmcycle=self.useCycle)
@@ -509,7 +509,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         dataId = self.indexer.make_data_id(None, self.config.datasetConfig.ref_dataset_name)
         butler.put(self.config.datasetConfig, 'ref_cat_config', dataId=dataId)
 
-        self.log.info("Done outputing standard stars.")
+        self.log.info("Done outputting standard stars.")
 
     def _formatCatalog(self, fgcmStarCat, offsets):
         """
@@ -558,7 +558,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         butler: lsst.daf.persistence.Butler
         """
 
-        self.config.log("Outputing jointcal_photoCalib objects")
+        self.log.info("Outputting jointcal_photoCalib objects")
 
         zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.useCycle)
         visitCat = butler.get('fgcmVisitCatalog')
@@ -641,7 +641,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                'filter': filterMapping[rec['filtername']],
                                'tract': 0})
 
-        self.log.info("Done outputing jointcal_photoCalib objects")
+        self.log.info("Done outputting jointcal_photoCalib objects")
 
     def _outputAtmospheres(self, butler):
         """
@@ -653,7 +653,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
            (used for mapper information)
         """
 
-        self.log.info("Outputing atmosphere transmissions")
+        self.log.info("Outputting atmosphere transmissions")
 
         # First, we need to grab the look-up table and key info
         lutCat = butler.get('fgcmLookUpTable')
@@ -715,4 +715,4 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             butler.put(curve, "transmission_atmosphere_fgcm",
                        dataId={self.visitDataRefName: visit})
 
-        self.log.info("Done outputing atmosphere transmissions")
+        self.log.info("Done outputting atmosphere transmissions")
