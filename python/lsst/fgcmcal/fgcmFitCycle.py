@@ -1140,15 +1140,17 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                      outConfig.cycleNumber)
         outConfig.save(configFileName)
 
-        self.log.info("Saved config for next cycle to %s" % (configFileName))
-        self.log.info("Be sure to look at:")
-        self.log.info("   config.expGrayPhotometricCut")
-        self.log.info("   config.expGrayHighCut")
-        self.log.info("If you are satisfied with the fit, please set:")
-        self.log.info("   config.maxIter = 0")
-        self.log.info("   config.outputStandards = True")
-
-        # tear down and clear memory
+        if self.config.maxIter == 0 and self.config.outputStandards:
+            # We are done, there is no more warning
+            self.log.info("Everything is in place to run fgcmOutputProducts.py")
+        else:
+            self.log.info("Saved config for next cycle to %s" % (configFileName))
+            self.log.info("Be sure to look at:")
+            self.log.info("   config.expGrayPhotometricCut")
+            self.log.info("   config.expGrayHighCut")
+            self.log.info("If you are satisfied with the fit, please set:")
+            self.log.info("   config.maxIter = 0")
+            self.log.info("   config.outputStandards = True")
 
     def _loadFgcmLut(self, butler, filterToBand=None):
         """
