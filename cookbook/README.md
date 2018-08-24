@@ -322,7 +322,7 @@ and patches.
 
 ### FGCM-Specific Data Products
 
-The data products that are of use to the end user, and grabbed from the butler,
+The data products that may be of use to the end user, and grabbed from the butler,
 e.g.:
 
 ```python
