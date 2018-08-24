@@ -558,7 +558,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         butler: lsst.daf.persistence.Butler
         """
 
-        self.log("Outputing jointcal_photoCalib objects")
+        self.log.info("Outputing jointcal_photoCalib objects")
 
         zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.useCycle)
         visitCat = butler.get('fgcmVisitCatalog')
