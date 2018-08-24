@@ -8,6 +8,8 @@ from lsst.utils import getPackageDir
 
 # Last cycle number that was run, preferably with outputStandards == True
 config.cycleNumber = 3
+# For quicker runs, we cut down the area used for cross-calibration
+config.referencePixelizationNPixels = 10
 
 # Reference object info
 config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
