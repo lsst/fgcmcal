@@ -541,6 +541,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'expField': 'VISIT',
                       'ccdField': 'CCD',
                       'seeingField': 'PSFSIGMA',
+                      'fwhmField': 'PSFSIGMA',
+                      'skyBrightnessField': 'SKYBACKGROUND',
                       'deepFlag': 'DEEPFLAG',  # unused
                       'bands': list(self.config.bands),
                       'fitBands': list(fitBands),
