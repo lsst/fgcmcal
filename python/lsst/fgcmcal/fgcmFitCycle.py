@@ -540,7 +540,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'ccdStartIndex': camera[0].getId(),
                       'expField': 'VISIT',
                       'ccdField': 'CCD',
-                      'seeingField': 'PSFSIGMA',
+                      'seeingField': 'DELTA_APER',
                       'fwhmField': 'PSFSIGMA',
                       'skyBrightnessField': 'SKYBACKGROUND',
                       'deepFlag': 'DEEPFLAG',  # unused
@@ -1286,6 +1286,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                      ('MJD', 'f8'),
                                                      ('EXPTIME', 'f8'),
                                                      ('PSFSIGMA', 'f8'),
+                                                     ('DELTA_APER', 'f8'),
                                                      ('SKYBACKGROUND', 'f8'),
                                                      ('DEEPFLAG', 'i2'),
                                                      ('TELHA', 'f8'),
@@ -1302,6 +1303,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmExpInfo['TELDEC'][:] = visitCat['teldec']
         fgcmExpInfo['PMB'][:] = visitCat['pmb']
         fgcmExpInfo['PSFSIGMA'][:] = visitCat['psfsigma']
+        fgcmExpInfo['DELTA_APER'][:] = visitCat['deltaaper']
         fgcmExpInfo['SKYBACKGROUND'][:] = visitCat['skybackground']
         # Note that we have to go through asAstropy() to get a string
         #  array out of an afwTable
