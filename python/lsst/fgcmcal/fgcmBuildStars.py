@@ -534,8 +534,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         aperMapper.addMapping(sourceSchema.find('coord_dec').key, 'dec')
         aperMapper.editOutputSchema().addField('mag_aper_inner', type=np.float64,
                                                doc="Magnitude at inner aperture")
+        aperMapper.editOutputSchema().addField('magerr_aper_inner', type=np.float64,
+                                               doc="Magnitude error at inner aperture")
         aperMapper.editOutputSchema().addField('mag_aper_outer', type=np.float64,
                                                doc="Magnitude at outer aperture")
+        aperMapper.editOutputSchema().addField('magerr_aper_outer', type=np.float64,
+                                               doc="Magnitude error at outer aperture")
 
         # we need to know the ccds...
         camera = butler.get('camera')
@@ -593,11 +597,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                     # And the aperture catalog
                     fluxAperInKey = sources.schema[self.config.apertureInnerFluxField].asKey()
+                    fluxErrAperInKey = sources.schema[self.config.apertureInnerFluxField + 'Err'].asKey()
                     fluxAperOutKey = sources.schema[self.config.apertureOuterFluxField].asKey()
+                    fluxErrAperOutKey = sources.schema[self.config.apertureOuterFluxField + 'Err'].asKey()
 
                     aperOutputSchema = aperMapper.getOutputSchema()
                     magInKey = aperOutputSchema['mag_aper_inner'].asKey()
+                    magErrInKey = aperOutputSchema['magerr_aper_inner'].asKey()
                     magOutKey = aperOutputSchema['mag_aper_outer'].asKey()
+                    magErrOutKey = aperOutputSchema['magerr_aper_outer'].asKey()
 
                     aperVisitCatalog = afwTable.BaseCatalog(aperMapper.getOutputSchema())
 
@@ -629,7 +637,11 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempAperCat.reserve(goodSrc.selected.sum())
                 tempAperCat.extend(sources[goodSrc.selected], mapper=aperMapper)
                 tempAperCat[magInKey][:] = -2.5 * np.log10(sources[fluxAperInKey][goodSrc.selected])
+                tempAperCat[magErrInKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrAperInKey][goodSrc.selected] /
+                                                                     sources[fluxAperInKey][goodSrc.selected])
                 tempAperCat[magOutKey][:] = -2.5 * np.log10(sources[fluxAperOutKey][goodSrc.selected])
+                tempAperCat[magErrOutKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrAperOutKey][goodSrc.selected] /
+                                                                      sources[fluxAperOutKey][goodSrc.selected])
 
                 aperVisitCatalog.extend(tempAperCat)
 
@@ -639,7 +651,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             if not aperVisitCatalog.isContiguous():
                 aperVisitCatalog = aperVisitCatalog.copy(deep=True)
 
-            visit['deltaaper'] = np.median(aperVisitCatalog[magInKey] - aperVisitCatalog[magOutKey])
+            magIn = aperVisitCatalog[magInKey]
+            magErrIn = aperVisitCatalog[magErrInKey]
+            magOut = aperVisitCatalog[magOutKey]
+            magErrOut = aperVisitCatalog[magErrOutKey]
+
+            ok = (np.isfinite(magIn) & np.isfinite(magErrIn) & np.isfinite(magOut) & np.isfinite(magErrOut))
+
+            visit['deltaaper'] = np.median(magIn[ok] - magOut[ok])
 
             self.log.info("  Found %d good stars in visit %d (delta_aper = %.3f)" %
                           (nStarInVisit, visit['visit'], visit['deltaaper']))
