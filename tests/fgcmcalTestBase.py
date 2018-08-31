@@ -247,7 +247,7 @@ class FgcmcalTestBase(object):
         # These should be very close but some tiny differences because the fgcm value
         # is defined at the center of the bbox, and the photoCal is the mean over the box
         self.assertFloatsAlmostEqual(photoCalMeanCalMags,
-                                     zptMeanCalMags, rtol=1e-7)
+                                     zptMeanCalMags, rtol=1e-6)
         # These should be roughly equal, but not precisely because of the focal-plane
         # variation.  However, this is a useful sanity check for something going totally
         # wrong.
