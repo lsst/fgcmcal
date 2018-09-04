@@ -16,10 +16,10 @@ from lsst.afw.image import TransmissionCurve
 from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask
 from lsst.pipe.tasks.photoCal import PhotoCalTask
 from .fgcmFitCycle import FgcmFitCycleTask
-import lsst.geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
+import lsst.afw.geom as afwGeom
 from lsst.meas.algorithms import IndexerRegistry
 from lsst.meas.algorithms import DatasetConfig
 
@@ -428,7 +428,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                     # Need to find the flux field in the reference catalog
                     # to work around limitations of DirectMatch in PhotoCal
                     ctr = stars[0].getCoord()
-                    rad = 0.05 * lsst.geom.degrees
+                    rad = 0.05 * afwGeom.degrees
                     refDataTest = self.refObjLoader.loadSkyCircle(ctr, rad, band)
                     refFluxFields[b] = refDataTest.fluxField
 
@@ -605,8 +605,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
             if self.superStarSubCcd:
                 # Spatially varying zeropoint
-                bbox = lsst.geom.Box2I(lsst.geom.Point2I(0.0, 0.0),
-                                       lsst.geom.Point2I(*rec['fgcmfzptchebxymax']))
+                bbox = afwGeom.Box2I(afwGeom.Point2I(0.0, 0.0),
+                                     afwGeom.Point2I(*rec['fgcmfzptchebxymax']))
 
                 # Take the zeropoint, apply the absolute relative calibration offset,
                 # and whatever flat-field scaling was applied

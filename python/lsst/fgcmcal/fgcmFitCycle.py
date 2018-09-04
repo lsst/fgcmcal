@@ -16,7 +16,6 @@ import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
 import lsst.afw.geom as afwGeom
 import lsst.afw.cameraGeom as afwCameraGeom
-import lsst.geom
 
 import fgcm
 
@@ -1121,8 +1120,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                 stdCat = stdCat.copy(deep=True)
 
             stdCat['id'][:] = outCat['FGCM_ID']
-            stdCat['coord_ra'][:] = outCat['RA'] * lsst.geom.degrees
-            stdCat['coord_dec'][:] = outCat['DEC'] * lsst.geom.degrees
+            stdCat['coord_ra'][:] = outCat['RA'] * afwGeom.degrees
+            stdCat['coord_dec'][:] = outCat['DEC'] * afwGeom.degrees
             stdCat['ngood'][:, :] = outCat['NGOOD'][:, :]
             stdCat['mag_std_noabs'][:, :] = outCat['MAG_STD'][:, :]
             stdCat['magerr_std'][:, :] = outCat['MAGERR_STD'][:, :]
