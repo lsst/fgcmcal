@@ -117,6 +117,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # And output the products
         self.config = fgcmcal.FgcmOutputProductsConfig()
         self.config.cycleNumber = 0
+        self.config.doZeropointOutput = False
         self.config.photoCal.photoCatName = 'sdss-dr9-fink-v5b'
         self.config.photoCal.colorterms.data = {}
         self.config.photoCal.colorterms.data['sdss*'] = lsst.pipe.tasks.colorterms.ColortermDict()

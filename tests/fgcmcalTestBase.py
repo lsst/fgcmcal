@@ -179,104 +179,107 @@ class FgcmcalTestBase(object):
         # Read in the raw stars...
         rawStars = butler.get('fgcmStandardStars', fgcmcycle=0)
 
-        # Read in the new reference catalog...
-        config = LoadIndexedReferenceObjectsConfig()
-        config.ref_dataset_name = 'fgcm_stars'
-        task = LoadIndexedReferenceObjectsTask(butler, config=config)
-        # Read in a giant radius to get them all
-        refStruct = task.loadSkyCircle(rawStars[0].getCoord(), 5.0 * lsst.geom.degrees,
-                                       filterName='r')
+        if self.config.doRefcatOutput:
+            # Read in the new reference catalog...
+            config = LoadIndexedReferenceObjectsConfig()
+            config.ref_dataset_name = 'fgcm_stars'
+            task = LoadIndexedReferenceObjectsTask(butler, config=config)
+            # Read in a giant radius to get them all
+            refStruct = task.loadSkyCircle(rawStars[0].getCoord(), 5.0 * lsst.geom.degrees,
+                                           filterName='r')
 
-        # Make sure all the stars are there
-        self.assertEqual(len(rawStars), len(refStruct.refCat))
+            # Make sure all the stars are there
+            self.assertEqual(len(rawStars), len(refStruct.refCat))
 
-        # And make sure the numbers are consistent
-        test, = np.where(rawStars['id'][0] == refStruct.refCat['id'])
+            # And make sure the numbers are consistent
+            test, = np.where(rawStars['id'][0] == refStruct.refCat['id'])
 
-        mag = rawStars['mag_std_noabs'][0, 0] + offsets[0]
-        flux = afwImage.fluxFromABMag(mag)
-        fluxErr = afwImage.fluxErrFromABMagErr(rawStars['magerr_std'][0, 0], mag)
-        self.assertFloatsAlmostEqual(flux, refStruct.refCat['r_flux'][test[0]], rtol=1e-6)
-        self.assertFloatsAlmostEqual(fluxErr, refStruct.refCat['r_fluxErr'][test[0]], rtol=1e-6)
+            mag = rawStars['mag_std_noabs'][0, 0] + offsets[0]
+            flux = afwImage.fluxFromABMag(mag)
+            fluxErr = afwImage.fluxErrFromABMagErr(rawStars['magerr_std'][0, 0], mag)
+            self.assertFloatsAlmostEqual(flux, refStruct.refCat['r_flux'][test[0]], rtol=1e-6)
+            self.assertFloatsAlmostEqual(fluxErr, refStruct.refCat['r_fluxErr'][test[0]], rtol=1e-6)
 
-        # Test the joincal_photoCalib output
+        if self.config.doZeropointOutput:
+            # Test the joincal_photoCalib output
 
-        zptCat = butler.get('fgcmZeropoints', fgcmcycle=0)
-        selected = (zptCat['fgcmflag'] < 16)
+            zptCat = butler.get('fgcmZeropoints', fgcmcycle=0)
+            selected = (zptCat['fgcmflag'] < 16)
 
-        # Read in all the calibrations, these should all be there
-        for rec in zptCat[selected]:
+            # Read in all the calibrations, these should all be there
+            for rec in zptCat[selected]:
+                testCal = butler.get('jointcal_photoCalib',
+                                     dataId={visitDataRefName: int(rec['visit']),
+                                             ccdDataRefName: int(rec['ccd']),
+                                             'filter': filterMapping[rec['filtername']],
+                                             'tract': 0})
+
+            # Our round-trip tests will be on this final one which is still loaded
             testCal = butler.get('jointcal_photoCalib',
-                                 dataId={visitDataRefName: int(rec['visit']),
-                                         ccdDataRefName: int(rec['ccd']),
-                                         'filter': filterMapping[rec['filtername']],
+                                 dataId={visitDataRefName: int(testVisit),
+                                         ccdDataRefName: int(testCcd),
+                                         'filter': filterMapping[testFilter],
                                          'tract': 0})
 
-        # Our round-trip tests will be on this final one which is still loaded
-        testCal = butler.get('jointcal_photoCalib',
-                             dataId={visitDataRefName: int(testVisit),
-                                     ccdDataRefName: int(testCcd),
-                                     'filter': filterMapping[testFilter],
-                                     'tract': 0})
+            src = butler.get('src', dataId={visitDataRefName: int(testVisit),
+                                            ccdDataRefName: int(testCcd)})
 
-        src = butler.get('src', dataId={visitDataRefName: int(testVisit),
-                                        ccdDataRefName: int(testCcd)})
+            # Only test sources with positive flux
+            gdSrc = (src['slot_CalibFlux_flux'] > 0.0)
 
-        # Only test sources with positive flux
-        gdSrc = (src['slot_CalibFlux_flux'] > 0.0)
+            # We need to apply the calibration offset to the fgcmzpt (which is internal
+            # and doesn't know about that yet)
+            testZpInd, = np.where((zptCat['visit'] == testVisit) &
+                                  (zptCat['ccd'] == testCcd))
+            fgcmZpt = zptCat['fgcmzpt'][testZpInd] + offsets[testBandIndex]
 
-        # We need to apply the calibration offset to the fgcmzpt (which is internal
-        # and doesn't know about that yet)
-        testZpInd, = np.where((zptCat['visit'] == testVisit) &
-                              (zptCat['ccd'] == testCcd))
-        fgcmZpt = zptCat['fgcmzpt'][testZpInd] + offsets[testBandIndex]
+            # This is the magnitude through the mean calibration
+            photoCalMeanCalMags = np.zeros(gdSrc.sum())
+            # This is the magnitude through the full focal-plane variable mags
+            photoCalMags = np.zeros_like(photoCalMeanCalMags)
+            # This is the magnitude with the FGCM (central-ccd) zeropoint
+            zptMeanCalMags = np.zeros_like(photoCalMeanCalMags)
 
-        # This is the magnitude through the mean calibration
-        photoCalMeanCalMags = np.zeros(gdSrc.sum())
-        # This is the magnitude through the full focal-plane variable mags
-        photoCalMags = np.zeros_like(photoCalMeanCalMags)
-        # This is the magnitude with the FGCM (central-ccd) zeropoint
-        zptMeanCalMags = np.zeros_like(photoCalMeanCalMags)
+            for i, rec in enumerate(src[gdSrc]):
+                photoCalMeanCalMags[i] = testCal.instFluxToMagnitude(rec['slot_CalibFlux_flux'])
+                photoCalMags[i] = testCal.instFluxToMagnitude(rec['slot_CalibFlux_flux'],
+                                                              rec.getCentroid())
+                zptMeanCalMags[i] = fgcmZpt - 2.5*np.log10(rec['slot_CalibFlux_flux'])
 
-        for i, rec in enumerate(src[gdSrc]):
-            photoCalMeanCalMags[i] = testCal.instFluxToMagnitude(rec['slot_CalibFlux_flux'])
-            photoCalMags[i] = testCal.instFluxToMagnitude(rec['slot_CalibFlux_flux'],
-                                                          rec.getCentroid())
-            zptMeanCalMags[i] = fgcmZpt - 2.5*np.log10(rec['slot_CalibFlux_flux'])
+            # These should be very close but some tiny differences because the fgcm value
+            # is defined at the center of the bbox, and the photoCal is the mean over the box
+            self.assertFloatsAlmostEqual(photoCalMeanCalMags,
+                                         zptMeanCalMags, rtol=1e-6)
+            # These should be roughly equal, but not precisely because of the focal-plane
+            # variation.  However, this is a useful sanity check for something going totally
+            # wrong.
+            self.assertFloatsAlmostEqual(photoCalMeanCalMags,
+                                         photoCalMags, rtol=1e-2)
 
-        # These should be very close but some tiny differences because the fgcm value
-        # is defined at the center of the bbox, and the photoCal is the mean over the box
-        self.assertFloatsAlmostEqual(photoCalMeanCalMags,
-                                     zptMeanCalMags, rtol=1e-6)
-        # These should be roughly equal, but not precisely because of the focal-plane
-        # variation.  However, this is a useful sanity check for something going totally
-        # wrong.
-        self.assertFloatsAlmostEqual(photoCalMeanCalMags,
-                                     photoCalMags, rtol=1e-2)
+        if self.config.doAtmosphereOutput:
+            # Test the transmission output
 
-        # Test the transmission output
+            visitCatalog = butler.get('fgcmVisitCatalog')
+            lutCat = butler.get('fgcmLookUpTable')
 
-        visitCatalog = butler.get('fgcmVisitCatalog')
-        lutCat = butler.get('fgcmLookUpTable')
+            testTrans = butler.get('transmission_atmosphere_fgcm',
+                                   dataId={visitDataRefName: visitCatalog[0]['visit']})
+            testResp = testTrans.sampleAt(position=afwGeom.Point2D(0, 0),
+                                          wavelengths=lutCat[0]['atmlambda'])
 
-        testTrans = butler.get('transmission_atmosphere_fgcm',
-                               dataId={visitDataRefName: visitCatalog[0]['visit']})
-        testResp = testTrans.sampleAt(position=afwGeom.Point2D(0, 0),
-                                      wavelengths=lutCat[0]['atmlambda'])
+            # The fit to be roughly consistent with the standard, although the
+            # airmass is taken into account even with the "frozen" atmosphere.
+            # This is also a rough comparison, because the interpolation does
+            # not work well with such a coarse look-up table used for the test.
+            self.assertFloatsAlmostEqual(testResp, lutCat[0]['atmstdtrans'], atol=0.06)
 
-        # The fit to be roughly consistent with the standard, although the
-        # airmass is taken into account even with the "frozen" atmosphere.
-        # This is also a rough comparison, because the interpolation does
-        # not work well with such a coarse look-up table used for the test.
-        self.assertFloatsAlmostEqual(testResp, lutCat[0]['atmstdtrans'], atol=0.06)
-
-        # The second should be close to the first, but there is the airmass
-        # difference so they aren't identical
-        testTrans2 = butler.get('transmission_atmosphere_fgcm',
-                                dataId={visitDataRefName: visitCatalog[1]['visit']})
-        testResp2 = testTrans2.sampleAt(position=afwGeom.Point2D(0, 0),
-                                        wavelengths=lutCat[0]['atmlambda'])
-        self.assertFloatsAlmostEqual(testResp, testResp2, atol=1e-4)
+            # The second should be close to the first, but there is the airmass
+            # difference so they aren't identical
+            testTrans2 = butler.get('transmission_atmosphere_fgcm',
+                                    dataId={visitDataRefName: visitCatalog[1]['visit']})
+            testResp2 = testTrans2.sampleAt(position=afwGeom.Point2D(0, 0),
+                                            wavelengths=lutCat[0]['atmlambda'])
+            self.assertFloatsAlmostEqual(testResp, testResp2, atol=1e-4)
 
     def _checkResult(self, result):
         self.assertNotEqual(result.resultList, [], 'resultList should not be empty')
