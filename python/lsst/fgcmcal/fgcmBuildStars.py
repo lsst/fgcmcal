@@ -160,7 +160,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector.doIsolated = True
 
         sourceSelector.signalToNoise.fluxField = self.fluxField
-        sourceSelector.signalToNoise.errField = self.fluxField + 'Err'
+        sourceSelector.signalToNoise.errField = self.fluxField + 'Sigma'
         sourceSelector.signalToNoise.minimum = 10.0
         sourceSelector.signalToNoise.maximum = 1000.0
 
@@ -575,7 +575,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                     # Calibration is based on configuration fluxField
                     fluxKey = sources.schema[self.config.fluxField].asKey()
-                    fluxErrKey = sources.schema[self.config.fluxField + 'Err'].asKey()
+                    fluxErrKey = sources.schema[self.config.fluxField + 'Sigma'].asKey()
 
                     outputSchema = sourceMapper.getOutputSchema()
                     visitKey = outputSchema['visit'].asKey()
@@ -597,9 +597,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                     # And the aperture catalog
                     fluxAperInKey = sources.schema[self.config.apertureInnerFluxField].asKey()
-                    fluxErrAperInKey = sources.schema[self.config.apertureInnerFluxField + 'Err'].asKey()
+                    fluxErrAperInKey = sources.schema[self.config.apertureInnerFluxField + 'Sigma'].asKey()
                     fluxAperOutKey = sources.schema[self.config.apertureOuterFluxField].asKey()
-                    fluxErrAperOutKey = sources.schema[self.config.apertureOuterFluxField + 'Err'].asKey()
+                    fluxErrAperOutKey = sources.schema[self.config.apertureOuterFluxField + 'Sigma'].asKey()
 
                     aperOutputSchema = aperMapper.getOutputSchema()
                     magInKey = aperOutputSchema['mag_aper_inner'].asKey()
@@ -613,19 +613,21 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 goodSrc = self.sourceSelector.selectSources(sources)
 
+                selected = goodSrc.selection
+
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
-                tempCat.reserve(goodSrc.selected.sum())
-                tempCat.extend(sources[goodSrc.selected], mapper=sourceMapper)
+                tempCat.reserve(selected.sum())
+                tempCat.extend(sources[selected], mapper=sourceMapper)
                 tempCat[visitKey][:] = visit['visit']
                 tempCat[ccdKey][:] = ccdId
                 # Compute "magnitude" by scaling flux with exposure time.
                 # Add an arbitrary zeropoint that needs to be investigated.
-                scaledFlux = sources[fluxKey][goodSrc.selected] * visit['scaling'][ccdIndex]
+                scaledFlux = sources[fluxKey][selected] * visit['scaling'][ccdIndex]
                 tempCat[magKey][:] = (-2.5 * np.log10(scaledFlux) +
                                       2.5 * np.log10(expTime))
                 # magErr is computed with original (unscaled) flux
-                tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrKey][goodSrc.selected] /
-                                                               sources[fluxKey][goodSrc.selected])
+                tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrKey][selected] /
+                                                               sources[fluxKey][selected])
 
                 if self.config.applyJacobian:
                     tempCat[magKey][:] -= 2.5 * np.log10(tempCat['jacobian'][:])
