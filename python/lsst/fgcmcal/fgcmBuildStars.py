@@ -636,14 +636,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 # And the aperture information
                 tempAperCat = afwTable.BaseCatalog(aperVisitCatalog.schema)
-                tempAperCat.reserve(goodSrc.selected.sum())
-                tempAperCat.extend(sources[goodSrc.selected], mapper=aperMapper)
-                tempAperCat[magInKey][:] = -2.5 * np.log10(sources[fluxAperInKey][goodSrc.selected])
-                tempAperCat[magErrInKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrAperInKey][goodSrc.selected] /
-                                                                     sources[fluxAperInKey][goodSrc.selected])
-                tempAperCat[magOutKey][:] = -2.5 * np.log10(sources[fluxAperOutKey][goodSrc.selected])
-                tempAperCat[magErrOutKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrAperOutKey][goodSrc.selected] /
-                                                                      sources[fluxAperOutKey][goodSrc.selected])
+                tempAperCat.reserve(selected.sum())
+                tempAperCat.extend(sources[selected], mapper=aperMapper)
+                tempAperCat[magInKey][:] = -2.5 * np.log10(sources[fluxAperInKey][selected])
+                tempAperCat[magErrInKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrAperInKey][selected] /
+                                                                     sources[fluxAperInKey][selected])
+                tempAperCat[magOutKey][:] = -2.5 * np.log10(sources[fluxAperOutKey][selected])
+                tempAperCat[magErrOutKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrAperOutKey][selected] /
+                                                                      sources[fluxAperOutKey][selected])
 
                 aperVisitCatalog.extend(tempAperCat)
 
