@@ -103,7 +103,7 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         self.photoCal.match.sourceSelection.doSignalToNoise = True
         self.photoCal.match.sourceSelection.signalToNoise.minimum = 10.0
         self.photoCal.match.sourceSelection.signalToNoise.fluxField = 'flux'
-        self.photoCal.match.sourceSelection.signalToNoise.errField = 'fluxErr'
+        self.photoCal.match.sourceSelection.signalToNoise.errField = 'fluxSigma'
         self.photoCal.match.sourceSelection.doFlags = True
         self.photoCal.match.sourceSelection.flags.good = []
         self.photoCal.match.sourceSelection.flags.bad = ['flag_badStar']
@@ -359,7 +359,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         sourceMapper = afwTable.SchemaMapper(stars.schema)
         sourceMapper.addMinimalSchema(afwTable.SourceTable.makeMinimalSchema())
         sourceMapper.editOutputSchema().addField('flux', type=np.float64, doc="flux")
-        sourceMapper.editOutputSchema().addField('fluxErr', type=np.float64, doc="flux error")
+        sourceMapper.editOutputSchema().addField('fluxSigma', type=np.float64, doc="flux error")
         badStarKey = sourceMapper.editOutputSchema().addField('flag_badStar',
                                                               type='Flag', doc="bad flag")
 
@@ -412,7 +412,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 sourceCat.reserve(len(i1a))
                 sourceCat.extend(stars[selected], mapper=sourceMapper)
                 sourceCat['flux'] = afwImage.fluxFromABMag(stars['mag_std_noabs'][selected, b])
-                sourceCat['fluxErr'] = afwImage.fluxErrFromABMagErr(stars['magerr_std'][selected, b],
+                sourceCat['fluxSigma'] = afwImage.fluxErrFromABMagErr(stars['magerr_std'][selected, b],
                                                                     stars['mag_std_noabs'][selected, b])
 
                 # Make sure we only use stars that have valid measurements
@@ -435,7 +435,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 # Make a copy of the config so that we can modify it
                 calConfig = copy.copy(self.config.photoCal.value)
                 calConfig.match.referenceSelection.signalToNoise.fluxField = refFluxFields[b]
-                calConfig.match.referenceSelection.signalToNoise.errField = refFluxFields[b] + 'Err'
+                calConfig.match.referenceSelection.signalToNoise.errField = refFluxFields[b] + 'Sigma'
                 calTask = self.config.photoCal.target(refObjLoader=self.refObjLoader,
                                                       config=calConfig,
                                                       schema=sourceCat.getSchema())
@@ -532,7 +532,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         sourceMapper.addMinimalSchema(afwTable.SourceTable.makeMinimalSchema())
         for band in self.bands:
             sourceMapper.editOutputSchema().addField('%s_flux' % (band), type=np.float64)
-            sourceMapper.editOutputSchema().addField('%s_fluxErr' % (band), type=np.float64)
+            sourceMapper.editOutputSchema().addField('%s_fluxSigma' % (band), type=np.float64)
             sourceMapper.editOutputSchema().addField('%s_nGood' % (band), type=np.float64)
 
         formattedCat = afwTable.SourceCatalog(sourceMapper.getOutputSchema())
@@ -544,7 +544,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             flux = afwImage.fluxFromABMag(mag)
             fluxErr = afwImage.fluxErrFromABMagErr(fgcmStarCat['magerr_std'][:, b], mag)
             formattedCat['%s_flux' % (band)][:] = flux
-            formattedCat['%s_fluxErr' % (band)][:] = fluxErr
+            formattedCat['%s_fluxSigma' % (band)][:] = fluxErr
             formattedCat['%s_nGood' % (band)][:] = fgcmStarCat['ngood'][:, b]
 
         return formattedCat
