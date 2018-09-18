@@ -6,6 +6,15 @@ import os.path
 
 from lsst.utils import getPackageDir
 
+# Do the reference catalog calibration
+doReferenceCalibration = True
+# Do the standard star catalog output
+doRefcatOutput = True
+# Do the atmosphere output
+doAtmosphereOutput = True
+# Do output the zeropoints in jointcal_photoCalib format (though uses a lot of space)
+doZeropointOutput = True
+
 # Last cycle number that was run, preferably with outputStandards == True
 config.cycleNumber = 3
 # For quicker runs, we cut down the area used for cross-calibration
