@@ -479,14 +479,14 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # We assume these are returned in radians, because the units interface
         # required a loop over a giant catalog.
         # TODO: figure out check of native units
-        indices = np.array(self.indexer.index_points(np.degrees(stars['coord_ra']),
-                                                     np.degrees(stars['coord_dec'])))
+        indices = np.array(self.indexer.indexPoints(np.degrees(stars['coord_ra']),
+                                                    np.degrees(stars['coord_dec'])))
 
         formattedCat = self._formatCatalog(stars, offsets)
 
         # Write the master schema
-        dataId = self.indexer.make_data_id('master_schema',
-                                           self.config.datasetConfig.ref_dataset_name)
+        dataId = self.indexer.makeDataId('master_schema',
+                                         self.config.datasetConfig.ref_dataset_name)
         butler.put(afwTable.SourceCatalog(formattedCat.schema), 'ref_cat', dataId=dataId)
 
         # Break up the pixels using a histogram
@@ -501,12 +501,12 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             selected[i1a] = True
 
             # Write the individual pixel
-            dataId = self.indexer.make_data_id(indices[i1a[0]],
-                                               self.config.datasetConfig.ref_dataset_name)
+            dataId = self.indexer.makeDataId(indices[i1a[0]],
+                                             self.config.datasetConfig.ref_dataset_name)
             butler.put(formattedCat[selected], 'ref_cat', dataId=dataId)
 
         # And save the dataset configuration
-        dataId = self.indexer.make_data_id(None, self.config.datasetConfig.ref_dataset_name)
+        dataId = self.indexer.makeDataId(None, self.config.datasetConfig.ref_dataset_name)
         butler.put(self.config.datasetConfig, 'ref_cat_config', dataId=dataId)
 
         self.log.info("Done outputting standard stars.")
