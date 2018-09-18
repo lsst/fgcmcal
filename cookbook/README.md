@@ -12,8 +12,8 @@ This cookbook assumes access to
 [lsst-dev](https://developer.lsst.io/services/lsst-dev.html) and the existence
 of the HSC RC dataset from PDR1.  This is regularly reprocessed, starting with
 [DM-10404](https://jira.lsstcorp.org/browse/DM-10404).  See Epic "Dataset
-Reprocessing Campaigns (FY18b-1)"
-[DM-13926](https://jira.lsstcorp.org/browse/DM-13926) for the list of tickets
+Reprocessing Campaigns (FY18b-2)"
+[DM-14950](https://jira.lsstcorp.org/browse/DM-14950) for the list of tickets
 with the most recent reprocessing.  On `lsst-dev` the recent reprocessing can
 be listed at `/datasets/hsc/repo/rerun/RC/`.  However, I do recommend checking
 the tickets at the linked Epic to confirm that the most recent processing
@@ -29,8 +29,8 @@ setup lsst_distrib
 setup -j -r /path/to/thirdparty/fgcm/.
 setup -j -r /path/to/lsst-dm/fgcmcal/.
 
-export RCRERUN=RC/w_2018_32/DM-15184
-export COOKBOOKRERUN=fgcm_cookbook
+export RCRERUN=RC/w_2018_36/DM-15603
+export COOKBOOKRERUN=fgcm_cookbook_w_2018_36
 ```
 
 The `RCRERUN` env variable should be set to the most recent completed rerun
