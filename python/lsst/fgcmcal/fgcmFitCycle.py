@@ -1099,7 +1099,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
 
         if self.config.outputStandards:
-            stdSchema = afwTable.SourceTable.makeMinimalSchema()
+            stdSchema = afwTable.SimpleTable.makeMinimalSchema()
             stdSchema.addField('ngood', type='ArrayI', doc='Number of good observations',
                                size=len(self.config.bands))
             stdSchema.addField('mag_std_noabs', type='ArrayF',
@@ -1110,7 +1110,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                size=len(self.config.bands))
 
             outCat = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
-            stdCat = afwTable.SourceCatalog(stdSchema)
+            stdCat = afwTable.SimpleCatalog(stdSchema)
 
             stdCat.reserve(outCat.size)
             for i in range(outCat.size):
