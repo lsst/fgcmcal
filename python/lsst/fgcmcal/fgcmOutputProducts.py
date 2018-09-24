@@ -357,7 +357,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         # We have to make a table for each pixel with flux/fluxErr
         sourceMapper = afwTable.SchemaMapper(stars.schema)
-        sourceMapper.addMinimalSchema(afwTable.SourceTable.makeMinimalSchema())
+        sourceMapper.addMinimalSchema(afwTable.SimpleTable.makeMinimalSchema())
         sourceMapper.editOutputSchema().addField('flux', type=np.float64, doc="flux")
         sourceMapper.editOutputSchema().addField('fluxErr', type=np.float64, doc="flux error")
         badStarKey = sourceMapper.editOutputSchema().addField('flag_badStar',
@@ -408,7 +408,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
             for b, band in enumerate(self.bands):
 
-                sourceCat = afwTable.SourceCatalog(sourceMapper.getOutputSchema())
+                sourceCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
                 sourceCat.reserve(len(i1a))
                 sourceCat.extend(stars[selected], mapper=sourceMapper)
                 sourceCat['flux'] = afwImage.fluxFromABMag(stars['mag_std_noabs'][selected, b])
@@ -487,7 +487,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # Write the master schema
         dataId = self.indexer.makeDataId('master_schema',
                                          self.config.datasetConfig.ref_dataset_name)
-        butler.put(afwTable.SourceCatalog(formattedCat.schema), 'ref_cat', dataId=dataId)
+        butler.put(afwTable.SimpleCatalog(formattedCat.schema), 'ref_cat', dataId=dataId)
 
         # Break up the pixels using a histogram
         h, rev = esutil.stat.histogram(indices, rev=True)
@@ -517,25 +517,25 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         parameters
         ----------
-        fgcmStarCat: SourceCatalog
-           SourceCatalog as output by fgcmcal
+        fgcmStarCat: SimpleCatalog
+           SimpleCatalog as output by fgcmcal
         offsets: list with len(self.bands) entries
            Zeropoint offsets to apply
 
         returns
         -------
-        formattedCat: SourceCatalog
-           SourceCatalog suitable for ref_cat
+        formattedCat: SimpleCatalog
+           SimpleCatalog suitable for ref_cat
         """
 
         sourceMapper = afwTable.SchemaMapper(fgcmStarCat.schema)
-        sourceMapper.addMinimalSchema(afwTable.SourceTable.makeMinimalSchema())
+        sourceMapper.addMinimalSchema(afwTable.SimpleTable.makeMinimalSchema())
         for band in self.bands:
             sourceMapper.editOutputSchema().addField('%s_flux' % (band), type=np.float64)
             sourceMapper.editOutputSchema().addField('%s_fluxErr' % (band), type=np.float64)
             sourceMapper.editOutputSchema().addField('%s_nGood' % (band), type=np.float64)
 
-        formattedCat = afwTable.SourceCatalog(sourceMapper.getOutputSchema())
+        formattedCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
         formattedCat.reserve(len(fgcmStarCat))
         formattedCat.extend(fgcmStarCat, mapper=sourceMapper)
 
