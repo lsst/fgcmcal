@@ -30,7 +30,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         doc=("Name of the source flux field to use.  The associated flag field\n"
              "('<name>_flag') will be implicitly included in badFlags"),
         dtype=str,
-        default='slot_CalibFlux_flux',
+        default='slot_CalibFlux_instFlux',
     )
     remake = pexConfig.Field(
         doc="Remake visit catalog and stars even if they are already in the butler tree.",
@@ -130,19 +130,19 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     apertureInnerFluxField = pexConfig.Field(
         doc="Field that contains inner aperture for aperture correction proxy",
         dtype=str,
-        default='base_CircularApertureFlux_12_0_flux'
+        default='base_CircularApertureFlux_12_0_instFlux'
     )
     apertureOuterFluxField = pexConfig.Field(
         doc="Field that contains outer aperture for aperture correction proxy",
         dtype=str,
-        default='base_CircularApertureFlux_17_0_flux'
+        default='base_CircularApertureFlux_17_0_instFlux'
     )
 
     def setDefaults(self):
         sourceSelector = self.sourceSelector["science"]
         sourceSelector.setDefaults()
 
-        fluxFlagName = self.fluxField[0: -len('flux')] + 'flag'
+        fluxFlagName = self.fluxField[0: -len('instFlux')] + 'flag'
 
         sourceSelector.flags.bad = ['base_PixelFlags_flag_edge',
                                     'base_PixelFlags_flag_interpolatedCenter',
