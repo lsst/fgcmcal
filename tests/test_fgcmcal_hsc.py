@@ -106,6 +106,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.outputStandards = True
         self.config.superStarSubCcd = True
         self.config.superStarSubCcdChebyshevOrder = 1
+        self.config.modelMagErrors = False
         self.otherArgs = []
 
         nZp = 1232
