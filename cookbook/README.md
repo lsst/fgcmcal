@@ -29,8 +29,8 @@ setup lsst_distrib
 setup -j -r /path/to/thirdparty/fgcm/.
 setup -j -r /path/to/lsst-dm/fgcmcal/.
 
-export RCRERUN=RC/w_2018_36/DM-15603
-export COOKBOOKRERUN=fgcm_cookbook_w_2018_36
+export RCRERUN=RC/w_2018_38/DM-15690
+export COOKBOOKRERUN=fgcm_cookbook_w_2018_38
 ```
 
 The `RCRERUN` env variable should be set to the most recent completed rerun
@@ -201,7 +201,7 @@ flats and internal aperture corrections.
 ```bash
 fgcmFitCycle.py /datasets/hsc/repo --rerun private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile fgcmFitCycleHscCookbook_cycle02_config.py \
---config maxIter=0 --config outputStandars=True |& tee \
+--config maxIter=0 --config outputStandards=True |& tee \
 ${COOKBOOKRERUN}_cycle02.log
 ```
 
