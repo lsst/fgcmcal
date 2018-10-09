@@ -275,7 +275,7 @@ class FgcmFitCycleConfig(pexConfig.Config):
     modelMagErrors = pexConfig.Field(
         doc="Should FGCM model the magnitude errors from sky/fwhm? (False means trust inputs)",
         dtype=bool,
-        default=False,
+        default=True,
     )
     outputStandards = pexConfig.Field(
         doc="Output standard stars? (Usually only for final iteration)",
