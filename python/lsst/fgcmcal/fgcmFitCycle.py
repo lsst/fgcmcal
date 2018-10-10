@@ -87,6 +87,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=int,
         default=1,
     )
+    superStarSigmaClip = pexConfig.Field(
+        doc="Number of sigma to clip outliers when selecting for superstar flats",
+        dtype=float,
+        default=5.0,
+    )
     cycleNumber = pexConfig.Field(
         doc="Fit Cycle Number",
         dtype=int,
@@ -558,6 +563,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'precomputeSuperStarInitialCycle': self.config.precomputeSuperStarInitialCycle,
                       'superStarSubCCD': self.config.superStarSubCcd,
                       'superStarSubCCDChebyshevOrder': self.config.superStarSubCcdChebyshevOrder,
+                      'superStarSigmaClip': self.config.superStarSigmaClip,
                       'cycleNumber': self.config.cycleNumber,
                       'maxIter': self.config.maxIter,
                       'UTBoundary': self.config.utBoundary,
