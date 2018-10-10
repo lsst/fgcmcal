@@ -30,7 +30,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         doc=("Name of the source flux field to use.  The associated flag field\n"
              "('<name>_flag') will be implicitly included in badFlags"),
         dtype=str,
-        default='slot_CalibFlux_flux',
+        default='slot_CalibFlux_instFlux',
     )
     remake = pexConfig.Field(
         doc="Remake visit catalog and stars even if they are already in the butler tree.",
@@ -72,11 +72,6 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=int,
         default=8,
     )
-    zeropointDefault = pexConfig.Field(
-        doc="Zeropoint default (arbitrary?)",
-        dtype=float,
-        default=25.0,
-    )
     filterToBand = pexConfig.DictField(
         doc="filterName to band mapping",
         keytype=str,
@@ -116,7 +111,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     applyJacobian = pexConfig.Field(
         doc="Apply Jacobian correction?",
         dtype=bool,
-        default=True
+        default=False
     )
     jacobianName = pexConfig.Field(
         doc="Name of field with jacobian correction",
@@ -132,12 +127,22 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         doc="How to select sources",
         default="science"
     )
+    apertureInnerFluxField = pexConfig.Field(
+        doc="Field that contains inner aperture for aperture correction proxy",
+        dtype=str,
+        default='base_CircularApertureFlux_12_0_instFlux'
+    )
+    apertureOuterFluxField = pexConfig.Field(
+        doc="Field that contains outer aperture for aperture correction proxy",
+        dtype=str,
+        default='base_CircularApertureFlux_17_0_instFlux'
+    )
 
     def setDefaults(self):
         sourceSelector = self.sourceSelector["science"]
         sourceSelector.setDefaults()
 
-        fluxFlagName = self.fluxField[0: -len('flux')] + 'flag'
+        fluxFlagName = self.fluxField[0: -len('instFlux')] + 'flag'
 
         sourceSelector.flags.bad = ['base_PixelFlags_flag_edge',
                                     'base_PixelFlags_flag_interpolatedCenter',
@@ -155,7 +160,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector.doIsolated = True
 
         sourceSelector.signalToNoise.fluxField = self.fluxField
-        sourceSelector.signalToNoise.errField = self.fluxField + 'Sigma'
+        sourceSelector.signalToNoise.errField = self.fluxField + 'Err'
         sourceSelector.signalToNoise.minimum = 10.0
         sourceSelector.signalToNoise.maximum = 1000.0
 
@@ -205,10 +210,10 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         exitStatus = 0
         if self.doRaise:
-            results = task.run(butler, dataRefList)
+            results = task.runDataRef(butler, dataRefList)
         else:
             try:
-                results = task.run(butler, dataRefList)
+                results = task.runDataRef(butler, dataRefList)
             except Exception as e:
                 exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
@@ -288,7 +293,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         return None
 
     @pipeBase.timeMethod
-    def run(self, butler, dataRefs):
+    def runDataRef(self, butler, dataRefs):
         """
         Cross-match and make star list for FGCM Input
 
@@ -414,6 +419,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         schema.addField('exptime', type=np.float32, doc="Exposure time")
         schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
         schema.addField('psfsigma', type=np.float32, doc="PSF sigma (reference CCD)")
+        schema.addField('deltaaper', type=np.float32, doc="Delta-aperture")
         schema.addField('skybackground', type=np.float32, doc="Sky background (ADU) (reference CCD)")
         # the following field is not used yet
         schema.addField('deepflag', type=np.int32, doc="Deep observation")
@@ -429,16 +435,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # now loop over visits and get the information
         for i, srcVisit in enumerate(srcVisits):
-            # Use bypass functions for visitInfo and filter
-
-            # Note that in some older repos this has an overhead due to gzipping
-            # of calexps, but this is obsolete so I won't worry about it.
+            # We don't use the bypasses since we need the psf info which does
+            # not have a bypass
 
             dataId = {self.config.visitDataRefName: srcVisit,
                       self.config.ccdDataRefName: srcCcds[i]}
 
-            # visitInfo = butler.get('calexp_visitInfo', dataId=dataId)
-            # f = butler.get('calexp_filter', dataId=dataId)
             exp = butler.get('calexp_sub', dataId=dataId, bbox=bbox,
                              flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
             visitInfo = exp.getInfo().getVisitInfo()
@@ -459,6 +461,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             rec['pmb'] = visitInfo.getWeather().getAirPressure() / 100
             rec['deepflag'] = 0
             rec['scaling'][:] = 1.0
+            rec['deltaaper'] = 0.0
 
             rec['psfsigma'] = psf.computeShape().getDeterminantRadius()
 
@@ -511,6 +514,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # map to ra/dec
         sourceMapper.addMapping(sourceSchema.find('coord_ra').key, 'ra')
         sourceMapper.addMapping(sourceSchema.find('coord_dec').key, 'dec')
+        sourceMapper.addMapping(sourceSchema.find(self.config.jacobianName).key,
+                                'jacobian')
 
         # and add the fields we want
         sourceMapper.editOutputSchema().addField(
@@ -522,6 +527,20 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         sourceMapper.editOutputSchema().addField(
             "magerr", type=np.float32, doc="Raw magnitude error")
 
+        # We also have a temporary catalog that will accumulate aperture measurements
+
+        aperMapper = afwTable.SchemaMapper(sourceSchema)
+        aperMapper.addMapping(sourceSchema.find('coord_ra').key, 'ra')
+        aperMapper.addMapping(sourceSchema.find('coord_dec').key, 'dec')
+        aperMapper.editOutputSchema().addField('mag_aper_inner', type=np.float64,
+                                               doc="Magnitude at inner aperture")
+        aperMapper.editOutputSchema().addField('magerr_aper_inner', type=np.float64,
+                                               doc="Magnitude error at inner aperture")
+        aperMapper.editOutputSchema().addField('mag_aper_outer', type=np.float64,
+                                               doc="Magnitude at outer aperture")
+        aperMapper.editOutputSchema().addField('magerr_aper_outer', type=np.float64,
+                                               doc="Magnitude error at outer aperture")
+
         # we need to know the ccds...
         camera = butler.get('camera')
 
@@ -529,11 +548,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # loop over visits
         for visit in visitCat:
-            self.log.info("Reading sources from visit %d" % (visit['visit']))
-
             expTime = visit['exptime']
 
             nStarInVisit = 0
+
+            # The temporary aperture catalog needs to be reset
+            aperStarted = False
 
             # loop over CCDs
             for ccdIndex, detector in enumerate(camera):
@@ -555,12 +575,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                     # Calibration is based on configuration fluxField
                     fluxKey = sources.schema[self.config.fluxField].asKey()
-                    fluxErrKey = sources.schema[self.config.fluxField + 'Sigma'].asKey()
-
-                    if self.config.applyJacobian:
-                        jacobianKey = sources.schema[self.config.jacobianName].asKey()
-                    else:
-                        jacobianKey = None
+                    fluxErrKey = sources.schema[self.config.fluxField + 'Err'].asKey()
 
                     outputSchema = sourceMapper.getOutputSchema()
                     visitKey = outputSchema['visit'].asKey()
@@ -577,39 +592,86 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                     started = True
 
+                if not aperStarted:
+                    # And the aperture catalog
+                    fluxAperInKey = sources.schema[self.config.apertureInnerFluxField].asKey()
+                    fluxErrAperInKey = sources.schema[self.config.apertureInnerFluxField + 'Err'].asKey()
+                    fluxAperOutKey = sources.schema[self.config.apertureOuterFluxField].asKey()
+                    fluxErrAperOutKey = sources.schema[self.config.apertureOuterFluxField + 'Err'].asKey()
+
+                    aperOutputSchema = aperMapper.getOutputSchema()
+                    magInKey = aperOutputSchema['mag_aper_inner'].asKey()
+                    magErrInKey = aperOutputSchema['magerr_aper_inner'].asKey()
+                    magOutKey = aperOutputSchema['mag_aper_outer'].asKey()
+                    magErrOutKey = aperOutputSchema['magerr_aper_outer'].asKey()
+
+                    aperVisitCatalog = afwTable.BaseCatalog(aperMapper.getOutputSchema())
+
+                    aperStarted = True
+
                 goodSrc = self.sourceSelector.selectSources(sources)
 
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
-                tempCat.table.preallocate(goodSrc.selected.sum())
+                tempCat.reserve(goodSrc.selected.sum())
                 tempCat.extend(sources[goodSrc.selected], mapper=sourceMapper)
                 tempCat[visitKey][:] = visit['visit']
                 tempCat[ccdKey][:] = ccdId
                 # Compute "magnitude" by scaling flux with exposure time.
                 # Add an arbitrary zeropoint that needs to be investigated.
                 scaledFlux = sources[fluxKey][goodSrc.selected] * visit['scaling'][ccdIndex]
-                tempCat[magKey][:] = (self.config.zeropointDefault -
-                                      2.5 * np.log10(scaledFlux) +
+                tempCat[magKey][:] = (-2.5 * np.log10(scaledFlux) +
                                       2.5 * np.log10(expTime))
                 # magErr is computed with original (unscaled) flux
                 tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrKey][goodSrc.selected] /
                                                                sources[fluxKey][goodSrc.selected])
 
                 if self.config.applyJacobian:
-                    tempCat[magKey][:] -= 2.5 * np.log10(sources[jacobianKey][goodSrc.selected])
-                    # FIXME
-                    # Divide scaling by mean of the jacobian of the sources
+                    tempCat[magKey][:] -= 2.5 * np.log10(tempCat['jacobian'][:])
 
                 fullCatalog.extend(tempCat)
 
+                # And the aperture information
+                tempAperCat = afwTable.BaseCatalog(aperVisitCatalog.schema)
+                tempAperCat.reserve(goodSrc.selected.sum())
+                tempAperCat.extend(sources[goodSrc.selected], mapper=aperMapper)
+                tempAperCat[magInKey][:] = -2.5 * np.log10(sources[fluxAperInKey][goodSrc.selected])
+                tempAperCat[magErrInKey][:] = (2.5 / np.log(10.)) * (
+                    sources[fluxErrAperInKey][goodSrc.selected] /
+                    sources[fluxAperInKey][goodSrc.selected])
+                tempAperCat[magOutKey][:] = -2.5 * np.log10(
+                    sources[fluxAperOutKey][goodSrc.selected])
+                tempAperCat[magErrOutKey][:] = (2.5 / np.log(10.)) * (
+                    sources[fluxErrAperOutKey][goodSrc.selected] /
+                    sources[fluxAperOutKey][goodSrc.selected])
+
+                aperVisitCatalog.extend(tempAperCat)
+
                 nStarInVisit += len(tempCat)
 
-            self.log.info("  Found %d good stars in visit %d" %
-                          (nStarInVisit, visit['visit']))
+            # Compute the median delta-aper
+            if not aperVisitCatalog.isContiguous():
+                aperVisitCatalog = aperVisitCatalog.copy(deep=True)
+
+            magIn = aperVisitCatalog[magInKey]
+            magErrIn = aperVisitCatalog[magErrInKey]
+            magOut = aperVisitCatalog[magOutKey]
+            magErrOut = aperVisitCatalog[magErrOutKey]
+
+            ok = (np.isfinite(magIn) & np.isfinite(magErrIn) & np.isfinite(magOut) & np.isfinite(magErrOut))
+
+            visit['deltaaper'] = np.median(magIn[ok] - magOut[ok])
+
+            self.log.info("  Found %d good stars in visit %d (delta_aper = %.3f)" %
+                          (nStarInVisit, visit['visit'], visit['deltaaper']))
 
         self.log.info("Found all good star observations in %.2f s" %
                       (time.time() - startTime))
 
+        # Write all the observations
         butler.put(fullCatalog, 'fgcmStarObservations')
+
+        # And overwrite the visitCatalog with delta_aper info
+        butler.put(visitCat, 'fgcmVisitCatalog')
 
         self.log.info("Done with all stars in %.2f s" %
                       (time.time() - startTime))
@@ -655,8 +717,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                       'coarseNSide': self.config.coarseNside,
                       'densNSide': self.config.densityCutNside,
                       'densMaxPerPixel': self.config.densityCutMaxPerPixel,
-                      'referenceBands': self.config.referenceBands,
-                      'zpDefault': self.config.zeropointDefault}
+                      'referenceBands': self.config.referenceBands}
 
         # initialize the FgcmMakeStars object
         fgcmMakeStars = fgcm.FgcmMakeStars(starConfig)

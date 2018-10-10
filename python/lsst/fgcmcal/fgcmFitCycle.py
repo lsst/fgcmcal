@@ -16,6 +16,7 @@ import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
 import lsst.afw.geom as afwGeom
 import lsst.afw.cameraGeom as afwCameraGeom
+import lsst.geom
 
 import fgcm
 
@@ -79,7 +80,17 @@ class FgcmFitCycleConfig(pexConfig.Config):
     superStarSubCcd = pexConfig.Field(
         doc="Compute superstar flat on sub-ccd scale",
         dtype=bool,
-        default=False,
+        default=True,
+    )
+    superStarSubCcdChebyshevOrder = pexConfig.Field(
+        doc="Order of chebyshev polynomials for sub-ccd superstar fit",
+        dtype=int,
+        default=1,
+    )
+    superStarSigmaClip = pexConfig.Field(
+        doc="Number of sigma to clip outliers when selecting for superstar flats",
+        dtype=float,
+        default=5.0,
     )
     cycleNumber = pexConfig.Field(
         doc="Fit Cycle Number",
@@ -269,7 +280,7 @@ class FgcmFitCycleConfig(pexConfig.Config):
     modelMagErrors = pexConfig.Field(
         doc="Should FGCM model the magnitude errors from sky/fwhm? (False means trust inputs)",
         dtype=bool,
-        default=False,
+        default=True,
     )
     outputStandards = pexConfig.Field(
         doc="Output standard stars? (Usually only for final iteration)",
@@ -319,10 +330,10 @@ class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
 
         exitStatus = 0
         if self.doRaise:
-            results = task.run(butler)
+            results = task.runDataRef(butler)
         else:
             try:
-                results = task.run(butler)
+                results = task.runDataRef(butler)
             except Exception as e:
                 exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
@@ -394,7 +405,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         return None
 
     @pipeBase.timeMethod
-    def run(self, butler):
+    def runDataRef(self, butler):
         """
         Run a single fit cycle for FGCM
 
@@ -519,6 +530,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         else:
             resetParameters = True
 
+        # Mirror area in cm**2
+        mirrorArea = np.pi*(camera.telescopeDiameter*100./2.)**2.
+
         # create a configuration dictionary for fgcmFitCycle
         configDict = {'outfileBase': self.config.outfileBase,
                       'logger': self.log,
@@ -526,12 +540,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'obsFile': None,
                       'indexFile': None,
                       'lutFile': None,
-                      'mirrorArea': np.pi*(camera.telescopeDiameter/2.)**2.,
+                      'mirrorArea': mirrorArea,
                       'cameraGain': self.config.cameraGain,
                       'ccdStartIndex': camera[0].getId(),
                       'expField': 'VISIT',
                       'ccdField': 'CCD',
-                      'seeingField': 'PSFSIGMA',
+                      'seeingField': 'DELTA_APER',
+                      'fwhmField': 'PSFSIGMA',
+                      'skyBrightnessField': 'SKYBACKGROUND',
                       'deepFlag': 'DEEPFLAG',  # unused
                       'bands': list(self.config.bands),
                       'fitBands': list(fitBands),
@@ -546,6 +562,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'freezeStdAtmosphere': self.config.freezeStdAtmosphere,
                       'precomputeSuperStarInitialCycle': self.config.precomputeSuperStarInitialCycle,
                       'superStarSubCCD': self.config.superStarSubCcd,
+                      'superStarSubCCDChebyshevOrder': self.config.superStarSubCcdChebyshevOrder,
+                      'superStarSigmaClip': self.config.superStarSigmaClip,
                       'cycleNumber': self.config.cycleNumber,
                       'maxIter': self.config.maxIter,
                       'UTBoundary': self.config.utBoundary,
@@ -988,9 +1006,15 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         zptSchema.addField('visit', type=np.int32, doc='Visit number')
         zptSchema.addField('ccd', type=np.int32, doc='CCD number')
         zptSchema.addField('fgcmflag', type=np.int32, doc='FGCM flag value')
-        zptSchema.addField('fgcmzpt', type=np.float32, doc='FGCM zeropoint')
+        zptSchema.addField('fgcmzpt', type=np.float32, doc='FGCM zeropoint (center of CCD)')
         zptSchema.addField('fgcmzpterr', type=np.float32,
                            doc='Error on zeropoint, estimated from repeatability + number of obs')
+        if self.config.superStarSubCcd:
+            zptSchema.addField('fgcmfzptcheb', type='ArrayD',
+                               size=fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_CHEB'].shape[1],
+                               doc='Chebyshev parameters (flattened) for zeropoint')
+            zptSchema.addField('fgcmfzptchebxymax', type='ArrayD', size=2,
+                               doc='maximum x/maximum y to scale to apply chebyshev parameters')
         zptSchema.addField('fgcmi0', type=np.float32, doc='Integral of the passband')
         zptSchema.addField('fgcmi10', type=np.float32, doc='Normalized chromatic integral')
         zptSchema.addField('fgcmr0', type=np.float32,
@@ -1026,12 +1050,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         if not zptCat.isContiguous():
             zptCat = zptCat.copy(deep=True)
 
-        # FIXME: will need to port over the visitDataRefName from the build stars config...
         zptCat['visit'][:] = fgcmFitCycle.fgcmZpts.zpStruct['VISIT']
         zptCat['ccd'][:] = fgcmFitCycle.fgcmZpts.zpStruct['CCD']
         zptCat['fgcmflag'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FLAG']
         zptCat['fgcmzpt'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_ZPT']
         zptCat['fgcmzpterr'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_ZPTERR']
+        if self.config.superStarSubCcd:
+            zptCat['fgcmfzptcheb'][:, :] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_CHEB']
+            zptCat['fgcmfzptchebxymax'][:, :] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_CHEB_XYMAX']
         zptCat['fgcmi0'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_I0']
         zptCat['fgcmi10'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_I10']
         zptCat['fgcmr0'][:] = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_R0']
@@ -1079,32 +1105,32 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
 
         if self.config.outputStandards:
-            stdSchema = afwTable.Schema()
-            stdSchema.addField('fgcm_id', type=np.int64, doc='FGCM Star id')
-            # For now, just use the degrees and figure out correct type later
-            stdSchema.addField('ra', type=np.float64, doc='Right ascension')
-            stdSchema.addField('dec', type=np.float64, doc='Declination')
+            stdSchema = afwTable.SimpleTable.makeMinimalSchema()
             stdSchema.addField('ngood', type='ArrayI', doc='Number of good observations',
                                size=len(self.config.bands))
-            stdSchema.addField('mag_std', type='ArrayF', doc='Standard magnitude',
+            stdSchema.addField('mag_std_noabs', type='ArrayF',
+                               doc='Standard magnitude (no absolute calibration)',
                                size=len(self.config.bands))
-            stdSchema.addField('magerr_std', type='ArrayF', doc='Standard magnitude error',
+            stdSchema.addField('magerr_std', type='ArrayF',
+                               doc='Standard magnitude error',
                                size=len(self.config.bands))
 
             outCat = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
-            stdCat = afwTable.BaseCatalog(stdSchema)
+            stdCat = afwTable.SimpleCatalog(stdSchema)
+
             stdCat.reserve(outCat.size)
             for i in range(outCat.size):
                 rec = stdCat.addNew()
 
+            # Sometimes the reserve doesn't actually make a contiguous catalog (sigh)
             if not stdCat.isContiguous():
                 stdCat = stdCat.copy(deep=True)
 
-            stdCat['fgcm_id'][:] = outCat['FGCM_ID']
-            stdCat['ra'][:] = outCat['RA']
-            stdCat['dec'][:] = outCat['DEC']
+            stdCat['id'][:] = outCat['FGCM_ID']
+            stdCat['coord_ra'][:] = outCat['RA'] * lsst.geom.degrees
+            stdCat['coord_dec'][:] = outCat['DEC'] * lsst.geom.degrees
             stdCat['ngood'][:, :] = outCat['NGOOD'][:, :]
-            stdCat['mag_std'][:, :] = outCat['MAG_STD'][:, :]
+            stdCat['mag_std_noabs'][:, :] = outCat['MAG_STD'][:, :]
             stdCat['magerr_std'][:, :] = outCat['MAGERR_STD'][:, :]
 
             butler.put(stdCat, 'fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
@@ -1122,12 +1148,17 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                      outConfig.cycleNumber)
         outConfig.save(configFileName)
 
-        self.log.info("Saved config for next cycle to %s" % (configFileName))
-        self.log.info("Be sure to look at:")
-        self.log.info("   config.expGrayPhotometricCut")
-        self.log.info("   config.expGrayHighCut")
-
-        # tear down and clear memory
+        if self.config.maxIter == 0 and self.config.outputStandards:
+            # We are done, there is no more warning
+            self.log.info("Everything is in place to run fgcmOutputProducts.py")
+        else:
+            self.log.info("Saved config for next cycle to %s" % (configFileName))
+            self.log.info("Be sure to look at:")
+            self.log.info("   config.expGrayPhotometricCut")
+            self.log.info("   config.expGrayHighCut")
+            self.log.info("If you are satisfied with the fit, please set:")
+            self.log.info("   config.maxIter = 0")
+            self.log.info("   config.outputStandards = True")
 
     def _loadFgcmLut(self, butler, filterToBand=None):
         """
@@ -1261,6 +1292,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                      ('MJD', 'f8'),
                                                      ('EXPTIME', 'f8'),
                                                      ('PSFSIGMA', 'f8'),
+                                                     ('DELTA_APER', 'f8'),
                                                      ('SKYBACKGROUND', 'f8'),
                                                      ('DEEPFLAG', 'i2'),
                                                      ('TELHA', 'f8'),
@@ -1277,6 +1309,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmExpInfo['TELDEC'][:] = visitCat['teldec']
         fgcmExpInfo['PMB'][:] = visitCat['pmb']
         fgcmExpInfo['PSFSIGMA'][:] = visitCat['psfsigma']
+        fgcmExpInfo['DELTA_APER'][:] = visitCat['deltaaper']
         fgcmExpInfo['SKYBACKGROUND'][:] = visitCat['skybackground']
         # Note that we have to go through asAstropy() to get a string
         #  array out of an afwTable

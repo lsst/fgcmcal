@@ -211,10 +211,10 @@ class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
 
         exitStatus = 0
         if self.doRaise:
-            results = task.run(butler)
+            results = task.runDataRef(butler)
         else:
             try:
-                results = task.run(butler)
+                results = task.runDataRef(butler)
             except Exception as e:
                 exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
@@ -286,7 +286,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         return None
 
     @pipeBase.timeMethod
-    def run(self, butler):
+    def runDataRef(self, butler):
         """
         Make a Look-Up Table for FGCM
 
