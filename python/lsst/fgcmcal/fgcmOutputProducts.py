@@ -1,6 +1,36 @@
 # See COPYRIGHT file at the top of the source tree.
+#
+# This file is part of fgcmcal.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""Make the final fgcmcal output products.
 
-from __future__ import division, absolute_import, print_function
+This task takes the final output from fgcmFitCycle and produces the following
+outputs for use in the DM stack: the FGCM standard stars in a reference
+catalog format; the model atmospheres in "transmission_atmosphere_fgcm"
+format; and the zeropoints in "jointcal_photoCalib" format.  Optionally, the
+task can transfer the 'absolute' calibration from a reference catalog
+to put the fgcm standard stars in units of Jansky.  This is accomplished
+by matching stars in a sample of healpix pixels, and applying the median
+offset per band.
+"""
 
 import sys
 import traceback
@@ -25,7 +55,7 @@ from lsst.meas.algorithms import DatasetConfig
 
 import fgcm
 
-__all__ = ['FgcmOutputProductsConfig', 'FgcmOutputProductsTask']
+__all__ = ['FgcmOutputProductsConfig', 'FgcmOutputProductsTask', 'FgcmOutputProductsRunner']
 
 
 class FgcmOutputProductsConfig(pexConfig.Config):
@@ -40,7 +70,7 @@ class FgcmOutputProductsConfig(pexConfig.Config):
     # The following fields refer to calibrating from a reference
     # catalog, but in the future this might need to be expanded
     doReferenceCalibration = pexConfig.Field(
-        doc="Apply 'absolute' calibration from reference catalog",
+        doc="Transfer 'absolute' calibration from reference catalog",
         dtype=bool,
         default=True,
     )
@@ -50,7 +80,7 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         default=True,
     )
     doAtmosphereOutput = pexConfig.Field(
-        doc="Output atmospheres in transmission format",
+        doc="Output atmospheres in transmission_atmosphere_fgcm format",
         dtype=bool,
         default=True,
     )
@@ -68,12 +98,13 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         doc="task to perform 'absolute' calibration",
     )
     referencePixelizationNside = pexConfig.Field(
-        doc="Healpix nside to pixelize catalog to compare to reference",
+        doc="Healpix nside to pixelize catalog to compare to reference catalog",
         dtype=int,
         default=64,
     )
     referencePixelizationMinStars = pexConfig.Field(
-        doc="Minimum number of stars per pixel to select for comparison",
+        doc=("Minimum number of stars per healpix pixel to select for comparison"
+             "to the specified reference catalog"),
         dtype=int,
         default=200,
     )
@@ -83,7 +114,10 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         default=50,
     )
     referencePixelizationNPixels = pexConfig.Field(
-        doc="Number of pixels to sample to do comparison",
+        doc=("Number of healpix pixels to sample to do comparison. "
+             "Doing too many will take a long time and not yield any more "
+             "precise results because the final number is the median offset "
+             "(per band) from the set of pixels."),
         dtype=int,
         default=100,
     )
@@ -95,6 +129,11 @@ class FgcmOutputProductsConfig(pexConfig.Config):
     def setDefaults(self):
         pexConfig.Config.setDefaults(self)
 
+        # In order to transfer the "absolute" calibration from a reference
+        # catalog to the relatively calibrated FGCM standard stars (one number
+        # per band), we use the PhotoCalTask to match stars in a sample of healpix
+        # pixels.  These basic settings ensure that only well-measured, good stars
+        # from the source and reference catalogs are used for the matching.
         self.photoCal.applyColorTerms = True
         self.photoCal.fluxField = 'flux'
         self.photoCal.magErrFloor = 0.003
@@ -133,12 +172,14 @@ class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
         """
         Parameters
         ----------
-        butler: lsst.daf.persistence.Butler
+        butler: `lsst.daf.persistence.Butler`
 
         Returns
         -------
-        None if self.doReturnResults is False
-        An empty list if self.doReturnResults is True
+        exitStatus: `list` with `pipeBase.Struct`
+           exitStatus (0: success; 1: failure)
+           if self.doReturnResults also
+           results (`np.array` with absolute zeropoint offsets)
         """
         task = self.TaskClass(butler=butler, config=self.config, log=self.log)
 
@@ -157,13 +198,11 @@ class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
         task.writeMetadata(butler)
 
         if self.doReturnResults:
-            # Not much in terms of results to return (empty list)
+            # The results here are the zeropoint offsets for each band
             return [pipeBase.Struct(exitStatus=exitStatus,
                                     results=results)]
         else:
             return [pipeBase.Struct(exitStatus=exitStatus)]
-
-    # turn off any multiprocessing
 
     def run(self, parsedCmd):
         """
@@ -177,8 +216,6 @@ class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
         resultList = []
 
         if self.precall(parsedCmd):
-            # profileName = parsedCmd.profile if hasattr(parsedCmd, "profile") else None
-            # log = parsedCmd.log
             targetList = self.getTargetList(parsedCmd)
             # make sure that we only get 1
             resultList = self(targetList[0])
@@ -204,7 +241,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler : lsst.daf.persistence.Butler
+        butler : `lsst.daf.persistence.Butler`
         """
 
         pipeBase.CmdLineTask.__init__(self, **kwargs)
@@ -217,14 +254,6 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             self.indexer = IndexerRegistry[self.config.datasetConfig.indexer.name](
                 self.config.datasetConfig.indexer.active)
 
-    @classmethod
-    def _makeArgumentParser(cls):
-        """Create an argument parser"""
-
-        parser = pipeBase.ArgumentParser(name=cls._DefaultName)
-
-        return parser
-
     # no saving of metadata for now
     def _getMetadataName(self):
         return None
@@ -236,11 +265,12 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler:  lsst.daf.persistence.Butler
+        butler:  `lsst.daf.persistence.Butler`
 
         Returns
         -------
-        Empty list
+        offsets: `pipeBase.Struct`
+           A structure with array of zeropoint offsets
         """
 
         # Check to make sure that the fgcmBuildStars config exists, to retrieve
@@ -313,7 +343,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler: lsst.daf.persistence.Butler
+        butler: `lsst.daf.persistence.Butler`
         """
 
         fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
@@ -328,13 +358,19 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         """
         Compute offsets relative to a reference catalog.
 
+        This method splits the star catalog into healpix pixels
+        and computes the calibration transfer for a sample of
+        these pixels to approximate the 'absolute' calibration
+        values (on for each band) to apply to transfer the
+        absolute scale.
+
         Parameters
         ----------
-        butler: lsst.daf.persistence.Butler
+        butler: `lsst.daf.persistence.Butler`
 
         Returns
         -------
-        offsets: np.array of floats
+        offsets: `np.array` of floats
            Per band zeropoint offsets
         """
 
@@ -342,12 +378,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         stars = butler.get('fgcmStandardStars', fgcmcycle=self.useCycle)
 
         # Only use stars that are observed in all the bands
+        # This will ensure that we use the same healpix pixels for the absolute
+        # calibration of each band.
         minObs = stars['ngood'].min(axis=1)
-
-        # Depending on how things work, this might need to be configurable
-        # However, I think that best results will occur when we use the same
-        # pixels to do the calibration for all the bands, so I think this
-        # is the right choice.
 
         goodStars = (minObs >= 1)
         stars = stars[goodStars]
@@ -356,6 +389,12 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                       (len(stars)))
 
         # We have to make a table for each pixel with flux/fluxErr
+        # This is a temporary table generated for input to the photoCal task.
+        # These fluxes are not instFlux (they are top-of-the-atmosphere approximate and
+        # have had chromatic corrections applied to get to the standard system
+        # specified by the atmosphere/instrumental parameters), nor are they
+        # in Jansky (since they don't have a proper absolute calibration: the overall
+        # zeropoint is estimated from the telescope size, etc.)
         sourceMapper = afwTable.SchemaMapper(stars.schema)
         sourceMapper.addMinimalSchema(afwTable.SimpleTable.makeMinimalSchema())
         sourceMapper.editOutputSchema().addField('flux', type=np.float64, doc="flux")
@@ -363,10 +402,10 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         badStarKey = sourceMapper.editOutputSchema().addField('flag_badStar',
                                                               type='Flag', doc="bad flag")
 
-        # The exposure is used to record the filter name
-        exposure = afwImage.ExposureF()
-
-        # Split up the stars (units are radians)
+        # Split up the stars
+        # Note that there is an assumption here that the ra/dec coords stored
+        # on-disk are in radians, and therefore that starObs['coord_ra'] /
+        # starObs['coord_dec'] return radians when used as an array of numpy float64s.
         theta = np.pi / 2. - stars['coord_dec']
         phi = stars['coord_ra']
 
@@ -402,46 +441,16 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         for p, pix in enumerate(gdpix):
             i1a = rev[rev[pix]: rev[pix + 1]]
 
-            # Need to convert to a boolean array
+            # the stars afwTable can only be indexed with boolean arrays,
+            # and not numpy index arrays (see DM-16497).  This little trick
+            # converts the index array into a boolean array
             selected[:] = False
             selected[i1a] = True
 
             for b, band in enumerate(self.bands):
 
-                sourceCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
-                sourceCat.reserve(len(i1a))
-                sourceCat.extend(stars[selected], mapper=sourceMapper)
-                sourceCat['flux'] = afwImage.fluxFromABMag(stars['mag_std_noabs'][selected, b])
-                sourceCat['fluxErr'] = afwImage.fluxErrFromABMagErr(stars['magerr_std'][selected, b],
-                                                                    stars['mag_std_noabs'][selected, b])
-
-                # Make sure we only use stars that have valid measurements
-                # (This is perhaps redundant with requirements above that the
-                # stars be observed in all bands, but it can't hurt)
-                badStar = (stars['mag_std_noabs'][selected, b] > 90.0)
-                for rec in sourceCat[badStar]:
-                    rec.set(badStarKey, True)
-
-                exposure.setFilter(afwImage.Filter(band))
-
-                if refFluxFields[b] is None:
-                    # Need to find the flux field in the reference catalog
-                    # to work around limitations of DirectMatch in PhotoCal
-                    ctr = stars[0].getCoord()
-                    rad = 0.05 * lsst.geom.degrees
-                    refDataTest = self.refObjLoader.loadSkyCircle(ctr, rad, band)
-                    refFluxFields[b] = refDataTest.fluxField
-
-                # Make a copy of the config so that we can modify it
-                calConfig = copy.copy(self.config.photoCal.value)
-                calConfig.match.referenceSelection.signalToNoise.fluxField = refFluxFields[b]
-                calConfig.match.referenceSelection.signalToNoise.errField = refFluxFields[b] + 'Err'
-                calTask = self.config.photoCal.target(refObjLoader=self.refObjLoader,
-                                                      config=calConfig,
-                                                      schema=sourceCat.getSchema())
-
-                struct = calTask.run(exposure, sourceCat)
-
+                struct = self._computeOffsetOneBand(sourceMapper, badStarKey, b, band, stars,
+                                                    selected, refFluxFields)
                 results['nstar'][p, b] = len(i1a)
                 results['nmatch'][p, b] = len(struct.arrays.refMag)
                 results['zp'][p, b] = struct.zp
@@ -454,11 +463,73 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             # make configurable
             ok, = np.where(results['nmatch'][:, b] >= self.config.referenceMinMatch)
             offsets[b] = np.median(results['zp'][ok, b])
+            # use median absolute deviation to estimate Normal sigma
+            # see https://en.wikipedia.org/wiki/Median_absolute_deviation
             madSigma = 1.4826 * np.median(np.abs(results['zp'][ok, b] - offsets[b]))
             self.log.info("Reference catalog offset for %s band: %.6f +/- %.6f" %
                           (band, offsets[b], madSigma))
 
         return offsets
+
+    def _computeOffsetOneBand(self, sourceMapper, badStarKey,
+                              b, band, stars, selected, refFluxFields):
+        """
+        Compute the zeropoint offset between the fgcm stars and the reference
+        stars for one pixel in one band
+
+        Parameters
+        ----------
+        sourceMapper: `afwTable.SchemaMapper`
+           Mapper to go from stars to calibratable catalog
+        badStarKey: `afwTable.Key`
+           Key for the field with bad stars
+        b: `int`
+           Index of the band in the star catalog
+        band: `str`
+           Name of band for reference catalog
+        stars: `afwTable.SimpleCatalog`
+           FGCM standard stars
+        selected: `np.array(dtype=np.bool)`
+           Boolean array of which stars are in the pixel
+        refFluxFields: `list`
+           List of names of flux fields for reference catalog
+        """
+
+        sourceCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
+        sourceCat.reserve(selected.sum())
+        sourceCat.extend(stars[selected], mapper=sourceMapper)
+        sourceCat['flux'] = afwImage.fluxFromABMag(stars['mag_std_noabs'][selected, b])
+        sourceCat['fluxErr'] = afwImage.fluxErrFromABMagErr(stars['magErr_std'][selected, b],
+                                                            stars['mag_std_noabs'][selected, b])
+        # Make sure we only use stars that have valid measurements
+        # (This is perhaps redundant with requirements above that the
+        # stars be observed in all bands, but it can't hurt)
+        badStar = (stars['mag_std_noabs'][selected, b] > 90.0)
+        for rec in sourceCat[badStar]:
+            rec.set(badStarKey, True)
+
+        exposure = afwImage.ExposureF()
+        exposure.setFilter(afwImage.Filter(band))
+
+        if refFluxFields[b] is None:
+            # Need to find the flux field in the reference catalog
+            # to work around limitations of DirectMatch in PhotoCal
+            ctr = stars[0].getCoord()
+            rad = 0.05 * lsst.geom.degrees
+            refDataTest = self.refObjLoader.loadSkyCircle(ctr, rad, band)
+            refFluxFields[b] = refDataTest.fluxField
+
+        # Make a copy of the config so that we can modify it
+        calConfig = copy.copy(self.config.photoCal.value)
+        calConfig.match.referenceSelection.signalToNoise.fluxField = refFluxFields[b]
+        calConfig.match.referenceSelection.signalToNoise.errField = refFluxFields[b] + 'Err'
+        calTask = self.config.photoCal.target(refObjLoader=self.refObjLoader,
+                                              config=calConfig,
+                                              schema=sourceCat.getSchema())
+
+        struct = calTask.run(exposure, sourceCat)
+
+        return struct
 
     def _outputStandardStars(self, butler, offsets):
         """
@@ -466,8 +537,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler: lsst.daf.persistence.Butler
-        offsets: np.array of floats
+        butler: `lsst.daf.persistence.Butler`
+        offsets: `np.array` of floats
            Per band zeropoint offsets
         """
 
@@ -476,11 +547,14 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # Load the stars (this is the full set of stars, no cuts)
         stars = butler.get('fgcmStandardStars', fgcmcycle=self.useCycle)
 
-        # We assume these are returned in radians, because the units interface
-        # required a loop over a giant catalog.
-        # TODO: figure out check of native units
-        indices = np.array(self.indexer.indexPoints(np.degrees(stars['coord_ra']),
-                                                    np.degrees(stars['coord_dec'])))
+        # We determine the conversion from the native units (typically radians) to
+        # degrees for the first star.  This allows us to treat coord_ra/coord_dec as
+        # numpy arrays rather than Angles, which would we approximately 600x slower.
+        # TODO: Fix this after DM-16524 (HtmIndexer.indexPoints should take coords
+        # (as Angles) for input
+        conv = stars[0]['coord_ra'].asDegrees() / float(stars[0]['coord_ra'])
+        indices = np.array(self.indexer.indexPoints(stars['coord_ra'] * conv,
+                                                    stars['coord_dec'] * conv))
 
         formattedCat = self._formatCatalog(stars, offsets)
 
@@ -496,7 +570,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         for i in gd:
             i1a = rev[rev[i]: rev[i + 1]]
 
-            # Turn into a boolean array
+            # the formattedCat afwTable can only be indexed with boolean arrays,
+            # and not numpy index arrays (see DM-16497).  This little trick
+            # converts the index array into a boolean array
             selected[:] = False
             selected[i1a] = True
 
@@ -513,36 +589,41 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
     def _formatCatalog(self, fgcmStarCat, offsets):
         """
-        Turn an FGCM-formatted star catalog, applying zp offsets.
+        Turn an FGCM-formatted star catalog, applying zeropoint offsets.
 
-        parameters
+        Parameters
         ----------
-        fgcmStarCat: SimpleCatalog
+        fgcmStarCat: `afwTable.SimpleCatalog`
            SimpleCatalog as output by fgcmcal
-        offsets: list with len(self.bands) entries
+        offsets: `list` with len(self.bands) entries
            Zeropoint offsets to apply
 
-        returns
+        Returns
         -------
-        formattedCat: SimpleCatalog
-           SimpleCatalog suitable for ref_cat
+        formattedCat: `afwTable.SimpleCatalog`
+           SimpleCatalog suitable for using as a reference catalog
         """
 
         sourceMapper = afwTable.SchemaMapper(fgcmStarCat.schema)
-        sourceMapper.addMinimalSchema(afwTable.SimpleTable.makeMinimalSchema())
+        minSchema = LoadIndexedReferenceObjectsTask.makeMinimalSchema(self.bands,
+                                                                      addFluxErr=True,
+                                                                      addCentroid=False,
+                                                                      addIsResolved=True,
+                                                                      coordErrDim=0)
+        sourceMapper.addMinimalSchema(minSchema)
         for band in self.bands:
-            sourceMapper.editOutputSchema().addField('%s_flux' % (band), type=np.float64)
-            sourceMapper.editOutputSchema().addField('%s_fluxErr' % (band), type=np.float64)
-            sourceMapper.editOutputSchema().addField('%s_nGood' % (band), type=np.float64)
+            sourceMapper.editOutputSchema().addField('%s_nGood' % (band), type=np.int32)
 
         formattedCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
         formattedCat.reserve(len(fgcmStarCat))
         formattedCat.extend(fgcmStarCat, mapper=sourceMapper)
 
+        # Note that we don't have to set `resolved` because the default is False
+
         for b, band in enumerate(self.bands):
             mag = fgcmStarCat['mag_std_noabs'][:, b] + offsets[b]
             flux = afwImage.fluxFromABMag(mag)
-            fluxErr = afwImage.fluxErrFromABMagErr(fgcmStarCat['magerr_std'][:, b], mag)
+            fluxErr = afwImage.fluxErrFromABMagErr(fgcmStarCat['magErr_std'][:, b], mag)
             formattedCat['%s_flux' % (band)][:] = flux
             formattedCat['%s_fluxErr' % (band)][:] = fluxErr
             formattedCat['%s_nGood' % (band)][:] = fgcmStarCat['ngood'][:, b]
@@ -555,7 +636,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler: lsst.daf.persistence.Butler
+        butler: `lsst.daf.persistence.Butler`
+        offsets: `np.array`
+           Float array of absolute calibration offsets, one for each filter
         """
 
         self.log.info("Outputting jointcal_photoCalib objects")
@@ -564,7 +647,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         visitCat = butler.get('fgcmVisitCatalog')
 
         # Only output those that we have a calibration
-        selected = (zptCat['fgcmflag'] < 16)
+        # See fgcmFitCycle._makeZptSchema for flag definitions
+        selected = (zptCat['fgcmFlag'] < 16)
 
         # Get the mapping from filtername to dataId filter name
         filterMapping = {}
@@ -596,44 +680,24 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         for rec in visitCat:
             scalingMapping[rec['visit']] = rec['scaling']
 
-        # Make a fixed variable to hold the parameters to build a ChebyshevBoundedField
-        orderPlus1 = self.chebyshevOrder + 1
-
-        pars = np.zeros((orderPlus1, orderPlus1))
-
         for rec in zptCat[selected]:
 
             if self.superStarSubCcd:
                 # Spatially varying zeropoint
-                bbox = lsst.geom.Box2I(lsst.geom.Point2I(0.0, 0.0),
-                                       lsst.geom.Point2I(*rec['fgcmfzptchebxymax']))
 
-                # Take the zeropoint, apply the absolute relative calibration offset,
-                # and whatever flat-field scaling was applied
-                pars[:, :] = (rec['fgcmfzptcheb'].reshape(orderPlus1, orderPlus1) *
-                              10.**(offsetMapping[rec['filtername']] / (-2.5)) *
-                              scalingMapping[rec['visit']][ccdMapping[rec['ccd']]])
-
-                # Apply absolute relative calibration offset to 0/0 term
-
-                field = afwMath.ChebyshevBoundedField(bbox, pars)
-                calibMean = field.mean()
-
-                calibErr = (np.log(10.) / 2.5) * calibMean * rec['fgcmzpterr']
-
-                photoCalib = afwImage.PhotoCalib(field, calibErr)
-
+                scaling = scalingMapping[rec['visit']][ccdMapping[rec['ccd']]]
+                photoCalib = self._getChebyshevPhotoCalib(rec['fgcmfZptCheb'],
+                                                          rec['fgcmZptErr'],
+                                                          rec['fgcmfZptChebXyMax'],
+                                                          offsetMapping[rec['filtername']],
+                                                          scaling)
             else:
                 # Spatially constant zeropoint
 
-                # Take the zeropoint, apply the absolute relative calibration offset,
-                # and whatever flat-field scaling was applied
-
-                calibMean = (10.**(rec['fgcmzpt'] / (-2.5)) *
-                             10.**(offsetMapping[rec['filtername']] / (-2.5)) *
-                             scalingMapping[rec['visit']][ccdMapping[rec['ccd']]])
-                calibErr = (np.log(10.) / 2.5) * calibMean * rec['fgcmzpterr']
-                photoCalib = afwImage.PhotoCalib(calibMean, calibErr)
+                scaling = scalingMapping[rec['visit']][ccdMapping[rec['ccd']]]
+                photoCalib = self._getConstantPhotoCalib(rec['fgcmZpt'], rec['fgcmZptErr'],
+                                                         offsetMapping[rec['filtername']],
+                                                         scaling)
 
             butler.put(photoCalib, 'jointcal_photoCalib',
                        dataId={self.visitDataRefName: int(rec['visit']),
@@ -643,14 +707,83 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         self.log.info("Done outputting jointcal_photoCalib objects")
 
+    def _getChebyshevPhotoCalib(self, coefficients, err, xyMax, offset, scaling):
+        """
+        Get the PhotoCalib object from a chebyshev polynomial zeropoint.
+
+        Parameters
+        ----------
+        coefficients: `np.array`
+           Flattened array of chebyshev coefficients
+        err: `float`
+           Error on zeropoint
+        xyMax: `list` of length 2
+           Maximum x and y of the chebyshev bounding box
+        offset: `float`
+           Absolute calibration offset
+        scaling: `float`
+           Flat scaling value from fgcmBuildStars
+
+        Returns
+        -------
+        photoCalib: `afwImage.PhotoCalib`
+        """
+
+        orderPlus1 = self.chebyshevOrder + 1
+        pars = np.zeros((orderPlus1, orderPlus1))
+
+        bbox = lsst.geom.Box2I(lsst.geom.Point2I(0.0, 0.0),
+                               lsst.geom.Point2I(*xyMax))
+        # Take the zeropoint, apply the absolute relative calibration offset,
+        # and whatever flat-field scaling was applied
+        pars[:, :] = (coefficients.reshape(orderPlus1, orderPlus1) *
+                      10.**(offset / (-2.5)) * scaling)
+
+        field = afwMath.ChebyshevBoundedField(bbox, pars)
+        calibMean = field.mean()
+
+        calibErr = (np.log(10.) / 2.5) * calibMean * err
+
+        photoCalib = afwImage.PhotoCalib(field, calibErr)
+
+        return photoCalib
+
+    def _getConstantPhotoCalib(self, zeropoint, err, offset, scaling):
+        """
+        Get the PhotoCalib object from a constant zeropoint.
+
+        Parameters
+        ----------
+        zeropoint: `float`
+           Zeropoint value (mag)
+        err: `float`
+           Error on zeropoint
+        offset: `float`
+           Absolute calibration offset
+        scaling: `float`
+           Flat scaling value from fgcmBuildStars
+
+        Returns
+        -------
+        photoCalib: `afwImage.PhotoCalib`
+        """
+
+        # Take the zeropoint, apply the absolute relative calibration offset,
+        # and whatever flat-field scaling was applied
+
+        calibMean = 10.**(zeropoint / (-2.5)) * 10.**(offset / (-2.5)) * scaling
+        calibErr = (np.log(10.) / 2.5) * calibMean * err
+        photoCalib = afwImage.PhotoCalib(calibMean, calibErr)
+
+        return photoCalib
+
     def _outputAtmospheres(self, butler):
         """
         Output the atmospheres.
 
         Parameters
         ----------
-        butler: lsst.daf.persistence.Butler
-           (used for mapper information)
+        butler: `lsst.daf.persistence.Butler`
         """
 
         self.log.info("Outputting atmosphere transmissions")
@@ -660,7 +793,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         atmosphereTableName = lutCat[0]['tablename']
         elevation = lutCat[0]['elevation']
-        atmLambda = lutCat[0]['atmlambda']
+        atmLambda = lutCat[0]['atmLambda']
         lutCat = None
 
         # Make the atmosphere table if possible
@@ -676,14 +809,14 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 modGen = fgcm.ModtranGenerator(elevation)
                 lambdaRange = np.array([atmLambda[0], atmLambda[-1]]) / 10.
                 lambdaStep = (atmLambda[1] - atmLambda[0]) / 10.
-            except (ValueError, IOError):
-                raise RuntimeError("FGCM look-up-table generated without modtran, "
-                                   "but modtran not configured to run.")
+            except (ValueError, IOError) as e:
+                raise RuntimeError("FGCM look-up-table generated with modtran, "
+                                   "but modtran not configured to run.") from e
 
         # Next, we need to grab the atmosphere parameters
         atmCat = butler.get('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
 
-        zenith = np.degrees(np.arccos(1. / atmCat['seczenith']))
+        zenith = np.degrees(np.arccos(1. / atmCat['secZenith']))
 
         for i, visit in enumerate(atmCat['visit']):
             if atmTable is not None:

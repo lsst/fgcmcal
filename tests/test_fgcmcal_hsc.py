@@ -1,6 +1,32 @@
 # See COPYRIGHT file at the top of the source tree.
+#
+# This file is part of fgcmcal.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""Test the fgcmcal code with testdata_jointcal/hsc.
 
-from __future__ import division, absolute_import, print_function
+Run test suite on fgcmcal using HSC data from testdata_jointcal.
+"""
+
+import matplotlib
+matplotlib.use("Agg")  # noqa E402
 
 import unittest
 import os
@@ -52,12 +78,12 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.otherArgs = []
 
         nBand = 2
-        i0Std = [0.07877351, 0.06464688]
-        i10Std = [-0.00061516, -0.00063434]
-        i0Recon = [0.06897538, 0.05616964]
-        i10Recon = [-6.97094875, 3.69335364]
+        i0Std = np.array([0.07877351, 0.06464688])
+        i10Std = np.array([-0.00061516, -0.00063434])
+        i0Recon = np.array([0.06897538, 0.05616964])
+        i10Recon = np.array([-6.97094875, 3.69335364])
 
-        self._runFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
+        self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         # Now the star building
         self.config = fgcmcal.FgcmBuildStarsConfig()
@@ -73,7 +99,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nStar = 472
         nObs = 5431
 
-        self._runFgcmBuildStars(nVisit, nStar, nObs)
+        self._testFgcmBuildStars(nVisit, nStar, nObs)
 
         # And the fit cycle
         self.config = fgcmcal.FgcmFitCycleConfig()
@@ -89,7 +115,6 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.washMjds = (0.0, )
         self.config.epochMjds = (0.0, 100000.0)
         self.config.latitude = 19.8256
-        self.config.cameraGain = 3.0
         self.config.pixelScale = 0.17
         self.config.expGrayPhotometricCut = (-0.05, -0.05)
         self.config.expGrayHighCut = (0.2, 0.2)
@@ -111,9 +136,12 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         nZp = 1232
         nGoodZp = 27
+        nOkZp = 33
+        nBadZp = 1199
         nStdStars = 472
+        nPlots = 27
 
-        self._runFgcmFitCycle(nZp, nGoodZp, nStdStars)
+        self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots)
 
         # And output the products
         self.config = fgcmcal.FgcmOutputProductsConfig()
@@ -143,11 +171,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.refObjLoader.retarget(target=LoadAstrometryNetObjectsTask)
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([8.685752, 8.971653])
+        zpOffsets = np.array([8.877202988, 9.163103988])
 
-        self._runFgcmOutputProducts(visitDataRefName, ccdDataRefName,
-                                    filterMapping, zpOffsets,
-                                    904014, 12, 'i', 1)
+        self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
+                                     filterMapping, zpOffsets,
+                                     904014, 12, 'i', 1)
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
