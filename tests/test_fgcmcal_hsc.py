@@ -2,6 +2,9 @@
 
 from __future__ import division, absolute_import, print_function
 
+import matplotlib
+matplotlib.use("Agg")  # noqa
+
 import unittest
 import os
 import tempfile

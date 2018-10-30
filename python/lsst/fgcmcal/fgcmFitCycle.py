@@ -3,9 +3,6 @@
 from __future__ import division, absolute_import, print_function
 from past.builtins import xrange
 
-import matplotlib
-matplotlib.use("Agg")  # noqa
-
 import sys
 import traceback
 
