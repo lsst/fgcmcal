@@ -12,6 +12,7 @@ import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
 import lsst.afw.cameraGeom as afwCameraGeom
 from lsst.afw.image import Filter
+from lsst.daf.persistence import NoResults
 
 import fgcm
 
@@ -557,7 +558,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                                                                        dataId={'filter': alias})
                     foundTrans = True
                     break
-                except:
+                except NoResults:
                     pass
             if not foundTrans:
                 raise ValueError("Could not find transmission for filter %s via any alias." % (filterName))

@@ -1241,12 +1241,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         lutFlat = np.zeros(lutCat[0]['lut'].size, dtype=[('I0', 'f4'),
                                                          ('I1', 'f4')])
 
-        try:
-            lutFlat['I0'][:] = lutCat[lutTypes.index('I0')]['lut'][:]
-            lutFlat['I1'][:] = lutCat[lutTypes.index('I1')]['lut'][:]
-        except:
-            # need to raise exception
-            pass
+        lutFlat['I0'][:] = lutCat[lutTypes.index('I0')]['lut'][:]
+        lutFlat['I1'][:] = lutCat[lutTypes.index('I1')]['lut'][:]
 
         lutDerivFlat = np.zeros(lutCat[0]['lut'].size, dtype=[('D_PWV', 'f4'),
                                                               ('D_O3', 'f4'),
@@ -1259,12 +1255,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                               ('D_ALPHA_I1', 'f4'),
                                                               ('D_SECZENITH_I1', 'f4')])
 
-        try:
-            for name in lutDerivFlat.dtype.names:
-                lutDerivFlat[name][:] = lutCat[lutTypes.index(name)]['lut'][:]
-        except:
-            # raise a helpful exception
-            pass
+        for name in lutDerivFlat.dtype.names:
+            lutDerivFlat[name][:] = lutCat[lutTypes.index(name)]['lut'][:]
 
         # and clear out the memory from the big object
         lutCat = None
