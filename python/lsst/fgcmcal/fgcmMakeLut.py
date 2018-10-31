@@ -514,8 +514,9 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         rec['luttype'] = 'I1'
         rec['lut'][:] = self.fgcmLutMaker.lut['I1'].flatten()
 
-        derivTypes = ['D_PMB', 'D_PWV', 'D_O3', 'D_LNTAU', 'D_ALPHA', 'D_SECZENITH',
-                      'D_PMB_I1', 'D_PWV_I1', 'D_O3_I1', 'D_LNTAU_I1', 'D_ALPHA_I1', 'D_SECZENITH_I1']
+        derivTypes = ['D_PMB', 'D_LNPWV', 'D_O3', 'D_LNTAU', 'D_ALPHA', 'D_SECZENITH',
+                      'D_PMB_I1', 'D_LNPWV_I1', 'D_O3_I1', 'D_LNTAU_I1', 'D_ALPHA_I1',
+                      'D_SECZENITH_I1']
         for derivType in derivTypes:
             rec = lutCat.addNew()
             rec['luttype'] = derivType

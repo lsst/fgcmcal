@@ -65,14 +65,14 @@ class FgcmcalTestBase(object):
         self.assertFloatsAlmostEqual(i10Std, lutStd[0]['I10STD'], msg='I10Std', rtol=1e-5)
 
         indices = fgcmLut.getIndices(np.arange(nBand, dtype=np.int32),
-                                     np.zeros(nBand) + lutStd[0]['PWVSTD'],
+                                     np.zeros(nBand) + np.log(lutStd[0]['PWVSTD']),
                                      np.zeros(nBand) + lutStd[0]['O3STD'],
                                      np.zeros(nBand) + np.log(lutStd[0]['TAUSTD']),
                                      np.zeros(nBand) + lutStd[0]['ALPHASTD'],
                                      np.zeros(nBand) + 1. / np.cos(np.radians(lutStd[0]['ZENITHSTD'])),
                                      np.zeros(nBand, dtype=np.int32),
                                      np.zeros(nBand) + lutStd[0]['PMBSTD'])
-        i0 = fgcmLut.computeI0(np.zeros(nBand) + lutStd[0]['PWVSTD'],
+        i0 = fgcmLut.computeI0(np.zeros(nBand) + np.log(lutStd[0]['PWVSTD']),
                                np.zeros(nBand) + lutStd[0]['O3STD'],
                                np.zeros(nBand) + np.log(lutStd[0]['TAUSTD']),
                                np.zeros(nBand) + lutStd[0]['ALPHASTD'],
@@ -82,7 +82,7 @@ class FgcmcalTestBase(object):
 
         self.assertFloatsAlmostEqual(i0Recon, i0, msg='i0Recon', rtol=1e-5)
 
-        i1 = fgcmLut.computeI1(np.zeros(nBand) + lutStd[0]['PWVSTD'],
+        i1 = fgcmLut.computeI1(np.zeros(nBand) + np.log(lutStd[0]['PWVSTD']),
                                np.zeros(nBand) + lutStd[0]['O3STD'],
                                np.zeros(nBand) + np.log(lutStd[0]['TAUSTD']),
                                np.zeros(nBand) + lutStd[0]['ALPHASTD'],

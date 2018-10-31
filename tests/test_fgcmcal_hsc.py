@@ -51,14 +51,14 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config = fgcmcal.FgcmMakeLutConfig()
         self.config.filterNames = ['r', 'i']
         self.config.stdFilterNames = ['r', 'i']
-        self.config.atmosphereTableName = 'fgcm_atm_subaru1_test'
+        self.config.atmosphereTableName = 'fgcm_atm_subaru2_test'
         self.otherArgs = []
 
         nBand = 2
-        i0Std = [0.07877351, 0.06464688]
-        i10Std = [-0.00061516, -0.00063434]
-        i0Recon = [0.06897538, 0.05616964]
-        i10Recon = [-6.97094875, 3.69335364]
+        i0Std = np.array([0.07877351, 0.06464688])
+        i10Std = np.array([-0.00061516, -0.00063434])
+        i0Recon = np.array([0.0689530429, 0.05600673])
+        i10Recon = np.array([-7.01847144, 3.62675740])
 
         self._runFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
@@ -146,7 +146,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.refObjLoader.retarget(target=LoadAstrometryNetObjectsTask)
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([8.685752, 8.971653])
+        zpOffsets = np.array([8.68610096, 8.97477531])
 
         self._runFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                     filterMapping, zpOffsets,
