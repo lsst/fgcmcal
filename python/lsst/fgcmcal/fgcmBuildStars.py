@@ -1,9 +1,36 @@
 # See COPYRIGHT file at the top of the source tree.
+#
+# This file is part of fgcmcal.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""Build star observations for input to FGCM.
 
-from __future__ import division, absolute_import, print_function
-from past.builtins import xrange
+This task finds all the visits and calexps in a repository (or a subset
+based on command line parameters) and extract all the potential calibration
+stars for input into fgcm.  This task additionally uses fgcm to match
+star observations into unique stars, and performs as much cleaning of
+the input catalog as possible.
+"""
 
 import sys
+import time
 import traceback
 
 import numpy as np
@@ -16,26 +43,19 @@ from lsst.daf.base.dateTime import DateTime
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
-import time
-
 import fgcm
 
-__all__ = ['FgcmBuildStarsConfig', 'FgcmBuildStarsTask']
+__all__ = ['FgcmBuildStarsConfig', 'FgcmBuildStarsTask', 'FgcmBuildStarsRunner']
 
 
 class FgcmBuildStarsConfig(pexConfig.Config):
     """Config for FgcmBuildStarsTask"""
 
-    fluxField = pexConfig.Field(
-        doc=("Name of the source flux field to use.  The associated flag field\n"
+    instFluxField = pexConfig.Field(
+        doc=("Name of the source instFlux field to use.  The associated flag field "
              "('<name>_flag') will be implicitly included in badFlags"),
         dtype=str,
         default='slot_CalibFlux_instFlux',
-    )
-    remake = pexConfig.Field(
-        doc="Remake visit catalog and stars even if they are already in the butler tree.",
-        dtype=bool,
-        default=False,
     )
     minPerBand = pexConfig.Field(
         doc="Minimum observations per band",
@@ -118,21 +138,16 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=str,
         default="base_Jacobian_value"
     )
-    renormalizeFlats = pexConfig.Field(
-        doc="Renormalize large-scale flat-field changes?",
-        dtype=bool,
-        default=False
-    )
     sourceSelector = sourceSelectorRegistry.makeField(
         doc="How to select sources",
         default="science"
     )
-    apertureInnerFluxField = pexConfig.Field(
+    apertureInnerInstFluxField = pexConfig.Field(
         doc="Field that contains inner aperture for aperture correction proxy",
         dtype=str,
         default='base_CircularApertureFlux_12_0_instFlux'
     )
-    apertureOuterFluxField = pexConfig.Field(
+    apertureOuterInstFluxField = pexConfig.Field(
         doc="Field that contains outer aperture for aperture correction proxy",
         dtype=str,
         default='base_CircularApertureFlux_17_0_instFlux'
@@ -142,7 +157,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector = self.sourceSelector["science"]
         sourceSelector.setDefaults()
 
-        fluxFlagName = self.fluxField[0: -len('instFlux')] + 'flag'
+        fluxFlagName = self.instFluxField[0: -len('instFlux')] + 'flag'
 
         sourceSelector.flags.bad = ['base_PixelFlags_flag_edge',
                                     'base_PixelFlags_flag_interpolatedCenter',
@@ -159,11 +174,13 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector.doSignalToNoise = True
         sourceSelector.doIsolated = True
 
-        sourceSelector.signalToNoise.fluxField = self.fluxField
-        sourceSelector.signalToNoise.errField = self.fluxField + 'Err'
+        sourceSelector.signalToNoise.fluxField = self.instFluxField
+        sourceSelector.signalToNoise.errField = self.instFluxField + 'Err'
         sourceSelector.signalToNoise.minimum = 10.0
         sourceSelector.signalToNoise.maximum = 1000.0
 
+        # FGCM operates on unresolved sources, and this setting is
+        # appropriate for the current base_classificationExtendedness
         sourceSelector.unresolved.maximum = 0.5
 
 
@@ -180,9 +197,6 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
     """
 
-    # TaskClass = FgcmBuildStarsTask
-
-    # only need a single butler instance to run on
     @staticmethod
     def getTargetList(parsedCmd):
         """
@@ -196,13 +210,12 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         """
         Parameters
         ----------
-        args: Tuple with (butler, dataRefList)
+        args: `tuple` with (butler, dataRefList)
 
         Returns
         -------
-        None if self.doReturnResults is False
-        A pipe.base.Struct containing these fields if self.doReturnResults is True:
-           dataRefList: the provided data references
+        exitStatus: `list` with `pipeBase.Struct`
+           exitStatus (0: success; 1: failure)
         """
         butler, dataRefList = args
 
@@ -210,10 +223,10 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         exitStatus = 0
         if self.doRaise:
-            results = task.runDataRef(butler, dataRefList)
+            task.runDataRef(butler, dataRefList)
         else:
             try:
-                results = task.runDataRef(butler, dataRefList)
+                task.runDataRef(butler, dataRefList)
             except Exception as e:
                 exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
@@ -222,13 +235,8 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         task.writeMetadata(butler)
 
-        if self.doReturnResults:
-            return [pipeBase.Struct(exitStatus=exitStatus,
-                                    results=results)]
-        else:
-            return [pipeBase.Struct(exitStatus=exitStatus)]
-
-    # turn off any multiprocessing
+        # The task does not return any results:
+        return [pipeBase.Struct(exitStatus=exitStatus)]
 
     def run(self, parsedCmd):
         """
@@ -242,11 +250,7 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         resultList = []
 
         if self.precall(parsedCmd):
-            # profileName = parsedCmd.profile if hasattr(parsedCmd, "profile") else None
-            # log = parsedCmd.log
             targetList = self.getTargetList(parsedCmd)
-            # And call the runner on the first (and only) item in the list,
-            #  which is a tuple of the butler and any dataRefs
             resultList = self(targetList[0])
 
         return resultList
@@ -267,13 +271,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler : lsst.daf.persistence.Butler
+        butler : `lsst.daf.persistence.Butler`
         """
 
         pipeBase.CmdLineTask.__init__(self, **kwargs)
         self.makeSubtask("sourceSelector")
-        # Only log fatal errors from the sourceSelector
-        self.sourceSelector.log.setLevel(self.sourceSelector.log.FATAL)
+        # Only log warning and fatal errors from the sourceSelector
+        self.sourceSelector.log.setLevel(self.sourceSelector.log.WARN)
 
     @classmethod
     def _makeArgumentParser(cls):
@@ -283,10 +287,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         parser.add_id_argument("--id", "calexp", help="Data ID, e.g. --id visit=6789 (optional)")
 
         return parser
-
-    # no saving of the config for now
-    # def _getConfigName(self):
-    #     return None
 
     # no saving of metadata for now
     def _getMetadataName(self):
@@ -299,24 +299,18 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler:  lsst.daf.persistence.Butler
-        dataRefs: list of lsst.daf.persistence.ButlerDataRef
-           Data references for the input visits
+        butler:  `lsst.daf.persistence.Butler`
+        dataRefs: `list` of `lsst.daf.persistence.ButlerDataRef`
+           Data references for the input visits.
            If this is an empty list, all visits with src catalogs in
            the repository are used.
            Only one individual dataRef from a visit need be specified
            and the code will find the other source catalogs from
-           each visit
-
-        Returns
-        -------
-        pipe.base.Struct
-            struct containing:
-            * dataRefs: the provided data references consolidated
+           each visit.
         """
 
         # Make the visit catalog if necessary
-        if self.config.remake or not butler.datasetExists('fgcmVisitCatalog'):
+        if not butler.datasetExists('fgcmVisitCatalog'):
             # we need to build visitCat
             visitCat = self._fgcmMakeVisitCatalog(butler, dataRefs)
         else:
@@ -324,19 +318,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             visitCat = butler.get('fgcmVisitCatalog')
 
         # Compile all the stars
-        if self.config.remake or not butler.datasetExists('fgcmStarObservations'):
+        if not butler.datasetExists('fgcmStarObservations'):
             self._fgcmMakeAllStarObservations(butler, visitCat)
         else:
             self.log.info("Found fgcmStarObservations")
 
-        if self.config.remake or (not butler.datasetExists('fgcmStarIds') or
-                                  not butler.datasetExists('fgcmStarIndices')):
+        if not butler.datasetExists('fgcmStarIds') or not butler.datasetExists('fgcmStarIndices'):
             self._fgcmMatchStars(butler, visitCat)
         else:
             self.log.info("Found fgcmStarIds and fgcmStarIndices")
-
-        # The return value could be the visitCat, if anybody wants that.
-        return visitCat
 
     def _fgcmMakeVisitCatalog(self, butler, dataRefs):
         """
@@ -344,18 +334,18 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler: lsst.daf.persistence.Butler
-        dataRefs: list of lsst.daf.persistence.ButlerDataRef
-           Data references for the input visits
+        butler: `lsst.daf.persistence.Butler`
+        dataRefs: `list` of `lsst.daf.persistence.ButlerDataRef`
+           Data references for the input visits.
            If this is an empty list, all visits with src catalogs in
            the repository are used.
            Only one individual dataRef from a visit need be specified
            and the code will find the other source catalogs from
-           each visit
+           each visit.
 
         Returns
         -------
-        visitCat: afw.table.BaseCatalog
+        visitCat: `afw.table.BaseCatalog`
         """
 
         startTime = time.time()
@@ -363,40 +353,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         camera = butler.get('camera')
         nCcd = len(camera)
 
-        if len(dataRefs) == 0:
-            # We did not specify any datarefs, so find all of them
-            if not self.config.checkAllCcds:
-                # Faster mode, scan through referenceCCD
-                allVisits = butler.queryMetadata('src',
-                                                 format=[self.config.visitDataRefName, 'filter'],
-                                                 dataId={self.config.ccdDataRefName:
-                                                         self.config.referenceCCD})
-                srcVisits = []
-                srcCcds = []
-                for dataset in allVisits:
-                    if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
-                                                            self.config.ccdDataRefName:
-                                                            self.config.referenceCCD})):
-                        srcVisits.append(dataset[0])
-                        srcCcds.append(self.config.referenceCCD)
-            else:
-                # Slower mode, check all CCDs
-                allVisits = butler.queryMetadata('src',
-                                                 format=[self.config.visitDataRefName, 'filter'])
-                srcVisits = []
-                srcCcds = []
+        # TODO: related to DM-13730, this dance of looking for source visits
+        # will be unnecessary with Gen3 Butler.  This should be part of
+        # DM-13730.
 
-                for dataset in allVisits:
-                    if dataset[0] in srcVisits:
-                        continue
-                    for ccd in xrange(nCcd):
-                        if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
-                                                                self.config.ccdDataRefName:
-                                                                    ccd})):
-                            srcVisits.append(dataset[0])
-                            srcCcds.append(ccd)
-                            # Once we find that a butler dataset exists, break out
-                            break
+        if len(dataRefs) == 0:
+            srcVisits, srcCcds = self._findSourceVisits(butler, nCcd)
         else:
             # get the visits from the datarefs, only for referenceCCD
             srcVisits = [d.dataId[self.config.visitDataRefName] for d in dataRefs if
@@ -409,34 +371,93 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         self.log.info("Found %d visits in %.2f s" %
                       (len(srcVisits), time.time() - startTime))
 
-        schema = afwTable.Schema()
-        schema.addField('visit', type=np.int32, doc="Visit number")
-        schema.addField('filtername', type=str, size=2, doc="Filter name")
-        schema.addField('telra', type=np.float64, doc="Pointing RA (deg)")
-        schema.addField('teldec', type=np.float64, doc="Pointing Dec (deg)")
-        schema.addField('telha', type=np.float64, doc="Pointing Hour Angle (deg)")
-        schema.addField('mjd', type=np.float64, doc="MJD of visit")
-        schema.addField('exptime', type=np.float32, doc="Exposure time")
-        schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
-        schema.addField('psfsigma', type=np.float32, doc="PSF sigma (reference CCD)")
-        schema.addField('deltaaper', type=np.float32, doc="Delta-aperture")
-        schema.addField('skybackground', type=np.float32, doc="Sky background (ADU) (reference CCD)")
-        # the following field is not used yet
-        schema.addField('deepflag', type=np.int32, doc="Deep observation")
-        schema.addField('scaling', type='ArrayD', doc="Scaling applied due to flat adjustment",
-                        size=len(camera))
+        schema = self._makeFgcmVisitSchema(nCcd)
 
         visitCat = afwTable.BaseCatalog(schema)
         visitCat.table.preallocate(len(srcVisits))
 
         startTime = time.time()
-        # reading in a small bbox is faster for non-gzipped images
+
+        self._fillVisitCatalog(butler, visitCat, srcVisits, srcCcds)
+
+        self.log.info("Found all VisitInfo in %.2f s" % (time.time() - startTime))
+
+        return visitCat
+
+    def _findSourceVisits(self, butler, nCcd):
+        """
+        Find all source catalogs in the repository
+
+        Parameters
+        ----------
+        butler: `lsst.daf.persistence.Butler`
+        nCcd: `int`
+           Number of CCDs in the camera
+
+        Returns
+        -------
+        (srcVisits, srcCcds): `tuple` of `list`s
+        """
+
+        # We did not specify any datarefs, so find all of them
+        if not self.config.checkAllCcds:
+            # Faster mode, scan through referenceCCD
+            allVisits = butler.queryMetadata('src',
+                                             format=[self.config.visitDataRefName, 'filter'],
+                                             dataId={self.config.ccdDataRefName:
+                                                     self.config.referenceCCD})
+            srcVisits = []
+            srcCcds = []
+            for dataset in allVisits:
+                if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
+                                                        self.config.ccdDataRefName:
+                                                        self.config.referenceCCD})):
+                    srcVisits.append(dataset[0])
+                    srcCcds.append(self.config.referenceCCD)
+        else:
+            # Slower mode, check all CCDs
+            allVisits = butler.queryMetadata('src',
+                                             format=[self.config.visitDataRefName, 'filter'])
+            srcVisits = []
+            srcCcds = []
+
+            for dataset in allVisits:
+                if dataset[0] in srcVisits:
+                    continue
+                for ccd in range(nCcd):
+                    if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
+                                                            self.config.ccdDataRefName:
+                                                                ccd})):
+                        srcVisits.append(dataset[0])
+                        srcCcds.append(ccd)
+                        # Once we find that a butler dataset exists, break out
+                        break
+
+        return (srcVisits, srcCcds)
+
+    def _fillVisitCatalog(self, butler, visitCat, srcVisits, srcCcds):
+        """
+        Fill the visit catalog with visit metadata
+
+        Parameters
+        ----------
+        butler: `lsst.daf.persistence.Butler`
+        visitCat: `afw.table.BaseCatalog`
+           Catalog with schema from _createFgcmVisitSchema()
+        srcVisits: `list'
+           List of source visits
+        srcCcds: `list`
+           List of source CCDs
+        """
+
         bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
 
         # now loop over visits and get the information
         for i, srcVisit in enumerate(srcVisits):
             # We don't use the bypasses since we need the psf info which does
             # not have a bypass
+            # TODO: When DM-15500 is implemented in the Gen3 Butler, this
+            # can be fixed
 
             dataId = {self.config.visitDataRefName: srcVisit,
                       self.config.ccdDataRefName: srcCcds[i]}
@@ -459,11 +480,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # convert from Pa to millibar
             # Note that I don't know if this unit will need to be per-camera config
             rec['pmb'] = visitInfo.getWeather().getAirPressure() / 100
-            rec['deepflag'] = 0
+            # Flag to signify if this is a "deep" field.  Not currently used
+            rec['deepFlag'] = 0
+            # Relative flat scaling (1.0 means no relative scaling)
             rec['scaling'][:] = 1.0
-            rec['deltaaper'] = 0.0
+            # Median delta aperture, to be measured from stars
+            rec['deltaAper'] = 0.0
 
-            rec['psfsigma'] = psf.computeShape().getDeterminantRadius()
+            rec['psfSigma'] = psf.computeShape().getDeterminantRadius()
 
             if butler.datasetExists('calexpBackground', dataId=dataId):
                 # Get background for reference CCD
@@ -471,22 +495,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 bgStats = (bg[0].getStatsImage().getImage().array
                            for bg in butler.get('calexpBackground',
                                                 dataId=dataId))
-                rec['skybackground'] = sum(np.median(bg[np.isfinite(bg)]) for bg in bgStats)
+                rec['skyBackground'] = sum(np.median(bg[np.isfinite(bg)]) for bg in bgStats)
             else:
-                rec['skybackground'] = -1.0
-
-        # Compute flat scaling if desired...
-        if self.config.renormalizeFlats:
-            self.log.info("Reading flats for renormalizeFlats")
-            scalingValues = self._computeFlatScaling(butler, visitCat)
-            visitCat['scaling'] *= scalingValues
-
-        self.log.info("Found all VisitInfo in %.2f s" % (time.time() - startTime))
-
-        # and now persist it
-        butler.put(visitCat, 'fgcmVisitCatalog')
-
-        return visitCat
+                rec['skyBackground'] = -1.0
 
     def _fgcmMakeAllStarObservations(self, butler, visitCat):
         """
@@ -494,13 +505,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler: lsst.daf.persistence.Butler
-        visitCat: afw.table.BaseCatalog
+        butler: `lsst.daf.persistence.Butler`
+        visitCat: `afw.table.BaseCatalog`
            Catalog with visit data for FGCM
-
-        Returns
-        -------
-        None
         """
 
         startTime = time.time()
@@ -508,43 +515,36 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # create our source schema
         sourceSchema = butler.get('src_schema', immediate=True).schema
 
-        # create a mapper to the preferred output
-        sourceMapper = afwTable.SchemaMapper(sourceSchema)
-
-        # map to ra/dec
-        sourceMapper.addMapping(sourceSchema.find('coord_ra').key, 'ra')
-        sourceMapper.addMapping(sourceSchema.find('coord_dec').key, 'dec')
-        sourceMapper.addMapping(sourceSchema.find(self.config.jacobianName).key,
-                                'jacobian')
-
-        # and add the fields we want
-        sourceMapper.editOutputSchema().addField(
-            "visit", type=np.int32, doc="Visit number")
-        sourceMapper.editOutputSchema().addField(
-            "ccd", type=np.int32, doc="CCD number")
-        sourceMapper.editOutputSchema().addField(
-            "mag", type=np.float32, doc="Raw magnitude")
-        sourceMapper.editOutputSchema().addField(
-            "magerr", type=np.float32, doc="Raw magnitude error")
+        sourceMapper = self._makeSourceMapper(sourceSchema)
 
         # We also have a temporary catalog that will accumulate aperture measurements
-
-        aperMapper = afwTable.SchemaMapper(sourceSchema)
-        aperMapper.addMapping(sourceSchema.find('coord_ra').key, 'ra')
-        aperMapper.addMapping(sourceSchema.find('coord_dec').key, 'dec')
-        aperMapper.editOutputSchema().addField('mag_aper_inner', type=np.float64,
-                                               doc="Magnitude at inner aperture")
-        aperMapper.editOutputSchema().addField('magerr_aper_inner', type=np.float64,
-                                               doc="Magnitude error at inner aperture")
-        aperMapper.editOutputSchema().addField('mag_aper_outer', type=np.float64,
-                                               doc="Magnitude at outer aperture")
-        aperMapper.editOutputSchema().addField('magerr_aper_outer', type=np.float64,
-                                               doc="Magnitude error at outer aperture")
+        aperMapper = self._makeAperMapper(sourceSchema)
 
         # we need to know the ccds...
         camera = butler.get('camera')
 
-        started = False
+        outputSchema = sourceMapper.getOutputSchema()
+        fullCatalog = afwTable.BaseCatalog(outputSchema)
+
+        # FGCM will provide relative calibration for the flux in config.instFluxField
+
+        instFluxKey = sourceSchema[self.config.instFluxField].asKey()
+        instFluxErrKey = sourceSchema[self.config.instFluxField + 'Err'].asKey()
+        visitKey = outputSchema['visit'].asKey()
+        ccdKey = outputSchema['ccd'].asKey()
+        instMagKey = outputSchema['instMag'].asKey()
+        instMagErrKey = outputSchema['instMagErr'].asKey()
+
+        aperOutputSchema = aperMapper.getOutputSchema()
+
+        instFluxAperInKey = sourceSchema[self.config.apertureInnerInstFluxField].asKey()
+        instFluxErrAperInKey = sourceSchema[self.config.apertureInnerInstFluxField + 'Err'].asKey()
+        instFluxAperOutKey = sourceSchema[self.config.apertureOuterInstFluxField].asKey()
+        instFluxErrAperOutKey = sourceSchema[self.config.apertureOuterInstFluxField + 'Err'].asKey()
+        instMagInKey = aperOutputSchema['instMag_aper_inner'].asKey()
+        instMagErrInKey = aperOutputSchema['instMagErr_aper_inner'].asKey()
+        instMagOutKey = aperOutputSchema['instMag_aper_outer'].asKey()
+        instMagErrOutKey = aperOutputSchema['instMagErr_aper_outer'].asKey()
 
         # loop over visits
         for visit in visitCat:
@@ -552,62 +552,22 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
             nStarInVisit = 0
 
-            # The temporary aperture catalog needs to be reset
-            aperStarted = False
+            # Reset the aperture catalog (per visit)
+            aperVisitCatalog = afwTable.BaseCatalog(aperOutputSchema)
 
             # loop over CCDs
             for ccdIndex, detector in enumerate(camera):
+
                 ccdId = detector.getId()
 
                 try:
-                    # Need to cast visit['visit'] to python int because butler
-                    # can't use numpy ints
                     sources = butler.get('src', dataId={self.config.visitDataRefName:
-                                                        int(visit['visit']),
+                                                        visit['visit'],
                                                         self.config.ccdDataRefName: ccdId},
                                          flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
                 except butlerExceptions.NoResults:
                     # this is not a problem if this ccd isn't there
                     continue
-
-                if not started:
-                    # get the keys for quicker look-up
-
-                    # Calibration is based on configuration fluxField
-                    fluxKey = sources.schema[self.config.fluxField].asKey()
-                    fluxErrKey = sources.schema[self.config.fluxField + 'Err'].asKey()
-
-                    outputSchema = sourceMapper.getOutputSchema()
-                    visitKey = outputSchema['visit'].asKey()
-                    ccdKey = outputSchema['ccd'].asKey()
-                    magKey = outputSchema['mag'].asKey()
-                    magErrKey = outputSchema['magerr'].asKey()
-
-                    # and the final part of the sourceMapper
-                    sourceMapper.addMapping(sources.schema['slot_Centroid_x'].asKey(), 'x')
-                    sourceMapper.addMapping(sources.schema['slot_Centroid_y'].asKey(), 'y')
-
-                    # Create a stub of the full catalog
-                    fullCatalog = afwTable.BaseCatalog(sourceMapper.getOutputSchema())
-
-                    started = True
-
-                if not aperStarted:
-                    # And the aperture catalog
-                    fluxAperInKey = sources.schema[self.config.apertureInnerFluxField].asKey()
-                    fluxErrAperInKey = sources.schema[self.config.apertureInnerFluxField + 'Err'].asKey()
-                    fluxAperOutKey = sources.schema[self.config.apertureOuterFluxField].asKey()
-                    fluxErrAperOutKey = sources.schema[self.config.apertureOuterFluxField + 'Err'].asKey()
-
-                    aperOutputSchema = aperMapper.getOutputSchema()
-                    magInKey = aperOutputSchema['mag_aper_inner'].asKey()
-                    magErrInKey = aperOutputSchema['magerr_aper_inner'].asKey()
-                    magOutKey = aperOutputSchema['mag_aper_outer'].asKey()
-                    magErrOutKey = aperOutputSchema['magerr_aper_outer'].asKey()
-
-                    aperVisitCatalog = afwTable.BaseCatalog(aperMapper.getOutputSchema())
-
-                    aperStarted = True
 
                 goodSrc = self.sourceSelector.selectSources(sources)
 
@@ -618,15 +578,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat[ccdKey][:] = ccdId
                 # Compute "magnitude" by scaling flux with exposure time.
                 # Add an arbitrary zeropoint that needs to be investigated.
-                scaledFlux = sources[fluxKey][goodSrc.selected] * visit['scaling'][ccdIndex]
-                tempCat[magKey][:] = (-2.5 * np.log10(scaledFlux) +
-                                      2.5 * np.log10(expTime))
-                # magErr is computed with original (unscaled) flux
-                tempCat[magErrKey][:] = (2.5 / np.log(10.)) * (sources[fluxErrKey][goodSrc.selected] /
-                                                               sources[fluxKey][goodSrc.selected])
+                scaledInstFlux = sources[instFluxKey][goodSrc.selected] * visit['scaling'][ccdIndex]
+                tempCat[instMagKey][:] = (-2.5 * np.log10(scaledInstFlux) + 2.5 * np.log10(expTime))
+                # instMagErr is computed with original (unscaled) flux
+                k = 2.5 / np.log(10.)
+                tempCat[instMagErrKey][:] = k * (sources[instFluxErrKey][goodSrc.selected] /
+                                                 sources[instFluxKey][goodSrc.selected])
 
                 if self.config.applyJacobian:
-                    tempCat[magKey][:] -= 2.5 * np.log10(tempCat['jacobian'][:])
+                    tempCat[instMagKey][:] -= 2.5 * np.log10(tempCat['jacobian'][:])
 
                 fullCatalog.extend(tempCat)
 
@@ -634,15 +594,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempAperCat = afwTable.BaseCatalog(aperVisitCatalog.schema)
                 tempAperCat.reserve(goodSrc.selected.sum())
                 tempAperCat.extend(sources[goodSrc.selected], mapper=aperMapper)
-                tempAperCat[magInKey][:] = -2.5 * np.log10(sources[fluxAperInKey][goodSrc.selected])
-                tempAperCat[magErrInKey][:] = (2.5 / np.log(10.)) * (
-                    sources[fluxErrAperInKey][goodSrc.selected] /
-                    sources[fluxAperInKey][goodSrc.selected])
-                tempAperCat[magOutKey][:] = -2.5 * np.log10(
-                    sources[fluxAperOutKey][goodSrc.selected])
-                tempAperCat[magErrOutKey][:] = (2.5 / np.log(10.)) * (
-                    sources[fluxErrAperOutKey][goodSrc.selected] /
-                    sources[fluxAperOutKey][goodSrc.selected])
+                tempAperCat[instMagInKey][:] = -2.5 * np.log10(sources[instFluxAperInKey][goodSrc.selected])
+                tempAperCat[instMagErrInKey][:] = (2.5 / np.log(10.)) * (
+                    sources[instFluxErrAperInKey][goodSrc.selected] /
+                    sources[instFluxAperInKey][goodSrc.selected])
+                tempAperCat[instMagOutKey][:] = -2.5 * np.log10(
+                    sources[instFluxAperOutKey][goodSrc.selected])
+                tempAperCat[instMagErrOutKey][:] = (2.5 / np.log(10.)) * (
+                    sources[instFluxErrAperOutKey][goodSrc.selected] /
+                    sources[instFluxAperOutKey][goodSrc.selected])
 
                 aperVisitCatalog.extend(tempAperCat)
 
@@ -652,17 +612,18 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             if not aperVisitCatalog.isContiguous():
                 aperVisitCatalog = aperVisitCatalog.copy(deep=True)
 
-            magIn = aperVisitCatalog[magInKey]
-            magErrIn = aperVisitCatalog[magErrInKey]
-            magOut = aperVisitCatalog[magOutKey]
-            magErrOut = aperVisitCatalog[magErrOutKey]
+            instMagIn = aperVisitCatalog[instMagInKey]
+            instMagErrIn = aperVisitCatalog[instMagErrInKey]
+            instMagOut = aperVisitCatalog[instMagOutKey]
+            instMagErrOut = aperVisitCatalog[instMagErrOutKey]
 
-            ok = (np.isfinite(magIn) & np.isfinite(magErrIn) & np.isfinite(magOut) & np.isfinite(magErrOut))
+            ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn) &
+                  np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
-            visit['deltaaper'] = np.median(magIn[ok] - magOut[ok])
+            visit['deltaAper'] = np.median(instMagIn[ok] - instMagOut[ok])
 
-            self.log.info("  Found %d good stars in visit %d (delta_aper = %.3f)" %
-                          (nStarInVisit, visit['visit'], visit['deltaaper']))
+            self.log.info("  Found %d good stars in visit %d (deltaAper = %.3f)" %
+                          (nStarInVisit, visit['visit'], visit['deltaAper']))
 
         self.log.info("Found all good star observations in %.2f s" %
                       (time.time() - startTime))
@@ -675,7 +636,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         self.log.info("Done with all stars in %.2f s" %
                       (time.time() - startTime))
-        return None
 
     def _fgcmMatchStars(self, butler, visitCat):
         """
@@ -683,20 +643,23 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler: lsst.daf.persistence.Butler
-        visitCat: afw.table.BaseCatalog
+        butler: `lsst.daf.persistence.Butler`
+        visitCat: `afw.table.BaseCatalog`
            Catalog with visit data for FGCM
 
-        Returns
+        Outputs
         -------
-        None
+        Butler will output fgcmStarIds (matched star identifiers) and
+        fgcmStarIndices (index values linking fgcmStarObservations to
+        fgcmStarIds).
         """
 
         obsCat = butler.get('fgcmStarObservations')
 
         # get filter names into a numpy array...
+        # This is the type that is expected by the fgcm code
         visitFilterNames = np.zeros(len(visitCat), dtype='a2')
-        for i in xrange(len(visitCat)):
+        for i in range(len(visitCat)):
             visitFilterNames[i] = visitCat[i]['filtername']
 
         # match to put filterNames with observations
@@ -724,14 +687,19 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # make the reference stars
         #  note that the ra/dec native Angle format is radians
-        fgcmMakeStars.makeReferenceStars(np.rad2deg(obsCat['ra']),
-                                         np.rad2deg(obsCat['dec']),
+        # We determine the conversion from the native units (typically
+        # radians) to degrees for the first observation.  This allows us
+        # to treate ra/dec as numpy arrays rather than Angles, which would
+        # be approximately 600x slower.
+        conv = obsCat[0]['ra'].asDegrees() / float(obsCat[0]['ra'])
+        fgcmMakeStars.makeReferenceStars(obsCat['ra'] * conv,
+                                         obsCat['dec'] * conv,
                                          filterNameArray=obsFilterNames,
                                          bandSelected=False)
 
         # and match all the stars
-        fgcmMakeStars.makeMatchedStars(np.rad2deg(obsCat['ra']),
-                                       np.rad2deg(obsCat['dec']),
+        fgcmMakeStars.makeMatchedStars(obsCat['ra'] * conv,
+                                       obsCat['dec'] * conv,
                                        obsFilterNames)
 
         # now persist
@@ -742,192 +710,135 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # FIXME: should be angle?
         objSchema.addField('ra', type=np.float64, doc='Mean object RA')
         objSchema.addField('dec', type=np.float64, doc='Mean object Dec')
-        objSchema.addField('obsarrindex', type=np.int32,
+        objSchema.addField('obsArrIndex', type=np.int32,
                            doc='Index in obsIndexTable for first observation')
-        objSchema.addField('nobs', type=np.int32, doc='Total number of observations')
+        objSchema.addField('nObs', type=np.int32, doc='Total number of observations')
 
         # make catalog and records
         fgcmStarIdCat = afwTable.BaseCatalog(objSchema)
         fgcmStarIdCat.table.preallocate(fgcmMakeStars.objIndexCat.size)
-        for i in xrange(fgcmMakeStars.objIndexCat.size):
+        for i in range(fgcmMakeStars.objIndexCat.size):
             fgcmStarIdCat.addNew()
 
         # fill the catalog
         fgcmStarIdCat['fgcm_id'][:] = fgcmMakeStars.objIndexCat['fgcm_id']
         fgcmStarIdCat['ra'][:] = fgcmMakeStars.objIndexCat['ra']
         fgcmStarIdCat['dec'][:] = fgcmMakeStars.objIndexCat['dec']
-        fgcmStarIdCat['obsarrindex'][:] = fgcmMakeStars.objIndexCat['obsarrindex']
-        fgcmStarIdCat['nobs'][:] = fgcmMakeStars.objIndexCat['nobs']
+        fgcmStarIdCat['obsArrIndex'][:] = fgcmMakeStars.objIndexCat['obsarrindex']
+        fgcmStarIdCat['nObs'][:] = fgcmMakeStars.objIndexCat['nobs']
 
         butler.put(fgcmStarIdCat, 'fgcmStarIds')
 
         # afwTable for observation indices
         obsSchema = afwTable.Schema()
-        obsSchema.addField('obsindex', type=np.int32, doc='Index in observation table')
+        obsSchema.addField('obsIndex', type=np.int32, doc='Index in observation table')
 
         fgcmStarIndicesCat = afwTable.BaseCatalog(obsSchema)
         fgcmStarIndicesCat.table.preallocate(fgcmMakeStars.obsIndexCat.size)
-        for i in xrange(fgcmMakeStars.obsIndexCat.size):
+        for i in range(fgcmMakeStars.obsIndexCat.size):
             fgcmStarIndicesCat.addNew()
 
-        fgcmStarIndicesCat['obsindex'][:] = fgcmMakeStars.obsIndexCat['obsindex']
+        fgcmStarIndicesCat['obsIndex'][:] = fgcmMakeStars.obsIndexCat['obsindex']
 
         butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
 
-        # and we're done with the stars
-        return None
-
-    def _computePsfSigma(self, butler, visitCat):
+    def _makeFgcmVisitSchema(self, nCcd):
         """
-        """
-        startTime = time.time()
+        Make a schema for an fgcmVisitCatalog
 
-        camera = butler.get('camera')
+        Parameters
+        ----------
+        nCcd: `int`
+           Number of CCDs in the camera
 
-        bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
-
-        psfSigma = np.zeros((len(visitCat), len(camera)))
-
-        for visitIndex, vis in enumerate(visitCat):
-            self.log.info(' Working on %d' % (vis['visit']))
-            visit = vis['visit']
-            for ccdIndex, detector in enumerate(camera):
-                dataId = {'visit': int(visit),
-                          'ccd': detector.getId()}
-
-                if not butler.datasetExists('calexp', dataId=dataId):
-                    continue
-                exp = butler.get('calexp_sub', dataId=dataId, bbox=bbox,
-                                 flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
-                psfSigma[visitIndex, ccdIndex] = exp.getPsf().computeShape().getDeterminantRadius()
-
-        self.log.info("Computed psfs from %d visits in %.2f s" %
-                      (len(visitCat), time.time() - startTime))
-        return psfSigma
-
-    def _computeSkyBackground(self, butler, visitCat):
-        """
-        """
-        startTime = time.time()
-
-        camera = butler.get('camera')
-
-        skyBackground = np.zeros((len(visitCat), len(camera)))
-
-        for visitIndex, vis in enumerate(visitCat):
-            visit = vis['visit']
-            for ccdIndex, detector in enumerate(camera):
-                dataId = {'visit': int(visit),
-                          'ccd': detector.getId()}
-
-                if not butler.datasetExists('calexpBackground', dataId=dataId):
-                    continue
-
-                bgStats = (bg[0].getStatsImage().getImage().array
-                           for bg in butler.get('calexpBackground',
-                                                dataId=dataId))
-                skyBackground[visitIndex, ccdIndex] = sum(np.median(bg[np.isfinite(bg)]) for bg in bgStats)
-
-        self.log.info("Computed background from %d visits in %.2f s" %
-                      (len(visitCat), time.time() - startTime))
-        return skyBackground
-
-    def _computeFlatScaling(self, butler, visitCat):
-        """
+        Returns
+        -------
+        schema: `afwTable.Schema`
         """
 
-        # Get the maximum ccd id.
-        # Note that this (and other assumptions) will have to be
-        # rethought if we don't have integer ccds...
-        camera = butler.get('camera')
-        nCcd = len(camera)
+        schema = afwTable.Schema()
+        schema.addField('visit', type=np.int32, doc="Visit number")
+        # Note that the FGCM code currently handles filternames up to 2 characters long
+        schema.addField('filtername', type=str, size=2, doc="Filter name")
+        schema.addField('telra', type=np.float64, doc="Pointing RA (deg)")
+        schema.addField('teldec', type=np.float64, doc="Pointing Dec (deg)")
+        schema.addField('telha', type=np.float64, doc="Pointing Hour Angle (deg)")
+        schema.addField('mjd', type=np.float64, doc="MJD of visit")
+        schema.addField('exptime', type=np.float32, doc="Exposure time")
+        schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
+        schema.addField('psfSigma', type=np.float32, doc="PSF sigma (reference CCD)")
+        schema.addField('deltaAper', type=np.float32, doc="Delta-aperture")
+        schema.addField('skyBackground', type=np.float32, doc="Sky background (ADU) (reference CCD)")
+        # the following field is not used yet
+        schema.addField('deepFlag', type=np.int32, doc="Deep observation")
+        schema.addField('scaling', type='ArrayD', doc="Scaling applied due to flat adjustment",
+                        size=nCcd)
 
-        # A dictionary to map Flats to visit/ccd pars
-        visitCcdFlatDict = {}
+        return schema
 
-        # A dictionary to store flat values
-        flatValueDict = {}
+    def _makeSourceMapper(self, sourceSchema):
+        """
+        Make a schema mapper for fgcm sources
 
-        # And a string that will be unique for my internal keys
-        joiner = '++'
+        Parameters
+        ----------
+        sourceSchema: `afwTable.Schema`
+           Default source schema from the butler
 
-        for vis in visitCat:
-            visit = vis['visit']
-            for ccdIndex, detector in enumerate(camera):
-                dataId = {'visit': int(visit),
-                          'ccd': detector.getId()}
-                if not butler.datasetExists('src', dataId=dataId):
-                    continue
+        Returns
+        -------
+        sourceMapper: `afwTable.schemaMapper`
+           Mapper to the FGCM source schema
+        """
 
-                flatRef = butler.dataRef('flat', dataId=dataId)
+        # create a mapper to the preferred output
+        sourceMapper = afwTable.SchemaMapper(sourceSchema)
 
-                fName = flatRef.dataId['filter']
-                cDate = flatRef.dataId['calibDate']
+        # map to ra/dec
+        sourceMapper.addMapping(sourceSchema['coord_ra'].asKey(), 'ra')
+        sourceMapper.addMapping(sourceSchema['coord_dec'].asKey(), 'dec')
+        sourceMapper.addMapping(sourceSchema[self.config.jacobianName].asKey(),
+                                'jacobian')
+        sourceMapper.addMapping(sourceSchema['slot_Centroid_x'].asKey(), 'x')
+        sourceMapper.addMapping(sourceSchema['slot_Centroid_y'].asKey(), 'y')
 
-                flatKey = '%s%s%s%s%04d' % (cDate, joiner, fName, joiner, ccdIndex)
+        # and add the fields we want
+        sourceMapper.editOutputSchema().addField(
+            "visit", type=np.int32, doc="Visit number")
+        sourceMapper.editOutputSchema().addField(
+            "ccd", type=np.int32, doc="CCD number")
+        sourceMapper.editOutputSchema().addField(
+            "instMag", type=np.float32, doc="Instrumental magnitude")
+        sourceMapper.editOutputSchema().addField(
+            "instMagErr", type=np.float32, doc="Instrumental magnitude error")
 
-                if flatKey not in flatValueDict:
-                    # Read in the flat and record the value
-                    self.log.info("Found new flat: %s" % (flatKey))
-                    flat = flatRef.get()
-                    flatValueDict[flatKey] = np.median(flat.getImage().getArray())
+        return sourceMapper
 
-                visitCcdKey = visit * (nCcd + 1) + ccdIndex
-                visitCcdFlatDict[visitCcdKey] = flatKey
+    def _makeAperMapper(self, sourceSchema):
+        """
+        Make a schema mapper for fgcm aperture measurements
 
-        # Group flats together in a dict
-        flatFields = {}
-        for key in flatValueDict:
-            parts = key.split(joiner)
-            flatName = parts[0] + joiner + parts[1]
-            if flatName not in flatFields:
-                flatFields[flatName] = (parts[1], np.zeros(nCcd))
-            flatFields[flatName][1][int(parts[2])] = flatValueDict[key]
+        Parameters
+        ----------
+        sourceSchema: `afwTable.Schema`
+           Default source schema from the butler
 
-        # And group by filter (uniquely)...
-        flatFilters = {flatFields[x][0] for x in flatFields}
+        Returns
+        -------
+        aperMapper: `afwTable.schemaMapper`
+           Mapper to the FGCM aperture schema
+        """
 
-        # Compute scaling
-        # Here's the math...
-        # When flat fields are applied, we have:
-        #  maskedImage.scaledDivides(1.0 / flatScale, flatMaskedImage)
-        # Right now, I'm assuming that flatScale == 1.0, but I don't know where
-        # this is recorded.
-        # And scaledDivides is "Divide lhs by c * rhs"
-        #  maskedImageNew = maskedImage / ((1.0 / flatScale) * flatMaskedImage)
-        # To remove the flat (on CCD scale) we need to *multiply* by median(flatField)
-        # Then to apply the reference flat we need to *divide* by median(referenceFlat)
-        # So the (multiplicative) scaling to switch from flatField to referenceFlat is:
-        #  scaling = median(flatField) / median(referenceFlat)
+        aperMapper = afwTable.SchemaMapper(sourceSchema)
+        aperMapper.addMapping(sourceSchema['coord_ra'].asKey(), 'ra')
+        aperMapper.addMapping(sourceSchema['coord_dec'].asKey(), 'dec')
+        aperMapper.editOutputSchema().addField('instMag_aper_inner', type=np.float64,
+                                               doc="Magnitude at inner aperture")
+        aperMapper.editOutputSchema().addField('instMagErr_aper_inner', type=np.float64,
+                                               doc="Magnitude error at inner aperture")
+        aperMapper.editOutputSchema().addField('instMag_aper_outer', type=np.float64,
+                                               doc="Magnitude at outer aperture")
+        aperMapper.editOutputSchema().addField('instMagErr_aper_outer', type=np.float64,
+                                               doc="Magnitude error at outer aperture")
 
-        flatScaleDict = flatValueDict.copy()
-        for flatFilter in flatFilters:
-            # get all the flats which have this...
-            flatKeys = [key for key in flatFields if flatFields[key][0] == flatFilter]
-
-            # take the first one as the arbitrary reference
-            referenceFlat = flatFields[flatKeys[0]][1]
-
-            # Loop over all the flats and scale to reference
-            for flatKey in flatKeys:
-                scaleVals = np.ones_like(referenceFlat)
-                u, = np.where((referenceFlat > 0) & (flatFields[flatKey][1] > 0))
-                scaleVals[u] = flatFields[flatKey][1][u] / referenceFlat[u]
-
-                for ccdIndex in range(nCcd):
-                    flatCcdKey = '%s%s%04d' % (flatKey, joiner, ccdIndex)
-                    if flatCcdKey in flatScaleDict:
-                        flatScaleDict[flatCcdKey] = scaleVals[ccdIndex]
-
-        # And compute scaling values for each visit/ccd pair
-        scalingValues = np.ones((len(visitCat), nCcd))
-        for visitIndex, vis in enumerate(visitCat):
-            visit = vis['visit']
-            for ccdIndex, detector in enumerate(camera):
-                visitCcdKey = visit * (nCcd + 1) + ccdIndex
-                try:
-                    scalingValues[visitIndex, ccdIndex] = flatScaleDict[visitCcdFlatDict[visitCcdKey]]
-                except KeyError:
-                    pass
-
-        return scalingValues
+        return aperMapper

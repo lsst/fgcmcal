@@ -1,10 +1,35 @@
 # See COPYRIGHT file at the top of the source tree.
+#
+# This file is part of fgcmcal.
+#
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""General fgcmcal testing class.
 
-from __future__ import division, absolute_import, print_function
+This class is used as the basis for individual obs package tests using
+data from testdata_jointcal.
+"""
 
 import os
 import shutil
 import numpy as np
+import glob
 
 import lsst.daf.persistence as dafPersistence
 import lsst.afw.geom as afwGeom
@@ -28,8 +53,14 @@ class FgcmcalTestBase(object):
 
         Parameters
         ----------
-        None
-
+        inputDir: `str`, optional
+           Input directory
+        testDir: `str`, optional
+           Test directory
+        logLevel: `str`, optional
+           Override loglevel for command-line tasks
+        otherArgs: `list`, default=[]
+           List of additional arguments to send to command-line tasks
         """
 
         self.config = None
@@ -41,12 +72,31 @@ class FgcmcalTestBase(object):
         lsst.log.setLevel("daf.persistence.butler", lsst.log.FATAL)
         lsst.log.setLevel("CameraMapper", lsst.log.FATAL)
 
-    def _runFgcmMakeLut(self, nBand, i0Std, i0Recon, i10Std, i10Recon):
-        """
-        """
-
         if self.logLevel is not None:
             self.otherArgs.extend(['--loglevel', 'fgcmcal=%s'%self.logLevel])
+
+    def _testFgcmMakeLut(self, nBand, i0Std, i0Recon, i10Std, i10Recon):
+        """
+        Test running of FgcmMakeLutTask
+
+        Parameters
+        ----------
+        nBand: `int`
+           Number of bands tested
+        i0Std: `np.array', size nBand
+           Values of i0Std to compare to
+        i10Std: `np.array`, size nBand
+           Values of i10Std to compare to
+        i0Recon: `np.array`, size nBand
+           Values of reconstructed i0 to compare to
+        i10Recon: `np.array`, size nBand
+           Values of reconsntructed i10 to compare to
+
+        Raises
+        ------
+        Exceptions on test failures
+        """
+
         args = [self.inputDir, '--output', self.testDir,
                 '--doraise']
         args.extend(self.otherArgs)
@@ -92,12 +142,24 @@ class FgcmcalTestBase(object):
 
         self.assertFloatsAlmostEqual(i10Recon, i1 / i0, msg='i10Recon', rtol=1e-5)
 
-    def _runFgcmBuildStars(self, nVisit, nStar, nObs):
+    def _testFgcmBuildStars(self, nVisit, nStar, nObs):
         """
+        Test running of FgcmBuildStarsTask
+
+        Parameters
+        ----------
+        nVisit: `int`
+           Number of visits expected
+        nStar: `int`
+           Number of stars expected
+        nObs: `int`
+           Number of observations of stars expected
+
+        Raises
+        ------
+        Exceptions on test failures
         """
 
-        if self.logLevel is not None:
-            self.otherArgs.extend(['--loglevel', 'fgcmcal=%s'%self.logLevel])
         args = [self.inputDir, '--output', self.testDir,
                 '--doraise']
         args.extend(self.otherArgs)
@@ -116,23 +178,42 @@ class FgcmcalTestBase(object):
         starObs = butler.get('fgcmStarObservations')
         self.assertEqual(nObs, len(starObs))
 
-    def _runFgcmFitCycle(self, nZp, nGoodZp, nStdStars):
+    def _testFgcmFitCycle(self, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots):
         """
-        """
+        Test running of FgcmFitCycleTask
 
-        if self.logLevel is not None:
-            self.otherArgs.extend(['--loglevel', 'fgcmcal=%s'%self.logLevel])
+        Parameters
+        ----------
+        nZp: `int`
+           Number of zeropoints created by the task
+        nGoodZp: `int`
+           Number of good (photometric) zeropoints created
+        nOkZp: `int`
+           Number of constrained zeropoints (photometric or not)
+        nBadZp: `int`
+           Number of unconstrained (bad) zeropoints
+        nStdStars: `int`
+           Number of standard stars produced
+        nPlots: `int`
+           Number of plots produced
+        """
 
         args = [self.inputDir, '--output', self.testDir,
                 '--doraise']
         args.extend(self.otherArgs)
 
         # Move into the test directory so the plots will get cleaned in tearDown
+        # In the future, with Gen3, we will probably have a better way of managing
+        # non-data output such as plots.
         cwd = os.getcwd()
         os.chdir(self.testDir)
 
         result = fgcmcal.FgcmFitCycleTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
+
+        # Check that the expected number of plots are there.
+        plots = glob.glob(os.path.join(os.getcwd(), self.config.outfileBase + '_cycle00_plots/') + '*.png')
+        self.assertEqual(nPlots, len(plots))
 
         # Move back to the previous directory
         os.chdir(cwd)
@@ -141,22 +222,50 @@ class FgcmcalTestBase(object):
 
         zps = butler.get('fgcmZeropoints', fgcmcycle=0)
 
+        # Check the numbers of zeropoints in all, good, okay, and bad
         self.assertEqual(nZp, len(zps))
 
-        gd, = np.where(zps['fgcmflag'] == 1)
+        gd, = np.where(zps['fgcmFlag'] == 1)
         self.assertEqual(nGoodZp, len(gd))
+
+        ok, = np.where(zps['fgcmFlag'] < 16)
+        self.assertEqual(nOkZp, len(ok))
+
+        bd, = np.where(zps['fgcmFlag'] >= 16)
+        self.assertEqual(nBadZp, len(bd))
+
+        # Check that there are no illegal values with the ok zeropoints
+        test, = np.where(zps['fgcmZpt'][gd] < -9000.0)
+        self.assertEqual(0, len(test))
 
         stds = butler.get('fgcmStandardStars', fgcmcycle=0)
 
         self.assertEqual(nStdStars, len(stds))
 
-    def _runFgcmOutputProducts(self, visitDataRefName, ccdDataRefName, filterMapping,
-                               zpOffsets, testVisit, testCcd, testFilter, testBandIndex):
+    def _testFgcmOutputProducts(self, visitDataRefName, ccdDataRefName, filterMapping,
+                                zpOffsets, testVisit, testCcd, testFilter, testBandIndex):
         """
-        """
+        Test running of FgcmOutputProductsTask
 
-        if self.logLevel is not None:
-            self.otherArgs.extend(['--loglevel', 'fgcmcal=%s'%self.logLevel])
+        Parameters
+        ----------
+        visitDataRefName: `str`
+           Name of column in dataRef to get the visit
+        ccdDataRefName: `str`
+           Name of column in dataRef to get the ccd
+        filterMapping: `dict`
+           Mapping of filterName to dataRef filter names
+        zpOffsets: `np.array`
+           Zeropoint offsets expected
+        testVisit: `int`
+           Visit id to check for round-trip computations
+        testCcd: `int`
+           Ccd id to check for round-trip computations
+        testFilter: `str`
+           Filtername for testVisit/testCcd
+        testBandIndex: `int`
+           Band index for testVisit/testCcd
+        """
 
         args = [self.inputDir, '--output', self.testDir,
                 '--doraise']
@@ -195,29 +304,32 @@ class FgcmcalTestBase(object):
 
         mag = rawStars['mag_std_noabs'][0, 0] + offsets[0]
         flux = afwImage.fluxFromABMag(mag)
-        fluxErr = afwImage.fluxErrFromABMagErr(rawStars['magerr_std'][0, 0], mag)
+        fluxErr = afwImage.fluxErrFromABMagErr(rawStars['magErr_std'][0, 0], mag)
         self.assertFloatsAlmostEqual(flux, refStruct.refCat['r_flux'][test[0]], rtol=1e-6)
         self.assertFloatsAlmostEqual(fluxErr, refStruct.refCat['r_fluxErr'][test[0]], rtol=1e-6)
 
         # Test the joincal_photoCalib output
 
         zptCat = butler.get('fgcmZeropoints', fgcmcycle=0)
-        selected = (zptCat['fgcmflag'] < 16)
+        selected = (zptCat['fgcmFlag'] < 16)
 
         # Read in all the calibrations, these should all be there
+        # This test is simply to ensure that all the photoCalib files exist
         for rec in zptCat[selected]:
             testCal = butler.get('jointcal_photoCalib',
                                  dataId={visitDataRefName: int(rec['visit']),
                                          ccdDataRefName: int(rec['ccd']),
                                          'filter': filterMapping[rec['filtername']],
                                          'tract': 0})
+            self.assertIsNotNone(testCal)
 
-        # Our round-trip tests will be on this final one which is still loaded
+        # We do round-trip value checking on just the final one (chosen arbitrarily)
         testCal = butler.get('jointcal_photoCalib',
                              dataId={visitDataRefName: int(testVisit),
                                      ccdDataRefName: int(testCcd),
                                      'filter': filterMapping[testFilter],
                                      'tract': 0})
+        self.assertIsNotNone(testCal)
 
         src = butler.get('src', dataId={visitDataRefName: int(testVisit),
                                         ccdDataRefName: int(testCcd)})
@@ -229,7 +341,7 @@ class FgcmcalTestBase(object):
         # and doesn't know about that yet)
         testZpInd, = np.where((zptCat['visit'] == testVisit) &
                               (zptCat['ccd'] == testCcd))
-        fgcmZpt = zptCat['fgcmzpt'][testZpInd] + offsets[testBandIndex]
+        fgcmZpt = zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex]
 
         # This is the magnitude through the mean calibration
         photoCalMeanCalMags = np.zeros(gdSrc.sum())
@@ -262,27 +374,48 @@ class FgcmcalTestBase(object):
         testTrans = butler.get('transmission_atmosphere_fgcm',
                                dataId={visitDataRefName: visitCatalog[0]['visit']})
         testResp = testTrans.sampleAt(position=afwGeom.Point2D(0, 0),
-                                      wavelengths=lutCat[0]['atmlambda'])
+                                      wavelengths=lutCat[0]['atmLambda'])
 
-        # The fit to be roughly consistent with the standard, although the
-        # airmass is taken into account even with the "frozen" atmosphere.
-        # This is also a rough comparison, because the interpolation does
-        # not work well with such a coarse look-up table used for the test.
-        self.assertFloatsAlmostEqual(testResp, lutCat[0]['atmstdtrans'], atol=0.06)
+        # The test fit is performed with the atmosphere parameters frozen
+        # (freezeStdAtmosphere = True).  Thus the only difference between
+        # these output atmospheres and the standard is the different
+        # airmass.  Furthermore, this is a very rough comparison because
+        # the look-up table is computed with very coarse sampling for faster
+        # testing.
+        # Therefore, this rough comparison can only be seen as a sanity check
+        # and is not high precision.
+        self.assertFloatsAlmostEqual(testResp, lutCat[0]['atmStdTrans'], atol=0.06)
 
         # The second should be close to the first, but there is the airmass
         # difference so they aren't identical
         testTrans2 = butler.get('transmission_atmosphere_fgcm',
                                 dataId={visitDataRefName: visitCatalog[1]['visit']})
         testResp2 = testTrans2.sampleAt(position=afwGeom.Point2D(0, 0),
-                                        wavelengths=lutCat[0]['atmlambda'])
+                                        wavelengths=lutCat[0]['atmLambda'])
         self.assertFloatsAlmostEqual(testResp, testResp2, atol=1e-4)
 
     def _checkResult(self, result):
+        """
+        Check the result output from the task
+
+        Parameters
+        ----------
+        result: `pipeBase.struct`
+           Result structure output from a task
+
+        Raises
+        ------
+        Exceptions on test failures
+        """
+
         self.assertNotEqual(result.resultList, [], 'resultList should not be empty')
         self.assertEqual(result.resultList[0].exitStatus, 0)
 
     def tearDown(self):
+        """
+        Tear down and clear directories
+        """
+
         if getattr(self, 'config', None) is not None:
             del self.config
 

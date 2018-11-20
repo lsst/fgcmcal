@@ -29,8 +29,6 @@ config.washMjds = (0.0, )
 config.epochMjds=[0.0, 57000.0, 57200.0, 100000.0]
 # Latitude of the observatory
 config.latitude = 19.8256
-# Gain of the camera (used to dead-reckon absolute scale)
-config.cameraGain = 3.0
 # Pixel scale (arcseconds)
 config.pixelScale = 0.17
 # Amount of gray extinction to be considered "photometric".  This will
