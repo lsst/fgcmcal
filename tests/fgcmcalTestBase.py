@@ -115,14 +115,14 @@ class FgcmcalTestBase(object):
         self.assertFloatsAlmostEqual(i10Std, lutStd[0]['I10STD'], msg='I10Std', rtol=1e-5)
 
         indices = fgcmLut.getIndices(np.arange(nBand, dtype=np.int32),
-                                     np.zeros(nBand) + lutStd[0]['PWVSTD'],
+                                     np.zeros(nBand) + np.log(lutStd[0]['PWVSTD']),
                                      np.zeros(nBand) + lutStd[0]['O3STD'],
                                      np.zeros(nBand) + np.log(lutStd[0]['TAUSTD']),
                                      np.zeros(nBand) + lutStd[0]['ALPHASTD'],
                                      np.zeros(nBand) + 1. / np.cos(np.radians(lutStd[0]['ZENITHSTD'])),
                                      np.zeros(nBand, dtype=np.int32),
                                      np.zeros(nBand) + lutStd[0]['PMBSTD'])
-        i0 = fgcmLut.computeI0(np.zeros(nBand) + lutStd[0]['PWVSTD'],
+        i0 = fgcmLut.computeI0(np.zeros(nBand) + np.log(lutStd[0]['PWVSTD']),
                                np.zeros(nBand) + lutStd[0]['O3STD'],
                                np.zeros(nBand) + np.log(lutStd[0]['TAUSTD']),
                                np.zeros(nBand) + lutStd[0]['ALPHASTD'],
@@ -132,7 +132,7 @@ class FgcmcalTestBase(object):
 
         self.assertFloatsAlmostEqual(i0Recon, i0, msg='i0Recon', rtol=1e-5)
 
-        i1 = fgcmLut.computeI1(np.zeros(nBand) + lutStd[0]['PWVSTD'],
+        i1 = fgcmLut.computeI1(np.zeros(nBand) + np.log(lutStd[0]['PWVSTD']),
                                np.zeros(nBand) + lutStd[0]['O3STD'],
                                np.zeros(nBand) + np.log(lutStd[0]['TAUSTD']),
                                np.zeros(nBand) + lutStd[0]['ALPHASTD'],
@@ -220,7 +220,7 @@ class FgcmcalTestBase(object):
 
         butler = dafPersistence.butler.Butler(self.testDir)
 
-        zps = butler.get('fgcmZeropoints', fgcmcycle=0)
+        zps = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
 
         # Check the numbers of zeropoints in all, good, okay, and bad
         self.assertEqual(nZp, len(zps))
@@ -238,7 +238,7 @@ class FgcmcalTestBase(object):
         test, = np.where(zps['fgcmZpt'][gd] < -9000.0)
         self.assertEqual(0, len(test))
 
-        stds = butler.get('fgcmStandardStars', fgcmcycle=0)
+        stds = butler.get('fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
 
         self.assertEqual(nStdStars, len(stds))
 
@@ -310,7 +310,7 @@ class FgcmcalTestBase(object):
 
         # Test the joincal_photoCalib output
 
-        zptCat = butler.get('fgcmZeropoints', fgcmcycle=0)
+        zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
         selected = (zptCat['fgcmFlag'] < 16)
 
         # Read in all the calibrations, these should all be there

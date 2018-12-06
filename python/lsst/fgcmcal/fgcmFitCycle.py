@@ -271,10 +271,20 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=1.0,
     )
-    sigma0Cal = pexConfig.Field(
-        doc="Systematic error floor for all observations",
+    sigmaCalRange = pexConfig.ListField(
+        doc="Allowed range for systematic error floor estimation",
         dtype=float,
-        default=0.003,
+        default=(0.001, 0.003),
+    )
+    sigmaCalFitPercentile = pexConfig.ListField(
+        doc="Magnitude percentile range to fit systematic error floor",
+        dtype=float,
+        default=(0.05, 0.15),
+    )
+    sigmaCalPlotPercentile = pexConfig.ListField(
+        doc="Magnitude percentile range to plot systematic error floor",
+        dtype=float,
+        default=(0.05, 0.95),
     )
     sigma0Phot = pexConfig.Field(
         doc="Systematic error floor for all zeropoints",
@@ -310,6 +320,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         doc="Should FGCM model the magnitude errors from sky/fwhm? (False means trust inputs)",
         dtype=bool,
         default=True,
+    )
+    useQuadraticPwv = pexConfig.Field(
+        doc="Model PWV with a quadratic term for variation through the night?",
+        dtype=bool,
+        default=False,
     )
     outputStandards = pexConfig.Field(
         doc="Output standard stars? (Usually only for final iteration)",
@@ -757,12 +772,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         lutFlat['I0'][:] = lutCat[lutTypes.index('I0')]['lut'][:]
         lutFlat['I1'][:] = lutCat[lutTypes.index('I1')]['lut'][:]
 
-        lutDerivFlat = np.zeros(lutCat[0]['lut'].size, dtype=[('D_PWV', 'f4'),
+        lutDerivFlat = np.zeros(lutCat[0]['lut'].size, dtype=[('D_LNPWV', 'f4'),
                                                               ('D_O3', 'f4'),
                                                               ('D_LNTAU', 'f4'),
                                                               ('D_ALPHA', 'f4'),
                                                               ('D_SECZENITH', 'f4'),
-                                                              ('D_PWV_I1', 'f4'),
+                                                              ('D_LNPWV_I1', 'f4'),
                                                               ('D_O3_I1', 'f4'),
                                                               ('D_LNTAU_I1', 'f4'),
                                                               ('D_ALPHA_I1', 'f4'),
@@ -986,15 +1001,18 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'sigFgcmMaxEGray': self.config.sigFgcmMaxEGray,
                       'ccdGrayMaxStarErr': self.config.ccdGrayMaxStarErr,
                       'approxThroughput': self.config.approxThroughput,
-                      'sigma0Cal': self.config.sigma0Cal,
+                      'sigmaCalRange': list(self.config.sigmaCalRange),
+                      'sigmaCalFitPercentile': list(self.config.sigmaCalFitPercentile),
+                      'sigmaCalPlotPercentile': list(self.config.sigmaCalPlotPercentile),
                       'sigma0Phot': self.config.sigma0Phot,
                       'mapLongitudeRef': self.config.mapLongitudeRef,
                       'mapNSide': self.config.mapNSide,
                       'varNSig': 100.0,  # Turn off 'variable star selection' which doesn't work yet
                       'varMinBand': 2,
-                      'useRetrievedPWV': False,
-                      'useNightlyRetrievedPWV': False,
+                      'useRetrievedPwv': False,
+                      'useNightlyRetrievedPwv': False,
                       'pwvRetrievalSmoothBlock': 25,
+                      'useQuadraticPwv': self.config.useQuadraticPwv,
                       'useRetrievedTauInit': False,
                       'tauRetrievalMinCCDPerNight': 500,
                       'modelMagErrors': self.config.modelMagErrors,
@@ -1039,12 +1057,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        ('LNTAUUNIT', 'f8'),
                                        ('LNTAUSLOPEUNIT', 'f8'),
                                        ('ALPHAUNIT', 'f8'),
-                                       ('PWVUNIT', 'f8'),
-                                       ('PWVPERSLOPEUNIT', 'f8'),
-                                       ('PWVGLOBALUNIT', 'f8'),
+                                       ('LNPWVUNIT', 'f8'),
+                                       ('LNPWVSLOPEUNIT', 'f8'),
+                                       ('LNPWVQUADRATICUNIT', 'f8'),
+                                       ('LNPWVGLOBALUNIT', 'f8'),
                                        ('O3UNIT', 'f8'),
                                        ('QESYSUNIT', 'f8'),
                                        ('QESYSSLOPEUNIT', 'f8'),
+                                       ('FILTEROFFSETUNIT', 'f8'),
                                        ('HASEXTERNALPWV', 'i2'),
                                        ('HASEXTERNALTAU', 'i2')])
         inParInfo['NCCD'] = parCat['nCcd']
@@ -1054,12 +1074,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParInfo['LNTAUUNIT'] = parCat['lnTauUnit']
         inParInfo['LNTAUSLOPEUNIT'] = parCat['lnTauSlopeUnit']
         inParInfo['ALPHAUNIT'] = parCat['alphaUnit']
-        inParInfo['PWVUNIT'] = parCat['pwvUnit']
-        inParInfo['PWVPERSLOPEUNIT'] = parCat['pwvPerSlopeUnit']
-        inParInfo['PWVGLOBALUNIT'] = parCat['pwvGlobalUnit']
+        inParInfo['LNPWVUNIT'] = parCat['lnPwvUnit']
+        inParInfo['LNPWVSLOPEUNIT'] = parCat['lnPwvSlopeUnit']
+        inParInfo['LNPWVQUADRATICUNIT'] = parCat['lnPwvQuadraticUnit']
+        inParInfo['LNPWVGLOBALUNIT'] = parCat['lnPwvGlobalUnit']
         inParInfo['O3UNIT'] = parCat['o3Unit']
         inParInfo['QESYSUNIT'] = parCat['qeSysUnit']
         inParInfo['QESYSSLOPEUNIT'] = parCat['qeSysSlopeUnit']
+        inParInfo['FILTEROFFSETUNIT'] = parCat['filterOffsetUnit']
         inParInfo['HASEXTERNALPWV'] = parCat['hasExternalPwv']
         inParInfo['HASEXTERNALTAU'] = parCat['hasExternalTau']
 
@@ -1069,18 +1091,24 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        parCat['parLnTauIntercept'].size),
                                       ('PARLNTAUSLOPE', 'f8',
                                        parCat['parLnTauSlope'].size),
-                                      ('PARPWVINTERCEPT', 'f8',
-                                       parCat['parPwvIntercept'].size),
-                                      ('PARPWVPERSLOPE', 'f8',
-                                       parCat['parPwvPerSlope'].size),
+                                      ('PARLNPWVINTERCEPT', 'f8',
+                                       parCat['parLnPwvIntercept'].size),
+                                      ('PARLNPWVSLOPE', 'f8',
+                                       parCat['parLnPwvSlope'].size),
+                                      ('PARLNPWVQUADRATIC', 'f8',
+                                       parCat['parLnPwvQuadratic'].size),
                                       ('PARQESYSINTERCEPT', 'f8',
                                        parCat['parQeSysIntercept'].size),
                                       ('PARQESYSSLOPE', 'f8',
                                        parCat['parQeSysSlope'].size),
-                                      ('PARRETRIEVEDPWVSCALE', 'f8'),
-                                      ('PARRETRIEVEDPWVOFFSET', 'f8'),
-                                      ('PARRETRIEVEDPWVNIGHTLYOFFSET', 'f8',
-                                       parCat['parRetrievedPwvNightlyOffset'].size),
+                                      ('PARFILTEROFFSET', 'f8',
+                                       parCat['parFilterOffset'].size),
+                                      ('PARFILTEROFFSETFITFLAG', 'i2',
+                                       parCat['parFilterOffsetFitFlag'].size),
+                                      ('PARRETRIEVEDLNPWVSCALE', 'f8'),
+                                      ('PARRETRIEVEDLNPWVOFFSET', 'f8'),
+                                      ('PARRETRIEVEDLNPWVNIGHTLYOFFSET', 'f8',
+                                       parCat['parRetrievedLnPwvNightlyOffset'].size),
                                       ('COMPAPERCORRPIVOT', 'f8',
                                        parCat['compAperCorrPivot'].size),
                                       ('COMPAPERCORRSLOPE', 'f8',
@@ -1105,12 +1133,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        parCat['compNGoodStarPerExp'].size),
                                       ('COMPSIGFGCM', 'f8',
                                        parCat['compSigFgcm'].size),
-                                      ('COMPRETRIEVEDPWV', 'f8',
-                                       parCat['compRetrievedPwv'].size),
-                                      ('COMPRETRIEVEDPWVRAW', 'f8',
-                                       parCat['compRetrievedPwvRaw'].size),
-                                      ('COMPRETRIEVEDPWVFLAG', 'i2',
-                                       parCat['compRetrievedPwvFlag'].size),
+                                      ('COMPSIGMACAL', 'f8',
+                                       parCat['compSigmaCal'].size),
+                                      ('COMPRETRIEVEDLNPWV', 'f8',
+                                       parCat['compRetrievedLnPwv'].size),
+                                      ('COMPRETRIEVEDLNPWVRAW', 'f8',
+                                       parCat['compRetrievedLnPwvRaw'].size),
+                                      ('COMPRETRIEVEDLNPWVFLAG', 'i2',
+                                       parCat['compRetrievedLnPwvFlag'].size),
                                       ('COMPRETRIEVEDTAUNIGHT', 'f8',
                                        parCat['compRetrievedTauNight'].size)])
 
@@ -1118,12 +1148,16 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParams['PARO3'][:] = parCat['parO3'][0, :]
         inParams['PARLNTAUINTERCEPT'][:] = parCat['parLnTauIntercept'][0, :]
         inParams['PARLNTAUSLOPE'][:] = parCat['parLnTauSlope'][0, :]
-        inParams['PARPWVINTERCEPT'][:] = parCat['parPwvIntercept'][0, :]
+        inParams['PARLNPWVINTERCEPT'][:] = parCat['parLnPwvIntercept'][0, :]
+        inParams['PARLNPWVSLOPE'][:] = parCat['parLnPwvSlope'][0, :]
+        inParams['PARLNPWVQUADRATIC'][:] = parCat['parLnPwvQuadratic'][0, :]
         inParams['PARQESYSINTERCEPT'][:] = parCat['parQeSysIntercept'][0, :]
         inParams['PARQESYSSLOPE'][:] = parCat['parQeSysSlope'][0, :]
-        inParams['PARRETRIEVEDPWVSCALE'] = parCat['parRetrievedPwvScale']
-        inParams['PARRETRIEVEDPWVOFFSET'] = parCat['parRetrievedPwvOffset']
-        inParams['PARRETRIEVEDPWVNIGHTLYOFFSET'][:] = parCat['parRetrievedPwvNightlyOffset'][0, :]
+        inParams['PARFILTEROFFSET'][:] = parCat['parFilterOffset'][0, :]
+        inParams['PARFILTEROFFSETFITFLAG'][:] = parCat['parFilterOffsetFitFlag'][0, :]
+        inParams['PARRETRIEVEDLNPWVSCALE'] = parCat['parRetrievedLnPwvScale']
+        inParams['PARRETRIEVEDLNPWVOFFSET'] = parCat['parRetrievedLnPwvOffset']
+        inParams['PARRETRIEVEDLNPWVNIGHTLYOFFSET'][:] = parCat['parRetrievedLnPwvNightlyOffset'][0, :]
         inParams['COMPAPERCORRPIVOT'][:] = parCat['compAperCorrPivot'][0, :]
         inParams['COMPAPERCORRSLOPE'][:] = parCat['compAperCorrSlope'][0, :]
         inParams['COMPAPERCORRSLOPEERR'][:] = parCat['compAperCorrSlopeErr'][0, :]
@@ -1136,9 +1170,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParams['COMPVARGRAY'][:] = parCat['compVarGray'][0, :]
         inParams['COMPNGOODSTARPEREXP'][:] = parCat['compNGoodStarPerExp'][0, :]
         inParams['COMPSIGFGCM'][:] = parCat['compSigFgcm'][0, :]
-        inParams['COMPRETRIEVEDPWV'][:] = parCat['compRetrievedPwv'][0, :]
-        inParams['COMPRETRIEVEDPWVRAW'][:] = parCat['compRetrievedPwvRaw'][0, :]
-        inParams['COMPRETRIEVEDPWVFLAG'][:] = parCat['compRetrievedPwvFlag'][0, :]
+        inParams['COMPSIGMACAL'][:] = parCat['compSigmaCal'][0, :]
+        inParams['COMPRETRIEVEDLNPWV'][:] = parCat['compRetrievedLnPwv'][0, :]
+        inParams['COMPRETRIEVEDLNPWVRAW'][:] = parCat['compRetrievedLnPwvRaw'][0, :]
+        inParams['COMPRETRIEVEDLNPWVFLAG'][:] = parCat['compRetrievedLnPwvFlag'][0, :]
         inParams['COMPRETRIEVEDTAUNIGHT'][:] = parCat['compRetrievedTauNight'][0, :]
 
         inSuperStar = np.zeros(parCat['superstarSize'][0, :], dtype='f8')
@@ -1246,14 +1281,17 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('lnTauSlopeUnit', type=np.float64,
                            doc='Step units for ln(AOD) slope')
         parSchema.addField('alphaUnit', type=np.float64, doc='Step units for alpha')
-        parSchema.addField('pwvUnit', type=np.float64, doc='Step units for pwv')
-        parSchema.addField('pwvPerSlopeUnit', type=np.float64,
-                           doc='Step units for PWV percent slope')
-        parSchema.addField('pwvGlobalUnit', type=np.float64,
-                           doc='Step units for global PWV parameters')
+        parSchema.addField('lnPwvUnit', type=np.float64, doc='Step units for ln(pwv)')
+        parSchema.addField('lnPwvSlopeUnit', type=np.float64,
+                           doc='Step units for ln(pwv) slope')
+        parSchema.addField('lnPwvQuadraticUnit', type=np.float64,
+                           doc='Step units for ln(pwv) quadratic term')
+        parSchema.addField('lnPwvGlobalUnit', type=np.float64,
+                           doc='Step units for global ln(pwv) parameters')
         parSchema.addField('o3Unit', type=np.float64, doc='Step units for O3')
         parSchema.addField('qeSysUnit', type=np.float64, doc='Step units for mirror gray')
         parSchema.addField('qeSysSlopeUnit', type=np.float64, doc='Step units for mirror gray slope')
+        parSchema.addField('filterOffsetUnit', type=np.float64, doc='Step units for filter offset')
         parSchema.addField('hasExternalPwv', type=np.int32, doc='Parameters fit using external pwv')
         parSchema.addField('hasExternalTau', type=np.int32, doc='Parameters fit using external tau')
 
@@ -1268,21 +1306,27 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('parLnTauSlope', type='ArrayD',
                            doc='ln(Tau) slope parameter vector',
                            size=pars['PARLNTAUSLOPE'].size)
-        parSchema.addField('parPwvIntercept', type='ArrayD', doc='PWV intercept parameter vector',
-                           size=pars['PARPWVINTERCEPT'].size)
-        parSchema.addField('parPwvPerSlope', type='ArrayD', doc='PWV percent slope parameter vector',
-                           size=pars['PARPWVPERSLOPE'].size)
+        parSchema.addField('parLnPwvIntercept', type='ArrayD', doc='ln(pwv) intercept parameter vector',
+                           size=pars['PARLNPWVINTERCEPT'].size)
+        parSchema.addField('parLnPwvSlope', type='ArrayD', doc='ln(pwv) slope parameter vector',
+                           size=pars['PARLNPWVSLOPE'].size)
+        parSchema.addField('parLnPwvQuadratic', type='ArrayD', doc='ln(pwv) quadratic parameter vector',
+                           size=pars['PARLNPWVQUADRATIC'].size)
         parSchema.addField('parQeSysIntercept', type='ArrayD', doc='Mirror gray intercept parameter vector',
                            size=pars['PARQESYSINTERCEPT'].size)
         parSchema.addField('parQeSysSlope', type='ArrayD', doc='Mirror gray slope parameter vector',
                            size=pars['PARQESYSSLOPE'].size)
-        parSchema.addField('parRetrievedPwvScale', type=np.float64,
-                           doc='Global scale for retrieved PWV')
-        parSchema.addField('parRetrievedPwvOffset', type=np.float64,
-                           doc='Global offset for retrieved PWV')
-        parSchema.addField('parRetrievedPwvNightlyOffset', type='ArrayD',
-                           doc='Nightly offset for retrieved PWV',
-                           size=pars['PARRETRIEVEDPWVNIGHTLYOFFSET'].size)
+        parSchema.addField('parFilterOffset', type='ArrayD', doc='Filter offset parameter vector',
+                           size=pars['PARFILTEROFFSET'].size)
+        parSchema.addField('parFilterOffsetFitFlag', type='ArrayI', doc='Filter offset parameter fit flag',
+                           size=pars['PARFILTEROFFSETFITFLAG'].size)
+        parSchema.addField('parRetrievedLnPwvScale', type=np.float64,
+                           doc='Global scale for retrieved ln(pwv)')
+        parSchema.addField('parRetrievedLnPwvOffset', type=np.float64,
+                           doc='Global offset for retrieved ln(pwv)')
+        parSchema.addField('parRetrievedLnPwvNightlyOffset', type='ArrayD',
+                           doc='Nightly offset for retrieved ln(pwv)',
+                           size=pars['PARRETRIEVEDLNPWVNIGHTLYOFFSET'].size)
         parSchema.addField('compAperCorrPivot', type='ArrayD', doc='Aperture correction pivot',
                            size=pars['COMPAPERCORRPIVOT'].size)
         parSchema.addField('compAperCorrSlope', type='ArrayD', doc='Aperture correction slope',
@@ -1306,14 +1350,16 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('compNGoodStarPerExp', type='ArrayI',
                            doc='Computed number of good stars per exposure',
                            size=pars['COMPNGOODSTARPEREXP'].size)
-        parSchema.addField('compSigFgcm', type='ArrayD', doc='Computed sigma_fgcm',
+        parSchema.addField('compSigFgcm', type='ArrayD', doc='Computed sigma_fgcm (intrinsic repeatability)',
                            size=pars['COMPSIGFGCM'].size)
-        parSchema.addField('compRetrievedPwv', type='ArrayD', doc='Retrieved PWV (smoothed)',
-                           size=pars['COMPRETRIEVEDPWV'].size)
-        parSchema.addField('compRetrievedPwvRaw', type='ArrayD', doc='Retrieved PWV (raw)',
-                           size=pars['COMPRETRIEVEDPWVRAW'].size)
-        parSchema.addField('compRetrievedPwvFlag', type='ArrayI', doc='Retrieved PWV Flag',
-                           size=pars['COMPRETRIEVEDPWVFLAG'].size)
+        parSchema.addField('compSigmaCal', type='ArrayD', doc='Computed sigma_cal (systematic error floor)',
+                           size=pars['COMPSIGMACAL'].size)
+        parSchema.addField('compRetrievedLnPwv', type='ArrayD', doc='Retrieved ln(pwv) (smoothed)',
+                           size=pars['COMPRETRIEVEDLNPWV'].size)
+        parSchema.addField('compRetrievedLnPwvRaw', type='ArrayD', doc='Retrieved ln(pwv) (raw)',
+                           size=pars['COMPRETRIEVEDLNPWVRAW'].size)
+        parSchema.addField('compRetrievedLnPwvFlag', type='ArrayI', doc='Retrieved ln(pwv) Flag',
+                           size=pars['COMPRETRIEVEDLNPWVFLAG'].size)
         parSchema.addField('compRetrievedTauNight', type='ArrayD', doc='Retrieved tau (per night)',
                            size=pars['COMPRETRIEVEDTAUNIGHT'].size)
         # superstarflat section
@@ -1365,28 +1411,33 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['lnTauUnit'] = parInfo['LNTAUUNIT']
         rec['lnTauSlopeUnit'] = parInfo['LNTAUSLOPEUNIT']
         rec['alphaUnit'] = parInfo['ALPHAUNIT']
-        rec['pwvUnit'] = parInfo['PWVUNIT']
-        rec['pwvPerSlopeUnit'] = parInfo['PWVPERSLOPEUNIT']
-        rec['pwvGlobalUnit'] = parInfo['PWVGLOBALUNIT']
+        rec['lnPwvUnit'] = parInfo['LNPWVUNIT']
+        rec['lnPwvSlopeUnit'] = parInfo['LNPWVSLOPEUNIT']
+        rec['lnPwvQuadraticUnit'] = parInfo['LNPWVQUADRATICUNIT']
+        rec['lnPwvGlobalUnit'] = parInfo['LNPWVGLOBALUNIT']
         rec['o3Unit'] = parInfo['O3UNIT']
         rec['qeSysUnit'] = parInfo['QESYSUNIT']
         rec['qeSysSlopeUnit'] = parInfo['QESYSSLOPEUNIT']
+        rec['filterOffsetUnit'] = parInfo['FILTEROFFSETUNIT']
         # note these are not currently supported here.
         rec['hasExternalPwv'] = 0
         rec['hasExternalTau'] = 0
 
         # parameter section
 
-        scalarNames = ['parRetrievedPwvScale', 'parRetrievedPwvOffset']
+        scalarNames = ['parRetrievedLnPwvScale', 'parRetrievedLnPwvOffset']
 
         arrNames = ['parAlpha', 'parO3', 'parLnTauIntercept', 'parLnTauSlope',
-                    'parPwvIntercept', 'parPwvPerSlope', 'parQeSysIntercept',
-                    'parQeSysSlope', 'parRetrievedPwvNightlyOffset', 'compAperCorrPivot',
+                    'parLnPwvIntercept', 'parLnPwvSlope', 'parLnPwvQuadratic',
+                    'parQeSysIntercept',
+                    'parQeSysSlope', 'parRetrievedLnPwvNightlyOffset', 'compAperCorrPivot',
+                    'parFilterOffset', 'parFilterOffsetFitFlag',
                     'compAperCorrSlope', 'compAperCorrSlopeErr', 'compAperCorrRange',
                     'compModelErrExptimePivot', 'compModelErrFwhmPivot',
                     'compModelErrSkyPivot', 'compModelErrPars',
                     'compExpGray', 'compVarGray', 'compNGoodStarPerExp', 'compSigFgcm',
-                    'compRetrievedPwv', 'compRetrievedPwvRaw', 'compRetrievedPwvFlag',
+                    'compSigmaCal',
+                    'compRetrievedLnPwv', 'compRetrievedLnPwvRaw', 'compRetrievedLnPwvFlag',
                     'compRetrievedTauNight']
 
         for scalarName in scalarNames:
