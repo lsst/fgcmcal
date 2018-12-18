@@ -606,7 +606,6 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         sourceMapper = afwTable.SchemaMapper(fgcmStarCat.schema)
         minSchema = LoadIndexedReferenceObjectsTask.makeMinimalSchema(self.bands,
-                                                                      addFluxErr=True,
                                                                       addCentroid=False,
                                                                       addIsResolved=True,
                                                                       coordErrDim=0)
