@@ -135,14 +135,14 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         # pixels.  These basic settings ensure that only well-measured, good stars
         # from the source and reference catalogs are used for the matching.
         self.photoCal.applyColorTerms = True
-        self.photoCal.fluxField = 'flux'
+        self.photoCal.fluxField = 'instFlux'
         self.photoCal.magErrFloor = 0.003
         self.photoCal.match.referenceSelection.doSignalToNoise = True
         self.photoCal.match.referenceSelection.signalToNoise.minimum = 10.0
         self.photoCal.match.sourceSelection.doSignalToNoise = True
         self.photoCal.match.sourceSelection.signalToNoise.minimum = 10.0
-        self.photoCal.match.sourceSelection.signalToNoise.fluxField = 'flux'
-        self.photoCal.match.sourceSelection.signalToNoise.errField = 'fluxErr'
+        self.photoCal.match.sourceSelection.signalToNoise.fluxField = 'instFlux'
+        self.photoCal.match.sourceSelection.signalToNoise.errField = 'instFluxErr'
         self.photoCal.match.sourceSelection.doFlags = True
         self.photoCal.match.sourceSelection.flags.good = []
         self.photoCal.match.sourceSelection.flags.bad = ['flag_badStar']
@@ -397,10 +397,13 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # zeropoint is estimated from the telescope size, etc.)
         sourceMapper = afwTable.SchemaMapper(stars.schema)
         sourceMapper.addMinimalSchema(afwTable.SimpleTable.makeMinimalSchema())
-        sourceMapper.editOutputSchema().addField('flux', type=np.float64, doc="flux")
-        sourceMapper.editOutputSchema().addField('fluxErr', type=np.float64, doc="flux error")
+        sourceMapper.editOutputSchema().addField('instFlux', type=np.float64,
+                                                 doc="instrumental flux (counts)")
+        sourceMapper.editOutputSchema().addField('instFluxErr', type=np.float64,
+                                                 doc="instrumental flux error (counts)")
         badStarKey = sourceMapper.editOutputSchema().addField('flag_badStar',
-                                                              type='Flag', doc="bad flag")
+                                                              type='Flag',
+                                                              doc="bad flag")
 
         # Split up the stars
         # Note that there is an assumption here that the ra/dec coords stored
@@ -498,9 +501,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         sourceCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
         sourceCat.reserve(selected.sum())
         sourceCat.extend(stars[selected], mapper=sourceMapper)
-        sourceCat['flux'] = afwImage.fluxFromABMag(stars['mag_std_noabs'][selected, b])
-        sourceCat['fluxErr'] = afwImage.fluxErrFromABMagErr(stars['magErr_std'][selected, b],
-                                                            stars['mag_std_noabs'][selected, b])
+        sourceCat['instFlux'] = 10.**(stars['mag_std_noabs'][selected, b] / (-2.5))
+        sourceCat['instFluxErr'] = (np.log(10.) / 2.5) * (stars['magErr_std'][selected, b] *
+                                                          sourceCat['instFlux'])
         # Make sure we only use stars that have valid measurements
         # (This is perhaps redundant with requirements above that the
         # stars be observed in all bands, but it can't hurt)
@@ -621,6 +624,10 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         for b, band in enumerate(self.bands):
             mag = fgcmStarCat['mag_std_noabs'][:, b] + offsets[b]
+            # We want fluxes in Jy from calibrated AB magnitudes
+            # (after applying offset)
+            # TODO: Full implementation of RFC-549 will have all reference
+            # catalogs in nJy instead of Jy.
             flux = afwImage.fluxFromABMag(mag)
             fluxErr = afwImage.fluxErrFromABMagErr(fgcmStarCat['magErr_std'][:, b], mag)
             formattedCat['%s_flux' % (band)][:] = flux
