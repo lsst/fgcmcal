@@ -74,14 +74,14 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config = fgcmcal.FgcmMakeLutConfig()
         self.config.filterNames = ['r', 'i']
         self.config.stdFilterNames = ['r', 'i']
-        self.config.atmosphereTableName = 'fgcm_atm_subaru1_test'
+        self.config.atmosphereTableName = 'fgcm_atm_subaru2_test'
         self.otherArgs = []
 
         nBand = 2
         i0Std = np.array([0.07877351, 0.06464688])
         i10Std = np.array([-0.00061516, -0.00063434])
-        i0Recon = np.array([0.06897538, 0.05616964])
-        i10Recon = np.array([-6.97094875, 3.69335364])
+        i0Recon = np.array([0.0689530429, 0.05600673])
+        i10Recon = np.array([-7.01847144, 3.62675740])
 
         self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
@@ -132,6 +132,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.superStarSubCcd = True
         self.config.superStarSubCcdChebyshevOrder = 1
         self.config.modelMagErrors = False
+        self.config.sigmaCalRange = (0.003, 0.003)
         self.otherArgs = []
 
         nZp = 1232
@@ -139,13 +140,26 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nOkZp = 33
         nBadZp = 1199
         nStdStars = 472
-        nPlots = 27
+        nPlots = 30
+
+        self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots)
+
+        # Test the second fit cycle -- need to copy to unfreeze config
+        newConfig = fgcmcal.FgcmFitCycleConfig()
+        newConfig.update(**self.config.toDict())
+        newConfig.cycleNumber = 1
+        self.config = newConfig
+
+        # These numbers change slightly after the additional cuts
+        nGoodZp = 26
+        nOkZp = 32
+        nBadZp = 1200
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots)
 
         # And output the products
         self.config = fgcmcal.FgcmOutputProductsConfig()
-        self.config.cycleNumber = 0
+        self.config.cycleNumber = 1
         self.config.photoCal.photoCatName = 'sdss-dr9-fink-v5b'
         self.config.photoCal.colorterms.data = {}
         self.config.photoCal.colorterms.data['sdss*'] = lsst.pipe.tasks.colorterms.ColortermDict()
@@ -171,7 +185,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.refObjLoader.retarget(target=LoadAstrometryNetObjectsTask)
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([8.877202988, 9.163103988])
+        zpOffsets = np.array([8.877352, 9.166878])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
