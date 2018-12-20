@@ -185,7 +185,10 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.refObjLoader.retarget(target=LoadAstrometryNetObjectsTask)
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([8.877352, 9.166878])
+        # These zeropoint offsets are empirical, and are there
+        # to check if changes in the code are altering the final
+        # output in a measurable way.
+        zpOffsets = np.array([-0.0227140467, 0.266808])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
