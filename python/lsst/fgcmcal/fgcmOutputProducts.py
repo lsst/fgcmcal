@@ -778,7 +778,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # Take the zeropoint, apply the absolute relative calibration offset,
         # and whatever flat-field scaling was applied
 
-        calibMean = (offset*units.ABmag).to_value(units.nJy) * scaling
+        calibMean = ((zeropoint + offset)*units.ABmag).to_value(units.nJy) * scaling
         calibErr = (np.log(10.) / 2.5) * calibMean * err
         photoCalib = afwImage.PhotoCalib(calibMean, calibErr)
 
