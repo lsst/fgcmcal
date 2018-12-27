@@ -39,6 +39,7 @@ import copy
 import numpy as np
 import healpy as hp
 import esutil
+from astropy import units
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -743,7 +744,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # Take the zeropoint, apply the absolute relative calibration offset,
         # and whatever flat-field scaling was applied
         pars[:, :] = (coefficients.reshape(orderPlus1, orderPlus1) *
-                      10.**(offset / (-2.5)) * scaling)
+                      (offset*units.ABmag).to_value(units.nJy) * scaling)
 
         field = afwMath.ChebyshevBoundedField(bbox, pars)
         calibMean = field.mean()
@@ -777,7 +778,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # Take the zeropoint, apply the absolute relative calibration offset,
         # and whatever flat-field scaling was applied
 
-        calibMean = 10.**(zeropoint / (-2.5)) * 10.**(offset / (-2.5)) * scaling
+        calibMean = ((zeropoint + offset)*units.ABmag).to_value(units.nJy) * scaling
         calibErr = (np.log(10.) / 2.5) * calibMean * err
         photoCalib = afwImage.PhotoCalib(calibMean, calibErr)
 
