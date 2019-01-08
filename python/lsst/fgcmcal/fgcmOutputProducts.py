@@ -25,7 +25,7 @@
 This task takes the final output from fgcmFitCycle and produces the following
 outputs for use in the DM stack: the FGCM standard stars in a reference
 catalog format; the model atmospheres in "transmission_atmosphere_fgcm"
-format; and the zeropoints in "jointcal_photoCalib" format.  Optionally, the
+format; and the zeropoints in "fgcm_photoCalib" format.  Optionally, the
 task can transfer the 'absolute' calibration from a reference catalog
 to put the fgcm standard stars in units of Jansky.  This is accomplished
 by matching stars in a sample of healpix pixels, and applying the median
@@ -86,7 +86,7 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         default=True,
     )
     doZeropointOutput = pexConfig.Field(
-        doc="Output zeropoints in jointcal_photoCalib format",
+        doc="Output zeropoints in fgcm_photoCalib format",
         dtype=bool,
         default=True,
     )
@@ -639,7 +639,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
     def _outputZeropoints(self, butler, offsets):
         """
-        Output the zeropoints in jointcal_photoCalib format.
+        Output the zeropoints in fgcm_photoCalib format.
 
         Parameters
         ----------
@@ -648,7 +648,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
            Float array of absolute calibration offsets, one for each filter
         """
 
-        self.log.info("Outputting jointcal_photoCalib objects")
+        self.log.info("Outputting fgcm_photoCalib objects")
 
         zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.useCycle)
         visitCat = butler.get('fgcmVisitCatalog')
@@ -706,13 +706,12 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                                          offsetMapping[rec['filtername']],
                                                          scaling)
 
-            butler.put(photoCalib, 'jointcal_photoCalib',
+            butler.put(photoCalib, 'fgcm_photoCalib',
                        dataId={self.visitDataRefName: int(rec['visit']),
                                self.ccdDataRefName: int(rec['ccd']),
-                               'filter': filterMapping[rec['filtername']],
-                               'tract': 0})
+                               'filter': filterMapping[rec['filtername']]})
 
-        self.log.info("Done outputting jointcal_photoCalib objects")
+        self.log.info("Done outputting fgcm_photoCalib objects")
 
     def _getChebyshevPhotoCalib(self, coefficients, err, xyMax, offset, scaling):
         """

@@ -316,19 +316,17 @@ class FgcmcalTestBase(object):
         # Read in all the calibrations, these should all be there
         # This test is simply to ensure that all the photoCalib files exist
         for rec in zptCat[selected]:
-            testCal = butler.get('jointcal_photoCalib',
+            testCal = butler.get('fgcm_photoCalib',
                                  dataId={visitDataRefName: int(rec['visit']),
                                          ccdDataRefName: int(rec['ccd']),
-                                         'filter': filterMapping[rec['filtername']],
-                                         'tract': 0})
+                                         'filter': filterMapping[rec['filtername']]})
             self.assertIsNotNone(testCal)
 
         # We do round-trip value checking on just the final one (chosen arbitrarily)
-        testCal = butler.get('jointcal_photoCalib',
+        testCal = butler.get('fgcm_photoCalib',
                              dataId={visitDataRefName: int(testVisit),
                                      ccdDataRefName: int(testCcd),
-                                     'filter': filterMapping[testFilter],
-                                     'tract': 0})
+                                     'filter': filterMapping[testFilter]})
         self.assertIsNotNone(testCal)
 
         src = butler.get('src', dataId={visitDataRefName: int(testVisit),
