@@ -108,7 +108,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.fitFlag = (1, 1)
         self.config.requiredFlag = (1, 1)
         self.config.filterToBand = {'r': 'r', 'i': 'i'}
-        self.config.maxIter = 1
+        self.config.maxIterBeforeFinalCycle = 1
         self.config.nCore = 1
         self.config.cycleNumber = 0
         self.config.utBoundary = 0.0
@@ -128,21 +128,25 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.nStarPerRun = 50
         self.config.nExpPerRun = 2
         self.config.colorSplitIndices = (0, 1)
-        self.config.outputStandards = True
         self.config.superStarSubCcd = True
         self.config.superStarSubCcdChebyshevOrder = 1
+        self.config.ccdGraySubCcd = False
+        self.config.ccdGraySubCcdChebyshevOrder = 1
+        self.config.ccdGraySubCcdTriangular = True
         self.config.modelMagErrors = False
+        self.config.outputZeropointsBeforeFinalCycle = False
+        self.config.outputStandardsBeforeFinalCycle = False
         self.config.sigmaCalRange = (0.003, 0.003)
         self.otherArgs = []
 
         nZp = 1232
-        nGoodZp = 27
-        nOkZp = 33
-        nBadZp = 1199
-        nStdStars = 472
+        nGoodZp = 26
+        nOkZp = 32
+        nBadZp = 1200
+        nStdStars = 391
         nPlots = 30
 
-        self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots)
+        self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
 
         # Test the second fit cycle -- need to copy to unfreeze config
         newConfig = fgcmcal.FgcmFitCycleConfig()
@@ -150,16 +154,21 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         newConfig.cycleNumber = 1
         self.config = newConfig
 
-        # These numbers change slightly after the additional cuts
-        nGoodZp = 26
-        nOkZp = 32
-        nBadZp = 1200
+        self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
+
+        # Test the "final" fit cycle
+        newConfig = fgcmcal.FgcmFitCycleConfig()
+        newConfig.update(**self.config.toDict())
+        newConfig.cycleNumber = 2
+        newConfig.ccdGraySubCcd = True
+        newConfig.isFinalCycle = True
+        self.config = newConfig
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots)
 
         # And output the products
         self.config = fgcmcal.FgcmOutputProductsConfig()
-        self.config.cycleNumber = 1
+        self.config.cycleNumber = 2
         self.config.photoCal.photoCatName = 'sdss-dr9-fink-v5b'
         self.config.photoCal.colorterms.data = {}
         self.config.photoCal.colorterms.data['sdss*'] = lsst.pipe.tasks.colorterms.ColortermDict()
@@ -188,7 +197,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # These zeropoint offsets are empirical, and are there
         # to check if changes in the code are altering the final
         # output in a measurable way.
-        zpOffsets = np.array([-0.0227140467, 0.266808])
+        zpOffsets = np.array([-0.022274071351, 0.266693204641])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,

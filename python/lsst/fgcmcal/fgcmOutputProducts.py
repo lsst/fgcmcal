@@ -470,7 +470,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             # use median absolute deviation to estimate Normal sigma
             # see https://en.wikipedia.org/wiki/Median_absolute_deviation
             madSigma = 1.4826 * np.median(np.abs(results['zp'][ok, b] - offsets[b]))
-            self.log.info("Reference catalog offset for %s band: %.6f +/- %.6f" %
+            self.log.info("Reference catalog offset for %s band: %.12f +/- %.12f" %
                           (band, offsets[b], madSigma))
 
         return offsets

@@ -197,15 +197,18 @@ ${COOKBOOKRERUN}_cycle01.log
 
 ### Final fit cycle
 
-After the user had concluded that the fit has converged to her satisfaction,
-one last run should be made with zero iterations and with `outputStandards =
-True`.  This will ensure the final products have consistently applied superstar
-flats and internal aperture corrections.  This should only take 2-3 minutes.
+After the user has concluded that the fit has converged to her satisfaction,
+one last run should be made with `isFinalCycle=True`.  This will tell `fgcm` to
+run one final selection of stars and photometric exposures, and will output
+zeropoints and standard stars for use in `fgcmOutputProducts.py`.  Running the
+final cycle ensures that the final products have consistently applied
+selections, superstar flats, and internal aperture corrections.  The final
+cycle run should only take 2-3 minutes.
 
 ```bash
 fgcmFitCycle.py /datasets/hsc/repo --rerun private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile fgcmFitCycleHscCookbook_cycle02_config.py \
---config maxIter=0 --config outputStandards=True |& tee \
+--config isFinalCycle=True --config outputStandards=True |& tee \
 ${COOKBOOKRERUN}_cycle02.log
 ```
 
