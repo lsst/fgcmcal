@@ -178,7 +178,7 @@ class FgcmcalTestBase(object):
         starObs = butler.get('fgcmStarObservations')
         self.assertEqual(nObs, len(starObs))
 
-    def _testFgcmFitCycle(self, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots):
+    def _testFgcmFitCycle(self, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=False):
         """
         Test running of FgcmFitCycleTask
 
@@ -196,6 +196,9 @@ class FgcmcalTestBase(object):
            Number of standard stars produced
         nPlots: `int`
            Number of plots produced
+        skipChecks: `bool`, optional
+           Skip number checks, when running less-than-final cycle.
+           Default is False.
         """
 
         args = [self.inputDir, '--output', self.testDir,
@@ -210,6 +213,9 @@ class FgcmcalTestBase(object):
 
         result = fgcmcal.FgcmFitCycleTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
+
+        if skipChecks:
+            return
 
         # Check that the expected number of plots are there.
         plots = glob.glob(os.path.join(os.getcwd(), self.config.outfileBase + '_cycle00_plots/') + '*.png')
@@ -278,15 +284,15 @@ class FgcmcalTestBase(object):
         # Extract the offsets from the results
         offsets = result.resultList[0].results.offsets
 
-        self.assertFloatsAlmostEqual(offsets[0], zpOffsets[0], rtol=1e-6)
-        self.assertFloatsAlmostEqual(offsets[1], zpOffsets[1], rtol=1e-6)
+        self.assertFloatsAlmostEqual(offsets[0], zpOffsets[0], atol=1e-7)
+        self.assertFloatsAlmostEqual(offsets[1], zpOffsets[1], atol=1e-7)
 
         butler = dafPersistence.butler.Butler(self.testDir)
 
         # Test the reference catalog stars
 
         # Read in the raw stars...
-        rawStars = butler.get('fgcmStandardStars', fgcmcycle=0)
+        rawStars = butler.get('fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
 
         # Read in the new reference catalog...
         config = LoadIndexedReferenceObjectsConfig()

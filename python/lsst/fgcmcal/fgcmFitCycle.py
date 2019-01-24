@@ -121,10 +121,32 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=int,
         default=1,
     )
+    superStarSubCcdTriangular = pexConfig.Field(
+        doc=("Should the sub-ccd superstar chebyshev matrix be triangular to "
+             "suppress high-order cross terms?"),
+        dtype=bool,
+        default=False,
+    )
     superStarSigmaClip = pexConfig.Field(
         doc="Number of sigma to clip outliers when selecting for superstar flats",
         dtype=float,
         default=5.0,
+    )
+    ccdGraySubCcd = pexConfig.Field(
+        doc="Compute CCD gray terms on sub-ccd scale",
+        dtype=bool,
+        default=False,
+    )
+    ccdGraySubCcdChebyshevOrder = pexConfig.Field(
+        doc="Order of the 2D chebyshev polynomials for sub-ccd gray fit.",
+        dtype=int,
+        default=1,
+    )
+    ccdGraySubCcdTriangular = pexConfig.Field(
+        doc=("Should the sub-ccd gray chebyshev matrix be triangular to "
+             "suppress high-order cross terms?"),
+        dtype=bool,
+        default=True,
     )
     cycleNumber = pexConfig.Field(
         doc=("FGCM fit cycle number.  This is automatically incremented after each run "
@@ -132,8 +154,16 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=int,
         default=None,
     )
-    maxIter = pexConfig.Field(
-        doc="Max iterations",
+    isFinalCycle = pexConfig.Field(
+        doc=("Is this the final cycle of the fitting?  Will automatically compute final "
+             "selection of stars and photometric exposures, and will output zeropoints "
+             "and standard stars for use in fgcmOutputProducts"),
+        dtype=bool,
+        default=False,
+    )
+    maxIterBeforeFinalCycle = pexConfig.Field(
+        doc=("Maximum fit iterations, prior to final cycle.  The number of iterations "
+             "will always be 0 in the final cycle for cleanup and final selection."),
         dtype=int,
         default=50,
     )
@@ -326,8 +356,13 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=bool,
         default=False,
     )
-    outputStandards = pexConfig.Field(
-        doc="Output standard stars? (Usually only for final iteration)",
+    outputStandardsBeforeFinalCycle = pexConfig.Field(
+        doc="Output standard stars prior to final cycle?  Used in debugging.",
+        dtype=bool,
+        default=False,
+    )
+    outputZeropointsBeforeFinalCycle = pexConfig.Field(
+        doc="Output standard stars prior to final cycle?  Used in debugging.",
         dtype=bool,
         default=False,
     )
@@ -492,6 +527,21 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         self._checkDatasetsExist(butler)
 
+        # Set defaults on whether to output standards and zeropoints
+        self.maxIter = self.config.maxIterBeforeFinalCycle
+        self.outputStandards = self.config.outputStandardsBeforeFinalCycle
+        self.outputZeropoints = self.config.outputZeropointsBeforeFinalCycle
+        self.resetFitParameters = True
+
+        if self.config.isFinalCycle:
+            # This is the final fit cycle, so we do not want to reset fit
+            # parameters, we want to run a final "clean-up" with 0 fit iterations,
+            # and we always want to output standards and zeropoints
+            self.maxIter = 0
+            self.outputStandards = True
+            self.outputZeropoints = True
+            self.resetFitParameters = False
+
         camera = butler.get('camera')
         configDict = self._makeConfigDict(camera)
 
@@ -619,8 +669,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                      outConfig.cycleNumber)
         outConfig.save(configFileName)
 
-        if self.config.maxIter == 0 and self.config.outputStandards:
-            # We are done, there is no more warning
+        if self.config.isFinalCycle == 0:
+            # We are done, ready to output products
             self.log.info("Everything is in place to run fgcmOutputProducts.py")
         else:
             self.log.info("Saved config for next cycle to %s" % (configFileName))
@@ -628,8 +678,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             self.log.info("   config.expGrayPhotometricCut")
             self.log.info("   config.expGrayHighCut")
             self.log.info("If you are satisfied with the fit, please set:")
-            self.log.info("   config.maxIter = 0")
-            self.log.info("   config.outputStandards = True")
+            self.log.info("   config.isFinalCycle = True")
 
     def _checkDatasetsExist(self, butler):
         """
@@ -928,11 +977,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             parts = ccut.split(',')
             starColorCutList.append([parts[0], parts[1], float(parts[2]), float(parts[3])])
 
-        if self.config.maxIter == 0:
-            resetParameters = False
-        else:
-            resetParameters = True
-
         # TODO: Having direct access to the mirror area from the camera would be
         #  useful.  See DM-16489.
         # Mirror area in cm**2
@@ -972,9 +1016,13 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'precomputeSuperStarInitialCycle': self.config.precomputeSuperStarInitialCycle,
                       'superStarSubCCD': self.config.superStarSubCcd,
                       'superStarSubCCDChebyshevOrder': self.config.superStarSubCcdChebyshevOrder,
+                      'superStarSubCCDTriangular': self.config.superStarSubCcdTriangular,
                       'superStarSigmaClip': self.config.superStarSigmaClip,
+                      'ccdGraySubCCD': self.config.ccdGraySubCcd,
+                      'ccdGraySubCCDChebyshevOrder': self.config.ccdGraySubCcdChebyshevOrder,
+                      'ccdGraySubCCDTriangular': self.config.ccdGraySubCcdTriangular,
                       'cycleNumber': self.config.cycleNumber,
-                      'maxIter': self.config.maxIter,
+                      'maxIter': self.maxIter,
                       'UTBoundary': self.config.utBoundary,
                       'washMJDs': self.config.washMjds,
                       'epochMJDs': self.config.epochMjds,
@@ -1020,7 +1068,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'outputStars': False,
                       'clobber': True,
                       'useSedLUT': False,
-                      'resetParameters': resetParameters}
+                      'resetParameters': self.resetFitParameters,
+                      'outputZeropoints': self.outputZeropoints}
 
         return configDict
 
@@ -1222,20 +1271,26 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         butler.put(flagStarCat, 'fgcmFlaggedStars', fgcmcycle=self.config.cycleNumber)
 
-        # Save the zeropoint information
-        zptSchema = self._makeZptSchema(fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_CHEB'].shape[1])
-        zptCat = self._makeZptCat(zptSchema, fgcmFitCycle.fgcmZpts.zpStruct)
+        # Save the zeropoint information and atmospheres only if desired
+        if self.outputZeropoints:
+            if self.config.superStarSubCcd or self.config.ccdGraySubCcd:
+                chebSize = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_CHEB'].shape[1]
+            else:
+                chebSize = 0
+            zptSchema = self._makeZptSchema(chebSize)
+            zptCat = self._makeZptCat(zptSchema, fgcmFitCycle.fgcmZpts.zpStruct)
 
-        butler.put(zptCat, 'fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
+            butler.put(zptCat, 'fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
 
-        # Save atmosphere values
-        atmSchema = self._makeAtmSchema()
-        atmCat = self._makeAtmCat(atmSchema, fgcmFitCycle.fgcmZpts.atmStruct)
+            # Save atmosphere values
+            # These are generated by the same code that generates zeropoints
+            atmSchema = self._makeAtmSchema()
+            atmCat = self._makeAtmCat(atmSchema, fgcmFitCycle.fgcmZpts.atmStruct)
 
-        butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
+            butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
 
         # Save the standard stars (if configured)
-        if self.config.outputStandards:
+        if self.outputStandards:
             stdSchema = self._makeStdSchema()
             stdStruct = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
             stdCat = self._makeStdCat(stdSchema, stdStruct)
