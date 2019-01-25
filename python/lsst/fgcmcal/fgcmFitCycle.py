@@ -665,6 +665,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         outConfig.cycleNumber += 1
         outConfig.precomputeSuperStarInitialCycle = False
         outConfig.freezeStdAtmosphere = False
+        outConfig.expGrayPhotometricCut[:] = fgcmFitCycle.updatedPhotometricCut
+        outConfig.expGrayHighCut[:] = fgcmFitCycle.updatedHighCut
         configFileName = '%s_cycle%02d_config.py' % (outConfig.outfileBase,
                                                      outConfig.cycleNumber)
         outConfig.save(configFileName)
