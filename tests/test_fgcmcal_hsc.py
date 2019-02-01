@@ -36,8 +36,6 @@ import numpy as np
 import lsst.utils
 import lsst.pex.exceptions
 
-from lsst.meas.extensions.astrometryNet import LoadAstrometryNetObjectsTask
-
 import fgcmcalTestBase
 
 import lsst.fgcmcal as fgcmcal
@@ -191,13 +189,13 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.photoCal.colorterms.data['sdss*'].data['i'].c0 = 0.00130204
         self.config.photoCal.colorterms.data['sdss*'].data['i'].c1 = -0.16922042
         self.config.photoCal.colorterms.data['sdss*'].data['i'].c2 = -0.01374245
-        self.config.refObjLoader.retarget(target=LoadAstrometryNetObjectsTask)
+        self.config.refObjLoader.ref_dataset_name = "sdss-dr9-fink-v5b"
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
         # These zeropoint offsets are empirical, and are there
         # to check if changes in the code are altering the final
         # output in a measurable way.
-        zpOffsets = np.array([-0.022274071351, 0.266693204641])
+        zpOffsets = np.array([-0.022274071351, 0.26665198802948])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
