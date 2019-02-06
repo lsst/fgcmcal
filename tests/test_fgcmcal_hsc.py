@@ -195,7 +195,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # These zeropoint offsets are empirical, and are there
         # to check if changes in the code are altering the final
         # output in a measurable way.
-        zpOffsets = np.array([-0.022274071351, 0.26665198802948])
+        zpOffsets = np.array([-0.0223396513611, 0.266586363316])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
