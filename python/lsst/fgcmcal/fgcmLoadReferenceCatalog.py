@@ -34,7 +34,7 @@ from astropy import units
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask
+from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask, ReferenceSourceSelectorTask
 from lsst.meas.algorithms import getRefFluxField
 from lsst.pipe.tasks.colorterms import ColortermLibrary
 from lsst.afw.image import fluxErrFromABMagErr, abMagErrFromFluxErr
@@ -60,6 +60,10 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
         doc="Library of photometric reference catalog name to color term dict.",
         dtype=ColortermLibrary,
     )
+    referenceSelector = pexConfig.ConfigurableField(
+        target=ReferenceSourceSelectorTask,
+        doc="Selection of reference sources",
+    )
 
     def validate(self):
         super().validate()
@@ -68,7 +72,10 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
             raise pexConfig.FieldValidationError(FgcmLoadReferenceCatalogConfig.colorterms, self, msg)
 
     def setDefaults(self):
-        pass
+        pexConfig.Config.setDefaults(self)
+
+        # self.referenceSelection.doSignalToNoise = True
+        # self.referenceSelection.signalToNoise.minimum = 10.0
 
 
 class FgcmLoadReferenceCatalogTask(pipeBase.Task):
@@ -94,6 +101,7 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         pipeBase.Task.__init__(self, *args, **kwargs)
         self.butler = butler
         self.makeSubtask('refObjLoader', butler=butler)
+        self.makeSubtask('referenceSelector')
         self._fluxFilters = None
         self._fluxFields = None
         self._referenceFilter = None
@@ -237,12 +245,14 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
                 refCat[fluxField+'Err'] *= 1e9
 
         # Do selections here...
-        # FIXME
+        goodSources = self.referenceSelector.selectSources(refCat)
+        # Convert to index array, easier down below
+        selected, = np.where(goodSources.selected)
 
-        fgcmRefCat = np.zeros(len(refCat), dtype=[('ra', 'f8'),
-                                                  ('dec', 'f8'),
-                                                  ('refMag', 'f4', len(filterList)),
-                                                  ('refMagErr', 'f4', len(filterList))])
+        fgcmRefCat = np.zeros(len(selected), dtype=[('ra', 'f8'),
+                                                    ('dec', 'f8'),
+                                                    ('refMag', 'f4', len(filterList)),
+                                                    ('refMagErr', 'f4', len(filterList))])
 
         # The ra/dec native Angle format is radians
         # We determine the conversion from the native units (typically
@@ -251,16 +261,18 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         # be approximately 600x slower.
 
         conv = refCat[0]['coord_ra'].asDegrees() / float(refCat[0]['coord_ra'])
-        fgcmRefCat['ra'] = refCat['coord_ra'] * conv
-        fgcmRefCat['dec'] = refCat['coord_dec'] * conv
+        fgcmRefCat['ra'] = refCat['coord_ra'][selected] * conv
+        fgcmRefCat['dec'] = refCat['coord_dec'][selected] * conv
 
         for i, fluxField in enumerate(self._fluxFields):
             fgcmRefCat['refMag'][:, i] = 99.0
             fgcmRefCat['refMagErr'][:, i] = 99.0
-            good, = np.where(refCat[fluxField] > 0.0)
-            fgcmRefCat['refMag'][good, i] = (refCat[fluxField][good] * units.nJy).to_value(units.ABmag)
-            fgcmRefCat['refMagErr'][good, i] = abMagErrFromFluxErr(refCat[fluxField+'Err'][good],
-                                                                   refCat[fluxField][good])
+            good, = np.where(np.nan_to_num(refCat[fluxField][selected]) > 0.0)
+            goodSel = selected[good]
+            fgcmRefCat['refMag'][good, i] = (refCat[fluxField][goodSel] *
+                                             units.nJy).to_value(units.ABmag)
+            fgcmRefCat['refMagErr'][good, i] = abMagErrFromFluxErr(refCat[fluxField+'Err'][goodSel],
+                                                                   refCat[fluxField][goodSel])
 
         return fgcmRefCat
 
