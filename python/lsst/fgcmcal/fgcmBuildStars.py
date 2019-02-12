@@ -43,6 +43,8 @@ from lsst.daf.base.dateTime import DateTime
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
+from .fgcmLoadReferenceCatalog import FgcmLoadReferenceCatalogTask
+
 import fgcm
 
 __all__ = ['FgcmBuildStarsConfig', 'FgcmBuildStarsTask', 'FgcmBuildStarsRunner']
@@ -103,8 +105,10 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=str,
         default=(),
     )
-    referenceBands = pexConfig.ListField(
-        doc="Reference bands for primary matches",
+    primaryBands = pexConfig.ListField(
+        doc=("Bands for 'primary' star matches. "
+             "A star must be observed in one of these bands to be considered "
+             "as a calibration star."),
         dtype=str,
         default=None
     )
@@ -151,6 +155,20 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         doc="Field that contains outer aperture for aperture correction proxy",
         dtype=str,
         default='base_CircularApertureFlux_17_0_instFlux'
+    )
+    doReferenceMatches = pexConfig.Field(
+        doc="Match reference catalog as additional constraint on calibration",
+        dtype=bool,
+        default=False,
+    )
+    fgcmLoadReferenceCatalog = pexConfig.ConfigurableField(
+        target=FgcmLoadReferenceCatalogTask,
+        doc="FGCM reference object loader",
+    )
+    referenceBands = pexConfig.ListField(
+        doc="bands, in wavelength order, that will be calibrated",
+        dtype=str,
+        default=(),
     )
 
     def setDefaults(self):
@@ -308,6 +326,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            and the code will find the other source catalogs from
            each visit.
         """
+
+        if self.config.doReferenceMatches:
+            self.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
 
         # Make the visit catalog if necessary
         if not butler.datasetExists('fgcmVisitCatalog'):
@@ -594,15 +615,22 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempAperCat = afwTable.BaseCatalog(aperVisitCatalog.schema)
                 tempAperCat.reserve(goodSrc.selected.sum())
                 tempAperCat.extend(sources[goodSrc.selected], mapper=aperMapper)
-                tempAperCat[instMagInKey][:] = -2.5 * np.log10(sources[instFluxAperInKey][goodSrc.selected])
-                tempAperCat[instMagErrInKey][:] = (2.5 / np.log(10.)) * (
-                    sources[instFluxErrAperInKey][goodSrc.selected] /
-                    sources[instFluxAperInKey][goodSrc.selected])
-                tempAperCat[instMagOutKey][:] = -2.5 * np.log10(
-                    sources[instFluxAperOutKey][goodSrc.selected])
-                tempAperCat[instMagErrOutKey][:] = (2.5 / np.log(10.)) * (
-                    sources[instFluxErrAperOutKey][goodSrc.selected] /
-                    sources[instFluxAperOutKey][goodSrc.selected])
+
+                with np.warnings.catch_warnings():
+                    # Ignore warnings, we will filter infinities and
+                    # nans below.
+                    np.warnings.simplefilter("ignore")
+
+                    tempAperCat[instMagInKey][:] = -2.5 * \
+                        np.log10(sources[instFluxAperInKey][goodSrc.selected])
+                    tempAperCat[instMagErrInKey][:] = (2.5 / np.log(10.)) * (
+                        sources[instFluxErrAperInKey][goodSrc.selected] /
+                        sources[instFluxAperInKey][goodSrc.selected])
+                    tempAperCat[instMagOutKey][:] = -2.5 * np.log10(
+                        sources[instFluxAperOutKey][goodSrc.selected])
+                    tempAperCat[instMagErrOutKey][:] = (2.5 / np.log(10.)) * (
+                        sources[instFluxErrAperOutKey][goodSrc.selected] /
+                        sources[instFluxAperOutKey][goodSrc.selected])
 
                 aperVisitCatalog.extend(tempAperCat)
 
@@ -680,43 +708,39 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                       'coarseNSide': self.config.coarseNside,
                       'densNSide': self.config.densityCutNside,
                       'densMaxPerPixel': self.config.densityCutMaxPerPixel,
+                      'primaryBands': self.config.primaryBands,
                       'referenceBands': self.config.referenceBands}
 
         # initialize the FgcmMakeStars object
         fgcmMakeStars = fgcm.FgcmMakeStars(starConfig)
 
-        # make the reference stars
+        # make the primary stars
         #  note that the ra/dec native Angle format is radians
         # We determine the conversion from the native units (typically
         # radians) to degrees for the first observation.  This allows us
         # to treate ra/dec as numpy arrays rather than Angles, which would
         # be approximately 600x slower.
         conv = obsCat[0]['ra'].asDegrees() / float(obsCat[0]['ra'])
-        fgcmMakeStars.makeReferenceStars(obsCat['ra'] * conv,
-                                         obsCat['dec'] * conv,
-                                         filterNameArray=obsFilterNames,
-                                         bandSelected=False)
+        fgcmMakeStars.makePrimaryStars(obsCat['ra'] * conv,
+                                       obsCat['dec'] * conv,
+                                       filterNameArray=obsFilterNames,
+                                       bandSelected=False)
 
         # and match all the stars
         fgcmMakeStars.makeMatchedStars(obsCat['ra'] * conv,
                                        obsCat['dec'] * conv,
                                        obsFilterNames)
 
+        if self.config.doReferenceMatches:
+            fgcmMakeStars.makeReferenceMatches(self.fgcmLoadReferenceCatalog)
+
         # now persist
 
-        # afwTable for objects
-        objSchema = afwTable.Schema()
-        objSchema.addField('fgcm_id', type=np.int32, doc='FGCM Unique ID')
-        # FIXME: should be angle?
-        objSchema.addField('ra', type=np.float64, doc='Mean object RA')
-        objSchema.addField('dec', type=np.float64, doc='Mean object Dec')
-        objSchema.addField('obsArrIndex', type=np.int32,
-                           doc='Index in obsIndexTable for first observation')
-        objSchema.addField('nObs', type=np.int32, doc='Total number of observations')
+        objSchema = self._makeFgcmObjSchema()
 
         # make catalog and records
         fgcmStarIdCat = afwTable.BaseCatalog(objSchema)
-        fgcmStarIdCat.table.preallocate(fgcmMakeStars.objIndexCat.size)
+        fgcmStarIdCat.reserve(fgcmMakeStars.objIndexCat.size)
         for i in range(fgcmMakeStars.objIndexCat.size):
             fgcmStarIdCat.addNew()
 
@@ -729,18 +753,31 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         butler.put(fgcmStarIdCat, 'fgcmStarIds')
 
-        # afwTable for observation indices
-        obsSchema = afwTable.Schema()
-        obsSchema.addField('obsIndex', type=np.int32, doc='Index in observation table')
+        obsSchema = self._makeFgcmObsSchema()
 
         fgcmStarIndicesCat = afwTable.BaseCatalog(obsSchema)
-        fgcmStarIndicesCat.table.preallocate(fgcmMakeStars.obsIndexCat.size)
+        fgcmStarIndicesCat.reserve(fgcmMakeStars.obsIndexCat.size)
         for i in range(fgcmMakeStars.obsIndexCat.size):
             fgcmStarIndicesCat.addNew()
 
         fgcmStarIndicesCat['obsIndex'][:] = fgcmMakeStars.obsIndexCat['obsindex']
 
         butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
+
+        if self.config.doReferenceMatches:
+            refSchema = self._makeFgcmRefSchema(len(self.config.referenceBands))
+
+            fgcmRefCat = afwTable.BaseCatalog(refSchema)
+            fgcmRefCat.reserve(fgcmMakeStars.referenceCat.size)
+
+            for i in range(fgcmMakeStars.referenceCat.size):
+                fgcmRefCat.addNew()
+
+            fgcmRefCat['fgcm_id'][:] = fgcmMakeStars.referenceCat['fgcm_id']
+            fgcmRefCat['refMag'][:, :] = fgcmMakeStars.referenceCat['refMag']
+            fgcmRefCat['refMagErr'][:, :] = fgcmMakeStars.referenceCat['refMagErr']
+
+            butler.put(fgcmRefCat, 'fgcmReferenceStars')
 
     def _makeFgcmVisitSchema(self, nCcd):
         """
@@ -842,3 +879,60 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                                doc="Magnitude error at outer aperture")
 
         return aperMapper
+
+    def _makeFgcmObjSchema(self):
+        """
+        Make a schema for the objIndexCat from fgcmMakeStars
+
+        Returns
+        -------
+        schema: `afwTable.Schema`
+        """
+
+        objSchema = afwTable.Schema()
+        objSchema.addField('fgcm_id', type=np.int32, doc='FGCM Unique ID')
+        # Will investigate making these angles...
+        objSchema.addField('ra', type=np.float64, doc='Mean object RA (deg)')
+        objSchema.addField('dec', type=np.float64, doc='Mean object Dec (deg)')
+        objSchema.addField('obsArrIndex', type=np.int32,
+                           doc='Index in obsIndexTable for first observation')
+        objSchema.addField('nObs', type=np.int32, doc='Total number of observations')
+
+        return objSchema
+
+    def _makeFgcmObsSchema(self):
+        """
+        Make a schema for the obsIndexCat from fgcmMakeStars
+
+        Returns
+        -------
+        schema: `afwTable.Schema`
+        """
+
+        obsSchema = afwTable.Schema()
+        obsSchema.addField('obsIndex', type=np.int32, doc='Index in observation table')
+
+        return obsSchema
+
+    def _makeFgcmRefSchema(self, nReferenceBands):
+        """
+        Make a schema for the referenceCat from fgcmMakeStars
+
+        Parameters
+        ----------
+        nReferenceBands: `int`
+           Number of reference bands
+
+        Returns
+        -------
+        schema: `afwTable.Schema`
+        """
+
+        refSchema = afwTable.Schema()
+        refSchema.addField('fgcm_id', type=np.int32, doc='FGCM Unique ID')
+        refSchema.addField('refMag', type='ArrayF', doc='Reference magnitude array (AB)',
+                           size=nReferenceBands)
+        refSchema.addField('refMagErr', type='ArrayF', doc='Reference magnitude error array',
+                           size=nReferenceBands)
+
+        return refSchema

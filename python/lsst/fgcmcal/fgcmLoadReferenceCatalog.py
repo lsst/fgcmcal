@@ -260,19 +260,20 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         # to treate ra/dec as numpy arrays rather than Angles, which would
         # be approximately 600x slower.
 
-        conv = refCat[0]['coord_ra'].asDegrees() / float(refCat[0]['coord_ra'])
-        fgcmRefCat['ra'] = refCat['coord_ra'][selected] * conv
-        fgcmRefCat['dec'] = refCat['coord_dec'][selected] * conv
+        if len(selected) > 0:
+            conv = refCat[0]['coord_ra'].asDegrees() / float(refCat[0]['coord_ra'])
+            fgcmRefCat['ra'] = refCat['coord_ra'][selected] * conv
+            fgcmRefCat['dec'] = refCat['coord_dec'][selected] * conv
 
-        for i, fluxField in enumerate(self._fluxFields):
-            fgcmRefCat['refMag'][:, i] = 99.0
-            fgcmRefCat['refMagErr'][:, i] = 99.0
-            good, = np.where(np.nan_to_num(refCat[fluxField][selected]) > 0.0)
-            goodSel = selected[good]
-            fgcmRefCat['refMag'][good, i] = (refCat[fluxField][goodSel] *
-                                             units.nJy).to_value(units.ABmag)
-            fgcmRefCat['refMagErr'][good, i] = abMagErrFromFluxErr(refCat[fluxField+'Err'][goodSel],
-                                                                   refCat[fluxField][goodSel])
+            for i, fluxField in enumerate(self._fluxFields):
+                fgcmRefCat['refMag'][:, i] = 99.0
+                fgcmRefCat['refMagErr'][:, i] = 99.0
+                good, = np.where(np.nan_to_num(refCat[fluxField][selected]) > 0.0)
+                goodSel = selected[good]
+                fgcmRefCat['refMag'][good, i] = (refCat[fluxField][goodSel] *
+                                                 units.nJy).to_value(units.ABmag)
+                fgcmRefCat['refMagErr'][good, i] = abMagErrFromFluxErr(refCat[fluxField+'Err'][goodSel],
+                                                                       refCat[fluxField][goodSel])
 
         return fgcmRefCat
 

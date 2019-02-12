@@ -79,6 +79,22 @@ class FgcmFitCycleConfig(pexConfig.Config):
         itemtype=str,
         default={},
     )
+    doReferenceCalibration = pexConfig.Field(
+        doc="Use reference catalog as additional constraint on calibration",
+        dtype=bool,
+        default=False,
+    )
+    refStarSnMin = pexConfig.Field(
+        doc="Reference star signal-to-noise minimum to use in calibration.  Set to <=0 for no cut.",
+        dtype=float,
+        default=20.0,
+    )
+    refStarOutlierNSig = pexConfig.Field(
+        doc=("Number of sigma compared to average mag for reference star to be considered an outlier. "
+             "Computed per-band, and if it is an outlier in any band it is rejected from fits."),
+        dtype=float,
+        default=4.0,
+    )
     nCore = pexConfig.Field(
         doc="Number of cores to use",
         dtype=int,
@@ -296,10 +312,10 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=0.10,
     )
-    approxThroughput = pexConfig.Field(
+    approxThroughput = pexConfig.ListField(
         doc="Approximate overall throughput at start of calibration observations",
         dtype=float,
-        default=1.0,
+        default=(1.0, ),
     )
     sigmaCalRange = pexConfig.ListField(
         doc="Allowed range for systematic error floor estimation",
@@ -595,6 +611,16 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             flagId = None
             flagFlag = None
 
+        if self.config.doReferenceCalibration:
+            refStars = butler.get('fgcmReferenceStars')
+            refId = refStars['fgcm_id'][:]
+            refMag = refStars['refMag'][:, :]
+            refMagErr = refStars['refMagErr'][:, :]
+        else:
+            refId = None
+            refMag = None
+            refMagErr = None
+
         # match star observations to visits
         # Only those star observations that match visits from fgcmExpInfo['VISIT'] will
         # actually be transferred into fgcm using the indexing below.
@@ -627,6 +653,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                             starIds['nObs'][:],
                             obsX=starObs['x'][starIndices['obsIndex']],
                             obsY=starObs['y'][starIndices['obsIndex']],
+                            refID=refId,
+                            refMag=refMag,
+                            refMagErr=refMagErr,
                             flagID=flagId,
                             flagFlag=flagFlag,
                             computeNobs=True)
@@ -638,6 +667,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         flagId = None
         flagFlag = None
         flaggedStars = None
+        refStars = None
 
         # and set the bits in the cycle object
         fgcmFitCycle.setLUT(fgcmLut)
@@ -720,6 +750,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                         fgcmcycle=self.config.cycleNumber-1):
                 raise RuntimeError("Could not find fgcmFlaggedStars for previous cycle (%d) in repo!" %
                                    (self.config.cycleNumber-1))
+
+        # And additional dataset if we want reference calibration
+        if self.config.doReferenceCalibration:
+            if not butler.datasetExists('fgcmReferenceStars'):
+                raise RuntimeError("Could not find fgcmReferenceStars in repo, and "
+                                   "doReferenceCalibration is True.")
 
     def _loadFgcmLut(self, butler, filterToBand=None):
         """
@@ -1042,6 +1078,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'expGrayRecoverCut': self.config.expGrayRecoverCut,
                       'expVarGrayPhotometricCut': self.config.expVarGrayPhotometricCut,
                       'expGrayErrRecoverCut': self.config.expGrayErrRecoverCut,
+                      'refStarSnMin': self.config.refStarSnMin,
+                      'refStarOutlierNSig': self.config.refStarOutlierNSig,
                       'illegalValue': -9999.0,  # internally used by fgcm.
                       'starColorCuts': starColorCutList,
                       'aperCorrFitNBins': self.config.aperCorrFitNBins,
@@ -1050,7 +1088,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'sigFgcmMaxErr': self.config.sigFgcmMaxErr,
                       'sigFgcmMaxEGray': self.config.sigFgcmMaxEGray,
                       'ccdGrayMaxStarErr': self.config.ccdGrayMaxStarErr,
-                      'approxThroughput': self.config.approxThroughput,
+                      'approxThroughput': list(self.config.approxThroughput),
                       'sigmaCalRange': list(self.config.sigmaCalRange),
                       'sigmaCalFitPercentile': list(self.config.sigmaCalFitPercentile),
                       'sigmaCalPlotPercentile': list(self.config.sigmaCalPlotPercentile),
@@ -1160,6 +1198,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                       ('PARRETRIEVEDLNPWVOFFSET', 'f8'),
                                       ('PARRETRIEVEDLNPWVNIGHTLYOFFSET', 'f8',
                                        parCat['parRetrievedLnPwvNightlyOffset'].size),
+                                      ('COMPABSTHROUGHPUT', 'f8',
+                                       parCat['compAbsThroughput'].size),
+                                      ('COMPREFOFFSET', 'f8',
+                                       parCat['compRefOffset'].size),
+                                      ('COMPREFSIGMA', 'f8',
+                                       parCat['compRefSigma'].size),
                                       ('COMPAPERCORRPIVOT', 'f8',
                                        parCat['compAperCorrPivot'].size),
                                       ('COMPAPERCORRSLOPE', 'f8',
@@ -1209,6 +1253,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParams['PARRETRIEVEDLNPWVSCALE'] = parCat['parRetrievedLnPwvScale']
         inParams['PARRETRIEVEDLNPWVOFFSET'] = parCat['parRetrievedLnPwvOffset']
         inParams['PARRETRIEVEDLNPWVNIGHTLYOFFSET'][:] = parCat['parRetrievedLnPwvNightlyOffset'][0, :]
+        inParams['COMPABSTHROUGHPUT'][:] = parCat['compAbsThroughput'][0, :]
+        inParams['COMPREFOFFSET'][:] = parCat['compRefOffset'][0, :]
+        inParams['COMPREFSIGMA'][:] = parCat['compRefSigma'][0, :]
         inParams['COMPAPERCORRPIVOT'][:] = parCat['compAperCorrPivot'][0, :]
         inParams['COMPAPERCORRSLOPE'][:] = parCat['compAperCorrSlope'][0, :]
         inParams['COMPAPERCORRSLOPEERR'][:] = parCat['compAperCorrSlopeErr'][0, :]
@@ -1384,6 +1431,15 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('parRetrievedLnPwvNightlyOffset', type='ArrayD',
                            doc='Nightly offset for retrieved ln(pwv)',
                            size=pars['PARRETRIEVEDLNPWVNIGHTLYOFFSET'].size)
+        parSchema.addField('compAbsThroughput', type='ArrayD',
+                           doc='Absolute throughput (relative to transmission curves)',
+                           size=pars['COMPABSTHROUGHPUT'].size)
+        parSchema.addField('compRefOffset', type='ArrayD',
+                           doc='Offset between reference stars and calibrated stars',
+                           size=pars['COMPREFOFFSET'].size)
+        parSchema.addField('compRefSigma', type='ArrayD',
+                           doc='Width of reference star/calibrated star distribution',
+                           size=pars['COMPREFSIGMA'].size)
         parSchema.addField('compAperCorrPivot', type='ArrayD', doc='Aperture correction pivot',
                            size=pars['COMPAPERCORRPIVOT'].size)
         parSchema.addField('compAperCorrSlope', type='ArrayD', doc='Aperture correction slope',
@@ -1489,6 +1545,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                     'parQeSysIntercept',
                     'parQeSysSlope', 'parRetrievedLnPwvNightlyOffset', 'compAperCorrPivot',
                     'parFilterOffset', 'parFilterOffsetFitFlag',
+                    'compAbsThroughput', 'compRefOffset', 'compRefSigma',
                     'compAperCorrSlope', 'compAperCorrSlopeErr', 'compAperCorrRange',
                     'compModelErrExptimePivot', 'compModelErrFwhmPivot',
                     'compModelErrSkyPivot', 'compModelErrPars',
