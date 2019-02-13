@@ -37,7 +37,7 @@ import lsst.pipe.base as pipeBase
 from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask, ReferenceSourceSelectorTask
 from lsst.meas.algorithms import getRefFluxField
 from lsst.pipe.tasks.colorterms import ColortermLibrary
-from lsst.afw.image import fluxErrFromABMagErr, abMagErrFromFluxErr
+from lsst.afw.image import abMagErrFromFluxErr
 import lsst.geom
 
 __all__ = ['FgcmLoadReferenceCatalogConfig', 'FgcmLoadReferenceCatalogTask']
@@ -215,6 +215,32 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         else:
             refCat = skyCircle.refCat
 
+        # Select on raw (uncorrected) catalog, where the errors should make more sense
+        goodSources = self.referenceSelector.selectSources(refCat)
+        selected = goodSources.selected
+
+        fgcmRefCat = np.zeros(np.sum(selected), dtype=[('ra', 'f8'),
+                                                       ('dec', 'f8'),
+                                                       ('refMag', 'f4', len(filterList)),
+                                                       ('refMagErr', 'f4', len(filterList))])
+        if fgcmRefCat.size == 0:
+            # Return an empty catalog if we don't have any selected sources
+            return fgcmRefCat
+
+        # The ra/dec native Angle format is radians
+        # We determine the conversion from the native units (typically
+        # radians) to degrees for the first observation.  This allows us
+        # to treate ra/dec as numpy arrays rather than Angles, which would
+        # be approximately 600x slower.
+
+        conv = refCat[0]['coord_ra'].asDegrees() / float(refCat[0]['coord_ra'])
+        fgcmRefCat['ra'] = refCat['coord_ra'][selected] * conv
+        fgcmRefCat['dec'] = refCat['coord_dec'][selected] * conv
+
+        # Default (unset) values are 99.0
+        fgcmRefCat['refMag'][:, :] = 99.0
+        fgcmRefCat['refMagErr'][:, :] = 99.0
+
         if self.config.applyColorTerms:
             try:
                 refCatName = self.refObjLoader.ref_dataset_name
@@ -223,57 +249,37 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
                 # completely removed a.net support
                 raise RuntimeError("Cannot perform colorterm corrections with a.net refcats.")
 
-            for filterName, fluxField in zip(self._fluxFilters, self._fluxFields):
+            for i, (filterName, fluxField) in enumerate(zip(self._fluxFilters, self._fluxFields)):
                 if fluxField is None:
                     continue
 
-                self.log.info("Applying color terms for filtername=%r" % (filterName))
+                self.log.debug("Applying color terms for filtername=%r" % (filterName))
 
                 colorterm = self.config.colorterms.getColorterm(
                     filterName=filterName, photoCatName=refCatName, doRaise=True)
 
                 refMag, refMagErr = colorterm.getCorrectedMagnitudes(refCat, filterName)
-                refCat[fluxField] = units.Magnitude(refMag, units.ABmag).to_value(units.nJy)
-                refCat[fluxField+'Err'] = fluxErrFromABMagErr(refMagErr, refMag) * 1e9
+
+                good, = np.where((np.nan_to_num(refMag[selected]) < 90.0) &
+                                 (np.nan_to_num(refMagErr[selected]) < 90.0) &
+                                 (np.nan_to_num(refMagErr[selected]) > 0.0))
+
+                fgcmRefCat['refMag'][good, i] = refMag[selected][good]
+                fgcmRefCat['refMagErr'][good, i] = refMagErr[selected][good]
+
         else:
-            # TODO: need to scale these until RFC-549 is completed and refcats return nanojansky
-            for filterName, fluxField in zip(self._fluxFilters, self._fluxFields):
-                if fluxField is None:
-                    continue
+            # No colorterms
 
-                refCat[fluxField] *= 1e9
-                refCat[fluxField+'Err'] *= 1e9
+            # TODO: need to use Jy here until RFC-549 is completed and refcats return nanojansky
 
-        # Do selections here...
-        goodSources = self.referenceSelector.selectSources(refCat)
-        # Convert to index array, easier down below
-        selected, = np.where(goodSources.selected)
-
-        fgcmRefCat = np.zeros(len(selected), dtype=[('ra', 'f8'),
-                                                    ('dec', 'f8'),
-                                                    ('refMag', 'f4', len(filterList)),
-                                                    ('refMagErr', 'f4', len(filterList))])
-
-        # The ra/dec native Angle format is radians
-        # We determine the conversion from the native units (typically
-        # radians) to degrees for the first observation.  This allows us
-        # to treate ra/dec as numpy arrays rather than Angles, which would
-        # be approximately 600x slower.
-
-        if len(selected) > 0:
-            conv = refCat[0]['coord_ra'].asDegrees() / float(refCat[0]['coord_ra'])
-            fgcmRefCat['ra'] = refCat['coord_ra'][selected] * conv
-            fgcmRefCat['dec'] = refCat['coord_dec'][selected] * conv
-
-            for i, fluxField in enumerate(self._fluxFields):
-                fgcmRefCat['refMag'][:, i] = 99.0
-                fgcmRefCat['refMagErr'][:, i] = 99.0
-                good, = np.where(np.nan_to_num(refCat[fluxField][selected]) > 0.0)
-                goodSel = selected[good]
-                fgcmRefCat['refMag'][good, i] = (refCat[fluxField][goodSel] *
-                                                 units.nJy).to_value(units.ABmag)
-                fgcmRefCat['refMagErr'][good, i] = abMagErrFromFluxErr(refCat[fluxField+'Err'][goodSel],
-                                                                       refCat[fluxField][goodSel])
+            for i, (filterName, fluxField) in enumerate(zip(self._fluxFilters, self._fluxFields)):
+                good, = np.where((np.nan_to_num(refCat[fluxField][selected]) > 0.0) &
+                                 (np.nan_to_num(refCat[fluxField+'Err'][selected]) > 0.0))
+                refMag = (refCat[fluxField][selected][good] * units.Jy).to_value(units.ABmag)
+                refMagErr = abMagErrFromFluxErr(refCat[fluxField+'Err'][selected][good],
+                                                refCat[fluxField][selected][good])
+                fgcmRefCat['refMag'][good, i] = refMag
+                fgcmRefCat['refMagErr'][good, i] = refMagErr
 
         return fgcmRefCat
 

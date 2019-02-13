@@ -701,7 +701,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                      outConfig.cycleNumber)
         outConfig.save(configFileName)
 
-        if self.config.isFinalCycle == 0:
+        if self.config.isFinalCycle == 1:
             # We are done, ready to output products
             self.log.info("Everything is in place to run fgcmOutputProducts.py")
         else:
