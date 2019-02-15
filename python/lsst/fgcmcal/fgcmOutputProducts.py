@@ -282,7 +282,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         fgcmBuildStarsConfig = butler.get('fgcmBuildStars_config')
         self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
         self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
-        self.filterToBand = fgcmBuildStarsConfig.filterToBand
+        self.filterMap = fgcmBuildStarsConfig.filterMap
 
         # Make sure that the fit config exists, to retrieve bands and other info
         if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber):
@@ -668,13 +668,13 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             dataRef = butler.dataRef('raw', dataId=dataId)
             filterMapping[rec['filtername']] = dataRef.dataId['filter']
             nFound += 1
-            if nFound == len(self.filterToBand):
+            if nFound == len(self.filterMap):
                 break
 
         # Get a mapping from filtername to the offsets
         offsetMapping = {}
-        for f in self.filterToBand:
-            offsetMapping[f] = offsets[self.bands.index(self.filterToBand[f])]
+        for f in self.filterMap:
+            offsetMapping[f] = offsets[self.bands.index(self.filterMap[f])]
 
         # Get a mapping from "ccd" to the ccd index used for the scaling
         camera = butler.get('camera')

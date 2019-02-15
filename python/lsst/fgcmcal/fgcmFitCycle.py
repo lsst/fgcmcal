@@ -71,10 +71,8 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=int,
         default=(0,),
     )
-    filterToBand = pexConfig.DictField(
-        doc=("Dictionary to map filterName (e.g. physical filter) to band (e.g. abstract filter). "
-             "With this mapping different filters (e.g. HSC r and r2) can be calibrated to the same "
-             "'r' band."),
+    filterMap = pexConfig.DictField(
+        doc="Mapping from 'filterName' to band.",
         keytype=str,
         itemtype=str,
         default={},
@@ -94,6 +92,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
              "Computed per-band, and if it is an outlier in any band it is rejected from fits."),
         dtype=float,
         default=4.0,
+    )
+    applyRefStarColorCuts = pexConfig.Field(
+        doc="Apply color cuts to reference stars?",
+        dtype=bool,
+        default=True,
     )
     nCore = pexConfig.Field(
         doc="Number of cores to use",
@@ -372,6 +375,17 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=bool,
         default=False,
     )
+    instrumentParsPerBand = pexConfig.Field(
+        doc="Model instrumental variation over time per band instead of as a gray term",
+        dtype=bool,
+        default=False,
+    )
+    instrumentSlopeMinDeltaT = pexConfig.Field(
+        doc=("Minimum time change (in days) between observations to use in constraining "
+             "instrument slope."),
+        dtype=float,
+        default=20.0,
+    )
     outputStandardsBeforeFinalCycle = pexConfig.Field(
         doc="Output standard stars prior to final cycle?  Used in debugging.",
         dtype=bool,
@@ -561,8 +575,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         camera = butler.get('camera')
         configDict = self._makeConfigDict(camera)
 
-        fgcmLut, lutIndexVals, lutStd = self._loadFgcmLut(butler,
-                                                          filterToBand=self.config.filterToBand)
+        fgcmLut, lutIndexVals, lutStd = self._loadFgcmLut(butler)
 
         # next we need the exposure/visit information
 
@@ -757,15 +770,13 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                 raise RuntimeError("Could not find fgcmReferenceStars in repo, and "
                                    "doReferenceCalibration is True.")
 
-    def _loadFgcmLut(self, butler, filterToBand=None):
+    def _loadFgcmLut(self, butler):
         """
         Load the FGCM look-up-table
 
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
-        filterToBand: `dict`
-           Dictionary mapping filters to bands (see self.config.filterToBand)
 
         Returns
         -------
@@ -879,7 +890,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # references to the temporary objects (lutCat, lutFlat, lutDerivFlat)
         # will fall out of scope and can be cleaned up by the garbage collector.
         fgcmLut = fgcm.FgcmLUT(lutIndexVals, lutFlat, lutDerivFlat, lutStd,
-                               filterToBand=self.config.filterToBand)
+                               filterToBand=dict(self.config.filterMap))
 
         return fgcmLut, lutIndexVals, lutStd
 
@@ -1044,7 +1055,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'fitBands': list(fitBands),
                       'notFitBands': list(notFitBands),
                       'requiredBands': list(requiredBands),
-                      'filterToBand': dict(self.config.filterToBand),
+                      'filterToBand': dict(self.config.filterMap),
                       'logLevel': 'INFO',  # FIXME
                       'nCore': self.config.nCore,
                       'nStarPerRun': self.config.nStarPerRun,
@@ -1080,6 +1091,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'expGrayErrRecoverCut': self.config.expGrayErrRecoverCut,
                       'refStarSnMin': self.config.refStarSnMin,
                       'refStarOutlierNSig': self.config.refStarOutlierNSig,
+                      'applyRefStarColorCuts': self.config.applyRefStarColorCuts,
                       'illegalValue': -9999.0,  # internally used by fgcm.
                       'starColorCuts': starColorCutList,
                       'aperCorrFitNBins': self.config.aperCorrFitNBins,
@@ -1104,6 +1116,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'useRetrievedTauInit': False,
                       'tauRetrievalMinCCDPerNight': 500,
                       'modelMagErrors': self.config.modelMagErrors,
+                      'instrumentParsPerBand': self.config.instrumentParsPerBand,
+                      'instrumentSlopeMinDeltaT': self.config.instrumentSlopeMinDeltaT,
                       'printOnly': False,
                       'outputStars': False,
                       'clobber': True,
@@ -1152,7 +1166,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        ('LNPWVGLOBALUNIT', 'f8'),
                                        ('O3UNIT', 'f8'),
                                        ('QESYSUNIT', 'f8'),
-                                       ('QESYSSLOPEUNIT', 'f8'),
                                        ('FILTEROFFSETUNIT', 'f8'),
                                        ('HASEXTERNALPWV', 'i2'),
                                        ('HASEXTERNALTAU', 'i2')])
@@ -1169,7 +1182,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParInfo['LNPWVGLOBALUNIT'] = parCat['lnPwvGlobalUnit']
         inParInfo['O3UNIT'] = parCat['o3Unit']
         inParInfo['QESYSUNIT'] = parCat['qeSysUnit']
-        inParInfo['QESYSSLOPEUNIT'] = parCat['qeSysSlopeUnit']
         inParInfo['FILTEROFFSETUNIT'] = parCat['filterOffsetUnit']
         inParInfo['HASEXTERNALPWV'] = parCat['hasExternalPwv']
         inParInfo['HASEXTERNALTAU'] = parCat['hasExternalTau']
@@ -1188,8 +1200,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        parCat['parLnPwvQuadratic'].size),
                                       ('PARQESYSINTERCEPT', 'f8',
                                        parCat['parQeSysIntercept'].size),
-                                      ('PARQESYSSLOPE', 'f8',
-                                       parCat['parQeSysSlope'].size),
+                                      ('COMPQESYSSLOPE', 'f8',
+                                       parCat['compQeSysSlope'].size),
                                       ('PARFILTEROFFSET', 'f8',
                                        parCat['parFilterOffset'].size),
                                       ('PARFILTEROFFSETFITFLAG', 'i2',
@@ -1247,7 +1259,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParams['PARLNPWVSLOPE'][:] = parCat['parLnPwvSlope'][0, :]
         inParams['PARLNPWVQUADRATIC'][:] = parCat['parLnPwvQuadratic'][0, :]
         inParams['PARQESYSINTERCEPT'][:] = parCat['parQeSysIntercept'][0, :]
-        inParams['PARQESYSSLOPE'][:] = parCat['parQeSysSlope'][0, :]
+        inParams['COMPQESYSSLOPE'][:] = parCat['compQeSysSlope'][0, :]
         inParams['PARFILTEROFFSET'][:] = parCat['parFilterOffset'][0, :]
         inParams['PARFILTEROFFSETFITFLAG'][:] = parCat['parFilterOffsetFitFlag'][0, :]
         inParams['PARRETRIEVEDLNPWVSCALE'] = parCat['parRetrievedLnPwvScale']
@@ -1394,7 +1406,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            doc='Step units for global ln(pwv) parameters')
         parSchema.addField('o3Unit', type=np.float64, doc='Step units for O3')
         parSchema.addField('qeSysUnit', type=np.float64, doc='Step units for mirror gray')
-        parSchema.addField('qeSysSlopeUnit', type=np.float64, doc='Step units for mirror gray slope')
         parSchema.addField('filterOffsetUnit', type=np.float64, doc='Step units for filter offset')
         parSchema.addField('hasExternalPwv', type=np.int32, doc='Parameters fit using external pwv')
         parSchema.addField('hasExternalTau', type=np.int32, doc='Parameters fit using external tau')
@@ -1418,8 +1429,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['PARLNPWVQUADRATIC'].size)
         parSchema.addField('parQeSysIntercept', type='ArrayD', doc='Mirror gray intercept parameter vector',
                            size=pars['PARQESYSINTERCEPT'].size)
-        parSchema.addField('parQeSysSlope', type='ArrayD', doc='Mirror gray slope parameter vector',
-                           size=pars['PARQESYSSLOPE'].size)
+        parSchema.addField('compQeSysSlope', type='ArrayD', doc='Mirror gray slope parameter vector',
+                           size=pars[0]['COMPQESYSSLOPE'].size)
         parSchema.addField('parFilterOffset', type='ArrayD', doc='Filter offset parameter vector',
                            size=pars['PARFILTEROFFSET'].size)
         parSchema.addField('parFilterOffsetFitFlag', type='ArrayI', doc='Filter offset parameter fit flag',
@@ -1530,7 +1541,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['lnPwvGlobalUnit'] = parInfo['LNPWVGLOBALUNIT']
         rec['o3Unit'] = parInfo['O3UNIT']
         rec['qeSysUnit'] = parInfo['QESYSUNIT']
-        rec['qeSysSlopeUnit'] = parInfo['QESYSSLOPEUNIT']
         rec['filterOffsetUnit'] = parInfo['FILTEROFFSETUNIT']
         # note these are not currently supported here.
         rec['hasExternalPwv'] = 0
@@ -1542,8 +1552,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         arrNames = ['parAlpha', 'parO3', 'parLnTauIntercept', 'parLnTauSlope',
                     'parLnPwvIntercept', 'parLnPwvSlope', 'parLnPwvQuadratic',
-                    'parQeSysIntercept',
-                    'parQeSysSlope', 'parRetrievedLnPwvNightlyOffset', 'compAperCorrPivot',
+                    'parQeSysIntercept', 'compQeSysSlope',
+                    'parRetrievedLnPwvNightlyOffset', 'compAperCorrPivot',
                     'parFilterOffset', 'parFilterOffsetFitFlag',
                     'compAbsThroughput', 'compRefOffset', 'compRefSigma',
                     'compAperCorrSlope', 'compAperCorrSlopeErr', 'compAperCorrRange',

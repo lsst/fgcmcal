@@ -214,15 +214,17 @@ class FgcmcalTestBase(object):
         result = fgcmcal.FgcmFitCycleTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
 
+        # Move back to the previous directory
+        os.chdir(cwd)
+
         if skipChecks:
             return
 
         # Check that the expected number of plots are there.
-        plots = glob.glob(os.path.join(os.getcwd(), self.config.outfileBase + '_cycle00_plots/') + '*.png')
+        plots = glob.glob(os.path.join(self.testDir, self.config.outfileBase +
+                                       '_cycle%02d_plots/' % (self.config.cycleNumber) +
+                                       '*.png'))
         self.assertEqual(nPlots, len(plots))
-
-        # Move back to the previous directory
-        os.chdir(cwd)
 
         butler = dafPersistence.butler.Butler(self.testDir)
 

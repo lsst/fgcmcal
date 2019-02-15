@@ -94,8 +94,8 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=int,
         default=8,
     )
-    filterToBand = pexConfig.DictField(
-        doc="filterName to band mapping",
+    filterMap = pexConfig.DictField(
+        doc="Mapping from 'filterName' to band.",
         keytype=str,
         itemtype=str,
         default={},
@@ -164,11 +164,6 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     fgcmLoadReferenceCatalog = pexConfig.ConfigurableField(
         target=FgcmLoadReferenceCatalogTask,
         doc="FGCM reference object loader",
-    )
-    referenceBands = pexConfig.ListField(
-        doc="bands, in wavelength order, that will be calibrated",
-        dtype=str,
-        default=(),
     )
 
     def setDefaults(self):
@@ -325,9 +320,19 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            Only one individual dataRef from a visit need be specified
            and the code will find the other source catalogs from
            each visit.
+
+        Raises
+        ------
+        RuntimeErrror: Raised if config.doReferenceMatches is set and
+           an fgcmLookUpTable is not available.
         """
 
         if self.config.doReferenceMatches:
+            # Ensure that we have a LUT
+            if not butler.datasetExists('fgcmLookUpTable'):
+                raise RuntimeError("Must have fgcmLookUpTable if using config.doReferenceMatches")
+
+            # Make a subtask for reference loading
             self.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
 
         # Make the visit catalog if necessary
@@ -696,10 +701,34 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         obsFilterNames = visitFilterNames[visitIndex]
 
+        if self.config.doReferenceMatches:
+            # Get the reference filter names, using the LUT
+            lutCat = butler.get('fgcmLookUpTable')
+
+            stdFilterDict = {filterName: stdFilter for (filterName, stdFilter) in
+                             zip(lutCat[0]['filterNames'].split(','),
+                                 lutCat[0]['stdFilterNames'].split(','))}
+            stdLambdaDict = {stdFilter: stdLambda for (stdFilter, stdLambda) in
+                             zip(lutCat[0]['stdFilterNames'].split(','),
+                                 lutCat[0]['lambdaStdFilter'])}
+
+            # Allow memory to be reclaimed
+            lutCat = None
+
+            referenceFilterNames = self._getReferenceFilterNames(visitCat,
+                                                                 stdFilterDict,
+                                                                 stdLambdaDict)
+            self.log.info("Using the following reference filters: %s" %
+                          (', '.join(referenceFilterNames)))
+
+        else:
+            # This should be an empty list
+            referenceFilterNames = []
+
         # make the fgcm starConfig dict
 
         starConfig = {'logger': self.log,
-                      'filterToBand': self.config.filterToBand,
+                      'filterToBand': self.config.filterMap,
                       'requiredBands': self.config.requiredBands,
                       'minPerBand': self.config.minPerBand,
                       'matchRadius': self.config.matchRadius,
@@ -709,13 +738,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                       'densNSide': self.config.densityCutNside,
                       'densMaxPerPixel': self.config.densityCutMaxPerPixel,
                       'primaryBands': self.config.primaryBands,
-                      'referenceBands': self.config.referenceBands}
+                      'referenceFilterNames': referenceFilterNames}
 
         # initialize the FgcmMakeStars object
         fgcmMakeStars = fgcm.FgcmMakeStars(starConfig)
 
         # make the primary stars
-        #  note that the ra/dec native Angle format is radians
+        # note that the ra/dec native Angle format is radians
         # We determine the conversion from the native units (typically
         # radians) to degrees for the first observation.  This allows us
         # to treate ra/dec as numpy arrays rather than Angles, which would
@@ -765,7 +794,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
 
         if self.config.doReferenceMatches:
-            refSchema = self._makeFgcmRefSchema(len(self.config.referenceBands))
+            refSchema = self._makeFgcmRefSchema(len(referenceFilterNames))
 
             fgcmRefCat = afwTable.BaseCatalog(refSchema)
             fgcmRefCat.reserve(fgcmMakeStars.referenceCat.size)
@@ -936,3 +965,35 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                            size=nReferenceBands)
 
         return refSchema
+
+    def _getReferenceFilterNames(self, visitCat, stdFilterDict, stdLambdaDict):
+        """
+        Get the reference filter names, in wavelength order, from the visitCat and
+        information from the look-up-table.
+
+        Parameters
+        ----------
+        visitCat: `afw.table.BaseCatalog`
+           Catalog with visit data for FGCM
+        stdFilterDict: `dict`
+           Mapping of filterName to stdFilterName from LUT
+        stdLambdaDict: `dict`
+           Mapping of stdFilterName to stdLambda from LUT
+
+        Returns
+        -------
+        referenceFilterNames: `list`
+           Wavelength-ordered list of reference filter names
+        """
+
+        # Find the unique list of filter names in visitCat
+        filterNames = np.unique(visitCat.asAstropy()['filtername'])
+
+        # Find the unique list of "standard" filters
+        stdFilterNames = {stdFilterDict[filterName] for filterName in filterNames}
+
+        # And sort these by wavelength
+        referenceFilterNames = [key for key in sorted({k: stdLambdaDict[k] for k in stdFilterNames},
+                                                      key=stdLambdaDict.get)]
+
+        return referenceFilterNames
