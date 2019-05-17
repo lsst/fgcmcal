@@ -593,6 +593,8 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
                            size=len(self.fgcmLutMaker.filterNames))
         lutSchema.addField('i10Std', type='ArrayD', doc='I10 Standard',
                            size=len(self.fgcmLutMaker.filterNames))
+        lutSchema.addField('i2Std', type='ArrayD', doc='I2 Standard',
+                           size=len(self.fgcmLutMaker.filterNames))
         lutSchema.addField('lambdaB', type='ArrayD', doc='Wavelength for passband (no atm)',
                            size=len(self.fgcmLutMaker.filterNames))
         lutSchema.addField('atmLambda', type='ArrayD', doc='Atmosphere wavelengths (Angstrom)',
@@ -667,6 +669,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         rec['i0Std'][:] = self.fgcmLutMaker.I0Std
         rec['i1Std'][:] = self.fgcmLutMaker.I1Std
         rec['i10Std'][:] = self.fgcmLutMaker.I10Std
+        rec['i2Std'][:] = self.fgcmLutMaker.I2Std
         rec['lambdaB'][:] = self.fgcmLutMaker.lambdaB
         rec['atmLambda'][:] = self.fgcmLutMaker.atmLambda
         rec['atmStdTrans'][:] = self.fgcmLutMaker.atmStdTrans

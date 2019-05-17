@@ -73,7 +73,7 @@ class FgcmOutputProductsConfig(pexConfig.Config):
     doReferenceCalibration = pexConfig.Field(
         doc="Transfer 'absolute' calibration from reference catalog",
         dtype=bool,
-        default=True,
+        default=False,
     )
     doRefcatOutput = pexConfig.Field(
         doc="Output standard stars in reference catalog format",
@@ -832,7 +832,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                                          o3=atmCat[i]['o3'],
                                                          tau=atmCat[i]['tau'],
                                                          alpha=atmCat[i]['alpha'],
-                                                         zenith=zenith[i])
+                                                         zenith=zenith[i],
+                                                         ctranslamstd=[atmCat[i]['cTrans'],
+                                                                       atmCat[i]['lamStd']])
             else:
                 # Run modtran
                 modAtm = modGen(pmb=atmCat[i]['pmb'],
@@ -842,7 +844,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                 alpha=atmCat[i]['alpha'],
                                 zenith=zenith[i],
                                 lambdaRange=lambdaRange,
-                                lambdaStep=lambdaStep)
+                                lambdaStep=lambdaStep,
+                                ctranslamstd=[atmCat[i]['cTrans'],
+                                              atmCat[i]['lamStd']])
                 atmVals = modAtm['COMBINED']
 
             # Now need to create something to persist...

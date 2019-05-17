@@ -386,6 +386,16 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=20.0,
     )
+    fitMirrorChromaticity = pexConfig.Field(
+        doc="Fit (intraband) mirror chromatic term?",
+        dtype=bool,
+        default=False,
+    )
+    coatingMjds = pexConfig.ListField(
+        doc="Mirror coating dates in MJD",
+        dtype=float,
+        default=(0.0,),
+    )
     outputStandardsBeforeFinalCycle = pexConfig.Field(
         doc="Output standard stars prior to final cycle?  Used in debugging.",
         dtype=bool,
@@ -841,6 +851,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                     ('I0STD', 'f8', lutFilterNames.size),
                                     ('I1STD', 'f8', lutFilterNames.size),
                                     ('I10STD', 'f8', lutFilterNames.size),
+                                    ('I2STD', 'f8', lutFilterNames.size),
                                     ('LAMBDAB', 'f8', lutFilterNames.size),
                                     ('ATMLAMBDA', 'f8', lutCat[0]['atmLambda'].size),
                                     ('ATMSTDTRANS', 'f8', lutCat[0]['atmStdTrans'].size)])
@@ -857,6 +868,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         lutStd['I0STD'][:] = lutCat[0]['i0Std']
         lutStd['I1STD'][:] = lutCat[0]['i1Std']
         lutStd['I10STD'][:] = lutCat[0]['i10Std']
+        lutStd['I2STD'][:] = lutCat[0]['i2Std']
         lutStd['LAMBDAB'][:] = lutCat[0]['lambdaB']
         lutStd['ATMLAMBDA'][:] = lutCat[0]['atmLambda'][:]
         lutStd['ATMSTDTRANS'][:] = lutCat[0]['atmStdTrans'][:]
@@ -1075,6 +1087,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'UTBoundary': self.config.utBoundary,
                       'washMJDs': self.config.washMjds,
                       'epochMJDs': self.config.epochMjds,
+                      'coatingMJDs': self.config.coatingMjds,
                       'minObsPerBand': self.config.minObsPerBand,
                       'latitude': self.config.latitude,
                       'brightObsGrayMax': self.config.brightObsGrayMax,
@@ -1118,6 +1131,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                       'modelMagErrors': self.config.modelMagErrors,
                       'instrumentParsPerBand': self.config.instrumentParsPerBand,
                       'instrumentSlopeMinDeltaT': self.config.instrumentSlopeMinDeltaT,
+                      'fitMirrorChromaticity': self.config.fitMirrorChromaticity,
                       'printOnly': False,
                       'outputStars': False,
                       'clobber': True,
@@ -1216,6 +1230,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        parCat['compRefOffset'].size),
                                       ('COMPREFSIGMA', 'f8',
                                        parCat['compRefSigma'].size),
+                                      ('COMPMIRRORCHROMATICITY', 'f8',
+                                       parCat['compMirrorChromaticity'].size),
+                                      ('MIRRORCHROMATICITYPIVOT', 'f8',
+                                       parCat['mirrorChromaticityPivot'].size),
                                       ('COMPAPERCORRPIVOT', 'f8',
                                        parCat['compAperCorrPivot'].size),
                                       ('COMPAPERCORRSLOPE', 'f8',
@@ -1268,6 +1286,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParams['COMPABSTHROUGHPUT'][:] = parCat['compAbsThroughput'][0, :]
         inParams['COMPREFOFFSET'][:] = parCat['compRefOffset'][0, :]
         inParams['COMPREFSIGMA'][:] = parCat['compRefSigma'][0, :]
+        inParams['COMPMIRRORCHROMATICITY'][:] = parCat['compMirrorChromaticity'][0, :]
+        inParams['MIRRORCHROMATICITYPIVOT'][:] = parCat['mirrorChromaticityPivot'][0, :]
         inParams['COMPAPERCORRPIVOT'][:] = parCat['compAperCorrPivot'][0, :]
         inParams['COMPAPERCORRSLOPE'][:] = parCat['compAperCorrSlope'][0, :]
         inParams['COMPAPERCORRSLOPEERR'][:] = parCat['compAperCorrSlopeErr'][0, :]
@@ -1451,6 +1471,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('compRefSigma', type='ArrayD',
                            doc='Width of reference star/calibrated star distribution',
                            size=pars['COMPREFSIGMA'].size)
+        parSchema.addField('compMirrorChromaticity', type='ArrayD',
+                           doc='Computed mirror chromaticity terms',
+                           size=pars['COMPMIRRORCHROMATICITY'].size)
+        parSchema.addField('mirrorChromaticityPivot', type='ArrayD',
+                           doc='Mirror chromaticity pivot mjd',
+                           size=pars['MIRRORCHROMATICITYPIVOT'].size)
         parSchema.addField('compAperCorrPivot', type='ArrayD', doc='Aperture correction pivot',
                            size=pars['COMPAPERCORRPIVOT'].size)
         parSchema.addField('compAperCorrSlope', type='ArrayD', doc='Aperture correction slope',
@@ -1556,6 +1582,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                     'parRetrievedLnPwvNightlyOffset', 'compAperCorrPivot',
                     'parFilterOffset', 'parFilterOffsetFitFlag',
                     'compAbsThroughput', 'compRefOffset', 'compRefSigma',
+                    'compMirrorChromaticity', 'mirrorChromaticityPivot',
                     'compAperCorrSlope', 'compAperCorrSlopeErr', 'compAperCorrRange',
                     'compModelErrExptimePivot', 'compModelErrFwhmPivot',
                     'compModelErrSkyPivot', 'compModelErrPars',
@@ -1747,6 +1774,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         atmSchema.addField('alpha', type=np.float64, doc='Aerosol slope')
         atmSchema.addField('o3', type=np.float64, doc='Ozone (dobson)')
         atmSchema.addField('secZenith', type=np.float64, doc='Secant(zenith) (~ airmass)')
+        atmSchema.addField('cTrans', type=np.float64, doc='Transmission correction factor')
+        atmSchema.addField('lamStd', type=np.float64, doc='Wavelength for transmission correction')
 
         return atmSchema
 
@@ -1779,6 +1808,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         atmCat['alpha'][:] = atmStruct['ALPHA']
         atmCat['o3'][:] = atmStruct['O3']
         atmCat['secZenith'][:] = atmStruct['SECZENITH']
+        atmCat['cTrans'][:] = atmStruct['CTRANS']
+        atmCat['lamStd'][:] = atmStruct['LAMSTD']
 
         return atmCat
 
