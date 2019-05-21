@@ -286,8 +286,8 @@ class FgcmcalTestBase(object):
         # Extract the offsets from the results
         offsets = result.resultList[0].results.offsets
 
-        self.assertFloatsAlmostEqual(offsets[0], zpOffsets[0], atol=1e-7)
-        self.assertFloatsAlmostEqual(offsets[1], zpOffsets[1], atol=1e-7)
+        self.assertFloatsAlmostEqual(offsets[0], zpOffsets[0], atol=1e-6)
+        self.assertFloatsAlmostEqual(offsets[1], zpOffsets[1], atol=1e-6)
 
         butler = dafPersistence.butler.Butler(self.testDir)
 

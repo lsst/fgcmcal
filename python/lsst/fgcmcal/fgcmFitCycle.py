@@ -376,7 +376,7 @@ class FgcmFitCycleConfig(pexConfig.Config):
         default=False,
     )
     instrumentParsPerBand = pexConfig.Field(
-        doc="Model instrumental variation over time per band instead of as a gray term",
+        doc="Model instrumental variation over time per band",
         dtype=bool,
         default=False,
     )
@@ -1695,6 +1695,18 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         zptSchema.addField('fgcmFpGry', type=np.float32,
                            doc='Average gray extinction over the full focal plane '
                            '(same for all ccds in a visit)')
+        zptSchema.addField('fgcmFpGryBlue', type=np.float32,
+                           doc='Average gray extinction over the full focal plane '
+                           'for 25% bluest stars')
+        zptSchema.addField('fgcmFpGryBlueErr', type=np.float32,
+                           doc='Error on Average gray extinction over the full focal plane '
+                           'for 25% bluest stars')
+        zptSchema.addField('fgcmFpGryRed', type=np.float32,
+                           doc='Average gray extinction over the full focal plane '
+                           'for 25% reddest stars')
+        zptSchema.addField('fgcmFpGryRedErr', type=np.float32,
+                           doc='Error on Average gray extinction over the full focal plane '
+                           'for 25% reddest stars')
         zptSchema.addField('fgcmFpVar', type=np.float32,
                            doc='Variance of gray extinction over the full focal plane '
                            '(same for all ccds in a visit)')
@@ -1748,6 +1760,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         zptCat['fgcmZptVar'][:] = zpStruct['FGCM_ZPTVAR']
         zptCat['fgcmTilings'][:] = zpStruct['FGCM_TILINGS']
         zptCat['fgcmFpGry'][:] = zpStruct['FGCM_FPGRY']
+        zptCat['fgcmFpGryBlue'][:] = zpStruct['FGCM_FPGRY_CSPLIT'][:, 0]
+        zptCat['fgcmFpGryBlueErr'][:] = zpStruct['FGCM_FPGRY_CSPLITERR'][:, 0]
+        zptCat['fgcmFpGryRed'][:] = zpStruct['FGCM_FPGRY_CSPLIT'][:, 2]
+        zptCat['fgcmFpGryRedErr'][:] = zpStruct['FGCM_FPGRY_CSPLITERR'][:, 2]
         zptCat['fgcmFpVar'][:] = zpStruct['FGCM_FPVAR']
         zptCat['fgcmDust'][:] = zpStruct['FGCM_DUST']
         zptCat['fgcmFlat'][:] = zpStruct['FGCM_FLAT']

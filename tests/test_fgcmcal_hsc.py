@@ -120,7 +120,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nGoodZp = 26
         nOkZp = 26
         nBadZp = 1206
-        nStdStars = 392
+        nStdStars = 389
         nPlots = 34
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -156,7 +156,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.refObjLoader.ref_dataset_name = "sdss-dr9-fink-v5b"
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([-0.001186734065, -0.001781757455])
+        zpOffsets = np.array([-0.001419307198, -0.001693746657])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,

@@ -7,7 +7,7 @@ import os.path
 from lsst.utils import getPackageDir
 
 # Do the reference catalog calibration
-doReferenceCalibration = True
+doReferenceCalibration = False
 # Do the standard star catalog output
 doRefcatOutput = True
 # Do the atmosphere output
