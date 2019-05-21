@@ -159,7 +159,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     doReferenceMatches = pexConfig.Field(
         doc="Match reference catalog as additional constraint on calibration",
         dtype=bool,
-        default=False,
+        default=True,
     )
     fgcmLoadReferenceCatalog = pexConfig.ConfigurableField(
         target=FgcmLoadReferenceCatalogTask,

@@ -80,12 +80,12 @@ class FgcmFitCycleConfig(pexConfig.Config):
     doReferenceCalibration = pexConfig.Field(
         doc="Use reference catalog as additional constraint on calibration",
         dtype=bool,
-        default=False,
+        default=True,
     )
     refStarSnMin = pexConfig.Field(
         doc="Reference star signal-to-noise minimum to use in calibration.  Set to <=0 for no cut.",
         dtype=float,
-        default=20.0,
+        default=50.0,
     )
     refStarOutlierNSig = pexConfig.Field(
         doc=("Number of sigma compared to average mag for reference star to be considered an outlier. "
