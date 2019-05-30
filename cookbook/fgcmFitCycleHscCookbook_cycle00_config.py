@@ -13,9 +13,9 @@ config.fitFlag = (1, 1, 1, 1, 1)
 config.requiredFlag = (1, 1, 1, 1, 1)
 # Dictionary that maps "filters" (instrumental configurations) to "bands"
 # (abstract names).  All filters must be listed in the LUT.
-config.filterToBand = {'g':'g', 'r':'r', 'i':'i', 'z':'z', 'y':'y'}
+config.filterMap = {'g':'g', 'r':'r', 'i':'i', 'z':'z', 'y':'y'}
 # Maximum number of fit iterations (15 for testing, 50+ for a full run.)
-config.maxIterBeforeFinalCycle = 15
+config.maxIterBeforeFinalCycle = 30
 # Number of cores to run with python multiprocessing
 config.nCore = 4
 # Cycle number (should start at 0)
@@ -24,9 +24,9 @@ config.cycleNumber = 0
 # This value will depend on your longitude/time zone!
 config.utBoundary = 0.0
 # MJD dates on which the mirror was washed
-config.washMjds = (0.0, )
+config.washMjds = (56700.0, 57500.0, 57700.0, 58050.0)
 # Dividing point between observing epochs (years, camera events, etc.)
-config.epochMjds=[0.0, 57000.0, 57200.0, 100000.0]
+config.epochMjds = (56700., 57420., 57606.)
 # Latitude of the observatory
 config.latitude = 19.8256
 # Pixel scale (arcseconds)
@@ -57,4 +57,11 @@ config.precomputeSuperStarInitialCycle = True
 config.superStarSubCcd = True
 # Chebyshev order of sub-ccd superstar fits
 config.superStarSubCcdChebyshevOrder = 2
-
+# Model instrumental variation over time per band
+config.instrumentParsPerBand = True
+# Use reference catalog as additional constraint on calibration
+config.doReferenceCalibration = True
+# Reference star signal-to-noise minimum to use in calibration
+config.refStarSnMin = 50.0
+# Number of sigma compared to average mag for reference star to be considered an outlier
+config.refStarOutlierNSig = 4.0

@@ -27,8 +27,8 @@ The environment should be set up as follows:
 ```
 setup lsst_distrib
 
-export RCRERUN=RC/w_2018_38/DM-15690
-export COOKBOOKRERUN=fgcm_cookbook_w_2018_38
+export RCRERUN=RC/w_2019_18/DM-19151-sfm
+export COOKBOOKRERUN=fgcm_cookbook_w_2019_18
 ```
 
 The `RCRERUN` env variable should be set to the most recent completed rerun
@@ -119,6 +119,12 @@ to scan for available `src` catalogs speeds things up by x100, which is
 necessary.  You can also specify by field or other valid dataId. A [sample
 config](fgcmBuildStarsHsc.py) for HSC is available.
 
+If `doReferenceCalibration = True` in the configuration (the new default), then
+stars from a reference catalog (e.g. PS1) will be loaded and matched to the
+internal stars.  The signal-to-noise cut specified here should be the minimum
+one expects to use in the actual fit, and the fit may also be performed without
+the use of reference stars if desired.
+
 ### Running `fgcmBuildStars.py`
 
 This is also a simple command-line task.  This task will take around 2.5 hours
@@ -141,18 +147,19 @@ by MJD) which should correspond to changes in observing (years, camera
 warm-ups, etc), preferably coordinated with when new flat-fields were
 generated.  At the moment flats are regenerated for HSC every couple of weeks
 which is too frequent for a good fit from FGCM.  This is being
-investigated. There is also a place to describe when the mirror was washed (in
-MJD), as the system throughput usually jumps at these times.
+investigated. There is also a place to describe when the mirror was washed or
+recoated (in MJD), as the system throughput usually jumps at these times.
 
-There are three important differences between the first fit cycle and subsequent
-cycles.  The first is that a "bright observation" algorithm is employed in the
-first cycle to choose approximately photometric observations, while for
-subsequent iterations the fit parameters from the previous iterations are used
-to find photometric observations.  The second is that it is recommended that
-you freeze the atmosphere to the "standard parameters" for the first fit
-cycle.  The third is that for HSC it can be useful to set
-`precomputeSuperStarInitialCycle` which can build a "super-star flat" based on
-the bright observation selection.
+There are three important differences between the first fit cycle ("cycle 0")
+and subsequent cycles.  The first is that a "bright observation" algorithm is
+employed in the first cycle to choose approximately photometric observations,
+while for subsequent iterations the best fit parameters from the previous
+iterations are used to determine photometric observations.  The second is that
+it is recommended that you freeze the atmosphere to the "standard parameters"
+for the first fit cycle (the default).  The third is that for HSC it can be
+useful to set `precomputeSuperStarInitialCycle` which can build a "super-star
+flat" based on the bright observation selection to smooth out the large
+illumination correction term.
 
 At the end of the first (and all subsequent) cycles a whole bunch of diagnostic
 plots are made in a subdirectory of the current directory where you invoked the
@@ -171,29 +178,45 @@ run on `lsst-dev01`.
 fgcmFitCycle.py /datasets/hsc/repo --rerun \
 private/${USER}/${COOKBOOKRERUN}/wide:private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile $FGCMCAL_DIR/cookbook/fgcmFitCycleHscCookbook_cycle00_config.py \
-|& tee ${COOKBOOKRERUN}_cycle00.log
+|& tee fgcmFitCycleHscCookbook_cycle00.log
 ```
 
 ### Subsequent Fit Cycles
 
-Before running any subsequent cycle, you should look at the diagnostic plots.
-The most important plots are `cycleNUMBER_expgray_BAND.png` plots.  Use these
-histograms to choose appropriate cuts for each band to select "photometric"
-exposures in the next cycle with the `expGrayPhotometricCut` (negative side)
-and `expGrayHighCut` (positive side) parameters.  You want to capture the core
-and reject outliers, but not too tight that you lose a lot of visits and can't
-constrain the fit.  You can also up the number of iterations per fit cycle.  In
-my experience, the fit does not improve if you go beyond ~50 iterations.  The
-best way to get the fit to improve is to remove non-photometric exposures.  In
-the future, I will explore more automated metrics of convergence, but my
-assumption is that global calibration is run infrequently enough, and is
-important enough to require manual checks.
+Before running subsequent fit cycles, it is helpful to look at the diagnostic
+plots.  The most important plots are `cycleNUMBER_expgray_BAND.png` plots.  As
+of [DM-17305](https://jira.lsstcorp.org/browse/DM-17305), the width of these
+histograms are used to set a default photometricity cut for the next fit
+cycle.  However, it is worth inspecting these histograms to ensure that they
+look "normal".  The expectation is that they have a Gaussian core with an
+excess non-photometric tail out to the negative side.  Any significant
+bi-modality is a sign that something has gone horribly awry with the fits,
+perhaps indicating issues with the input data or the configuration parameters.
+
+The relevant configuration parameters that you might want to adjust based on
+these plots are `expGrayPhotometricCut` (on the negative side) and
+`expGrayHighCut` (on the positive side).  You want to capture the core and
+reject outliers, but not too tight that you lose a lot of visits and can't
+constrain the fit.
+
+You can also increase the number of iterations per fit cycle.  In my
+experience, the fit does not improve if you go beyond ~50 iterations with small
+datasets, but large datasets can use ~100 iterations per cycle.
 
 ```bash
-fgcmFitCycle.py /datasets/hsc/repo --rerun private/${USER}/${COOKBOOKRERUN}/fit1 \
+fgcmFitCycle.py /datasets/hsc/repo --rerun \
+private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile fgcmFitCycleHscCookbook_cycle01_config.py |& tee \
-${COOKBOOKRERUN}_cycle01.log
+fgcmFitCycleHscCookbook_cycle01.log
 ```
+
+```bash
+fgcmFitCycle.py /datasets/hsc/repo --rerun \
+private/${USER}/${COOKBOOKRERUN}/fit1 \
+--configfile fgcmFitCycleHscCookbook_cycle02_config.py |& tee \
+fgcmFitCycleHscCookbook_cycle02.log
+```
+
 
 ### Final fit cycle
 
@@ -207,9 +230,9 @@ cycle run should only take 2-3 minutes.
 
 ```bash
 fgcmFitCycle.py /datasets/hsc/repo --rerun private/${USER}/${COOKBOOKRERUN}/fit1 \
---configfile fgcmFitCycleHscCookbook_cycle02_config.py \
---config isFinalCycle=True --config outputStandards=True |& tee \
-${COOKBOOKRERUN}_cycle02.log
+--configfile fgcmFitCycleHscCookbook_cycle03_config.py \
+--config isFinalCycle=True |& tee \
+fgcmFitCycleHscCookbook_cycle03.log
 ```
 
 ## Outputs
@@ -280,16 +303,18 @@ used by downstream processing in the stack.
 The final task can output atmosphere transmission curves derived from the model
 fit for each visit (`doAtmosphereOutput'); output a reference catalog of
 "standard stars" that may be used for single-ccd calibration
-(`doRefcatOutput`); and `jointcal_photoCalib` files for each visit/ccd
+(`doRefcatOutput`); and `fgcm_photoCalib` files for each visit/ccd
 (`doZeropointOutput`).  All of these options are on by default.
 
-One key thing is that FGCM does not use any absolute reference sources, so the
-overall throughput for each band is unconstrained.  Therefore, to get the
-output reference catalog and zeropoints on a physical scale, we must use
-calspec standards (preferred, and deferred to the future) or a reference
-catalog.  At the moment, this uses the same PS1 catalog that is used as a
-reference for the `PhotoCal` and `jointcal` tasks.  This is set with
-`doReferenceCalibration`, and the default is on.  Please see the [sample
+The FGCM calibration can be run with or without reference stars as an anchor.
+The new default, including in this cookbook, is to run with reference sources
+from PS1.  However, if you run without reference sources you get a good
+relative calibraiton but the overall throughput for each band is
+unconstrained.  To get the output reference catalog and zeropoints on a
+physical scale, we must use calspec standards (which is preferred, but not
+currently supported) or a reference catalog such as PS1.  To turn on this final
+computation of the system throughput, set `doReferenceCalibration=True` in the
+`FgcmOutputProducts` task.  (The default is now `False`).  Please see the [sample
 config](fgcmOutputProductsHsc.py) for example usage of setting up the reference
 catalog.
 
@@ -301,7 +326,7 @@ be converged and should be output.  This should take around 5 minutes on `lsst-d
 fgcmOutputProducts.py /datasets/hsc/repo --rerun \
 private/${USER}/${COOKBOOKRERUN}/wide:private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile $FGCMCAL_DIR/cookbook/fgcmOutputProductsHsc.py \
---config cycleNumber=2 |& tee ${COOKBOOKRERUN}_output.log
+--config cycleNumber=3 |& tee fgcmFitCycleHscCookbook_output.log
 ```
 
 In the output repo
@@ -312,20 +337,17 @@ atmosphere parameters to the "standard" values, these will be computed
 specifically for the airmass of each individual observation.
 
 In the output repo
-`/datasets/hsc/repo/rerun/private/erykoff/rc2_w_2018_32/fit1/ref_cats/fgcm_stars/'
+`/datasets/hsc/repo/rerun/private/${USER}/${COOKBOOKRERUN}/fit1/ref_cats/fgcm_stars/'
 you will find a sharded reference catalog suitable to use for any observations
 overlapping the survey images that have been calibrated.
 
 And in the output repo
-`/datasets/hsc/repo/rerun/private/erykoff/rc2_w_2018_32/fit1/jointcal-results`
-you will find all of the `jointcal_photoCalib` spatially-variable zeropoint
+`/datasets/hsc/repo/rerun/private/${USER}/${COOKBOOKRERUN}/fit1/fgcmcal-results`
+you will find all of the `fgcmcal_photoCalib` spatially-variable zeropoint
 files that can be used in coaddition.  At the moment, these combine information
 from the WCS Jacobian distortions as well as the spatially variable
 transmission (due to the illumination correction derived by FGCM).  In the
 future, the Jacobian information will be factored out.
-
-Note that all the files are set to tract `0000`, as FGCM has no concept of tracts
-and patches.
 
 ### FGCM-Specific Data Products
 

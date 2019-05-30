@@ -71,9 +71,11 @@ class FgcmOutputProductsConfig(pexConfig.Config):
     # The following fields refer to calibrating from a reference
     # catalog, but in the future this might need to be expanded
     doReferenceCalibration = pexConfig.Field(
-        doc="Transfer 'absolute' calibration from reference catalog",
+        doc=("Transfer 'absolute' calibration from reference catalog? "
+             "This afterburner step is unnecessary if reference stars "
+             "were used in the full fit in FgcmFitCycleTask."),
         dtype=bool,
-        default=True,
+        default=False,
     )
     doRefcatOutput = pexConfig.Field(
         doc="Output standard stars in reference catalog format",
@@ -282,7 +284,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         fgcmBuildStarsConfig = butler.get('fgcmBuildStars_config')
         self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
         self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
-        self.filterToBand = fgcmBuildStarsConfig.filterToBand
+        self.filterMap = fgcmBuildStarsConfig.filterMap
 
         # Make sure that the fit config exists, to retrieve bands and other info
         if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber):
@@ -293,6 +295,10 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         self.bands = fitCycleConfig.bands
         self.superStarSubCcd = fitCycleConfig.superStarSubCcd
         self.chebyshevOrder = fitCycleConfig.superStarSubCcdChebyshevOrder
+
+        if self.config.doReferenceCalibration and fitCycleConfig.doReferenceCalibration:
+            self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
+                          "fitCycleConfig.doReferenceCalibration")
 
         # And make sure that the atmosphere was output properly
         if not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber):
@@ -668,13 +674,13 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             dataRef = butler.dataRef('raw', dataId=dataId)
             filterMapping[rec['filtername']] = dataRef.dataId['filter']
             nFound += 1
-            if nFound == len(self.filterToBand):
+            if nFound == len(self.filterMap):
                 break
 
         # Get a mapping from filtername to the offsets
         offsetMapping = {}
-        for f in self.filterToBand:
-            offsetMapping[f] = offsets[self.bands.index(self.filterToBand[f])]
+        for f in self.filterMap:
+            offsetMapping[f] = offsets[self.bands.index(self.filterMap[f])]
 
         # Get a mapping from "ccd" to the ccd index used for the scaling
         camera = butler.get('camera')
@@ -832,7 +838,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                                          o3=atmCat[i]['o3'],
                                                          tau=atmCat[i]['tau'],
                                                          alpha=atmCat[i]['alpha'],
-                                                         zenith=zenith[i])
+                                                         zenith=zenith[i],
+                                                         ctranslamstd=[atmCat[i]['cTrans'],
+                                                                       atmCat[i]['lamStd']])
             else:
                 # Run modtran
                 modAtm = modGen(pmb=atmCat[i]['pmb'],
@@ -842,7 +850,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                 alpha=atmCat[i]['alpha'],
                                 zenith=zenith[i],
                                 lambdaRange=lambdaRange,
-                                lambdaStep=lambdaStep)
+                                lambdaStep=lambdaStep,
+                                ctranslamstd=[atmCat[i]['cTrans'],
+                                              atmCat[i]['lamStd']])
                 atmVals = modAtm['COMBINED']
 
             # Now need to create something to persist...
