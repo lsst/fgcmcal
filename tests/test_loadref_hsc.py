@@ -24,9 +24,6 @@
 
 """
 
-import matplotlib
-matplotlib.use("Agg")  # noqa E402
-
 import unittest
 import os
 import numpy as np
@@ -36,11 +33,9 @@ import esutil
 import lsst.utils
 import lsst.pex.exceptions
 import lsst.pipe.tasks
-import lsst.daf.persistence as dafPersistence
+import lsst.daf.persistence as dafPersist
 
 import lsst.fgcmcal as fgcmcal
-
-ROOT = os.path.abspath(os.path.dirname(__file__))
 
 
 class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
@@ -88,7 +83,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         config.colorterms.data['sdss*'].data['i'].c1 = -0.16922042
         config.colorterms.data['sdss*'].data['i'].c2 = -0.01374245
 
-        butler = dafPersistence.Butler(self.inputDir)
+        butler = dafPersist.Butler(self.inputDir)
         loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler, config=config)
 
         ra = 320.0

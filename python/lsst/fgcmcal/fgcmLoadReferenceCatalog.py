@@ -54,7 +54,7 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
         doc=("Apply photometric color terms to reference stars?"
              "Requires that colorterms be set to a ColorTermLibrary"),
         dtype=bool,
-        default=False
+        default=True
     )
     colorterms = pexConfig.ConfigField(
         doc="Library of photometric reference catalog name to color term dict.",
@@ -71,12 +71,6 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
             msg = "applyColorTerms=True requires the `colorterms` field be set to a ColortermLibrary."
             raise pexConfig.FieldValidationError(FgcmLoadReferenceCatalogConfig.colorterms, self, msg)
 
-    def setDefaults(self):
-        pexConfig.Config.setDefaults(self)
-
-        # self.referenceSelection.doSignalToNoise = True
-        # self.referenceSelection.signalToNoise.minimum = 10.0
-
 
 class FgcmLoadReferenceCatalogTask(pipeBase.Task):
     """
@@ -88,7 +82,7 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
        Data butler for reading catalogs
     """
     ConfigClass = FgcmLoadReferenceCatalogConfig
-    _DefaultName = 'FgcmLoadReferenceCatalogTask'
+    _DefaultName = 'fgcmLoadReferenceCatalog'
 
     def __init__(self, butler, *args, **kwargs):
         """Construct an FgcmLoadReferenceCatalogTask
@@ -260,6 +254,10 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
 
                 refMag, refMagErr = colorterm.getCorrectedMagnitudes(refCat, filterName)
 
+                # nan_to_num replaces nans with zeros, and this ensures that we select
+                # magnitudes that both filter out nans and are not very large (corresponding
+                # to very small fluxes), as "99" is a common sentinel for illegal magnitudes.
+
                 good, = np.where((np.nan_to_num(refMag[selected]) < 90.0) &
                                  (np.nan_to_num(refMagErr[selected]) < 90.0) &
                                  (np.nan_to_num(refMagErr[selected]) > 0.0))
@@ -273,6 +271,8 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
             # TODO: need to use Jy here until RFC-549 is completed and refcats return nanojansky
 
             for i, (filterName, fluxField) in enumerate(zip(self._fluxFilters, self._fluxFields)):
+                # nan_to_num replaces nans with zeros, and this ensures that we select
+                # fluxes that both filter out nans and are positive.
                 good, = np.where((np.nan_to_num(refCat[fluxField][selected]) > 0.0) &
                                  (np.nan_to_num(refCat[fluxField+'Err'][selected]) > 0.0))
                 refMag = (refCat[fluxField][selected][good] * units.Jy).to_value(units.ABmag)
@@ -310,15 +310,11 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
                                                           filterName)
                 foundReferenceFilter = True
                 self._referenceFilter = filterName
+                break
             except RuntimeError:
                 # This just means that the filterName wasn't listed
                 # in the reference catalog.  This is okay.
                 pass
-
-            if foundReferenceFilter:
-                # We have found a filter to use to load the reference
-                # catalog
-                break
 
         if not foundReferenceFilter:
             raise RuntimeError("Could not find any valid flux field(s) %s" %

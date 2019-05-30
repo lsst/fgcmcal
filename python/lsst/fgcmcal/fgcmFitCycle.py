@@ -376,7 +376,9 @@ class FgcmFitCycleConfig(pexConfig.Config):
         default=False,
     )
     instrumentParsPerBand = pexConfig.Field(
-        doc="Model instrumental variation over time per band",
+        doc=("Model instrumental parameters per band? "
+             "Otherwise, instrumental parameters (QE changes with time) are "
+             "shared among all bands."),
         dtype=bool,
         default=False,
     )
@@ -1187,16 +1189,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParInfo['LUTFILTERNAMES'][:] = parLutFilterNames
         inParInfo['FITBANDS'][:] = parFitBands
         inParInfo['NOTFITBANDS'][:] = parNotFitBands
-        # inParInfo['LNTAUUNIT'] = parCat['lnTauUnit']
-        # inParInfo['LNTAUSLOPEUNIT'] = parCat['lnTauSlopeUnit']
-        # inParInfo['ALPHAUNIT'] = parCat['alphaUnit']
-        # inParInfo['LNPWVUNIT'] = parCat['lnPwvUnit']
-        # inParInfo['LNPWVSLOPEUNIT'] = parCat['lnPwvSlopeUnit']
-        # inParInfo['LNPWVQUADRATICUNIT'] = parCat['lnPwvQuadraticUnit']
-        # inParInfo['LNPWVGLOBALUNIT'] = parCat['lnPwvGlobalUnit']
-        # inParInfo['O3UNIT'] = parCat['o3Unit']
-        # inParInfo['QESYSUNIT'] = parCat['qeSysUnit']
-        # inParInfo['FILTEROFFSETUNIT'] = parCat['filterOffsetUnit']
         inParInfo['HASEXTERNALPWV'] = parCat['hasExternalPwv']
         inParInfo['HASEXTERNALTAU'] = parCat['hasExternalTau']
 
@@ -1558,16 +1550,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['lutFilterNames'] = lutFilterNameString
         rec['fitBands'] = fitBandString
         rec['notFitBands'] = notFitBandString
-        # rec['lnTauUnit'] = parInfo['LNTAUUNIT']
-        # rec['lnTauSlopeUnit'] = parInfo['LNTAUSLOPEUNIT']
-        # rec['alphaUnit'] = parInfo['ALPHAUNIT']
-        # rec['lnPwvUnit'] = parInfo['LNPWVUNIT']
-        # rec['lnPwvSlopeUnit'] = parInfo['LNPWVSLOPEUNIT']
-        # rec['lnPwvQuadraticUnit'] = parInfo['LNPWVQUADRATICUNIT']
-        # rec['lnPwvGlobalUnit'] = parInfo['LNPWVGLOBALUNIT']
-        # rec['o3Unit'] = parInfo['O3UNIT']
-        # rec['qeSysUnit'] = parInfo['QESYSUNIT']
-        # rec['filterOffsetUnit'] = parInfo['FILTEROFFSETUNIT']
         # note these are not currently supported here.
         rec['hasExternalPwv'] = 0
         rec['hasExternalTau'] = 0

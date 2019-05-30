@@ -18,7 +18,7 @@ config.densityCutNside = 128
 config.densityCutMaxPerPixel = 1500
 # Dictionary that maps "filters" (instrumental configurations) to "bands"
 # (abstract names).  All filters must be listed in the LUT.
-config.filterMap = {'g':'g', 'r':'r', 'i':'i', 'z':'z', 'y':'y'}
+config.filterMap = {'g': 'g', 'r': 'r', 'i': 'i', 'z': 'z', 'y': 'y'}
 # Which bands are required to be observed to be considered a calibration star
 config.requiredBands = ['g', 'r', 'i', 'z']
 # The reference CCD is a good CCD used to select visit to speed up the scanning

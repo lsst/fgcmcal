@@ -626,8 +626,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     # nans below.
                     np.warnings.simplefilter("ignore")
 
-                    tempAperCat[instMagInKey][:] = -2.5 * \
-                        np.log10(sources[instFluxAperInKey][goodSrc.selected])
+                    tempAperCat[instMagInKey][:] = -2.5 * np.log10(
+                        sources[instFluxAperInKey][goodSrc.selected])
                     tempAperCat[instMagErrInKey][:] = (2.5 / np.log(10.)) * (
                         sources[instFluxErrAperInKey][goodSrc.selected] /
                         sources[instFluxAperInKey][goodSrc.selected])
@@ -712,8 +712,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                              zip(lutCat[0]['stdFilterNames'].split(','),
                                  lutCat[0]['lambdaStdFilter'])}
 
-            # Allow memory to be reclaimed
-            lutCat = None
+            del lutCat
 
             referenceFilterNames = self._getReferenceFilterNames(visitCat,
                                                                  stdFilterDict,
@@ -993,7 +992,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         stdFilterNames = {stdFilterDict[filterName] for filterName in filterNames}
 
         # And sort these by wavelength
-        referenceFilterNames = [key for key in sorted({k: stdLambdaDict[k] for k in stdFilterNames},
-                                                      key=stdLambdaDict.get)]
+        referenceFilterNames = sorted(stdFilterNames, key=stdLambdaDict.get)
 
         return referenceFilterNames

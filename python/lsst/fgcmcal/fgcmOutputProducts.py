@@ -71,7 +71,9 @@ class FgcmOutputProductsConfig(pexConfig.Config):
     # The following fields refer to calibrating from a reference
     # catalog, but in the future this might need to be expanded
     doReferenceCalibration = pexConfig.Field(
-        doc="Transfer 'absolute' calibration from reference catalog",
+        doc=("Transfer 'absolute' calibration from reference catalog? "
+             "This afterburner step is unnecessary if reference stars "
+             "were used in the full fit in FgcmFitCycleTask."),
         dtype=bool,
         default=False,
     )
@@ -293,6 +295,10 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         self.bands = fitCycleConfig.bands
         self.superStarSubCcd = fitCycleConfig.superStarSubCcd
         self.chebyshevOrder = fitCycleConfig.superStarSubCcdChebyshevOrder
+
+        if self.config.doReferenceCalibration and fitCycleConfig.doReferenceCalibration:
+            self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
+                          "fitCycleConfig.doReferenceCalibration")
 
         # And make sure that the atmosphere was output properly
         if not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber):

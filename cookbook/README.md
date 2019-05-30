@@ -342,15 +342,12 @@ you will find a sharded reference catalog suitable to use for any observations
 overlapping the survey images that have been calibrated.
 
 And in the output repo
-`/datasets/hsc/repo/rerun/private/${USER}/${COOKBOOKRERUN}/fit1/jointcal-results`
-you will find all of the `jointcal_photoCalib` spatially-variable zeropoint
+`/datasets/hsc/repo/rerun/private/${USER}/${COOKBOOKRERUN}/fit1/fgcmcal-results`
+you will find all of the `fgcmcal_photoCalib` spatially-variable zeropoint
 files that can be used in coaddition.  At the moment, these combine information
 from the WCS Jacobian distortions as well as the spatially variable
 transmission (due to the illumination correction derived by FGCM).  In the
 future, the Jacobian information will be factored out.
-
-Note that all the files are set to tract `0000`, as FGCM has no concept of tracts
-and patches.
 
 ### FGCM-Specific Data Products
 
