@@ -512,6 +512,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         """
 
         c = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
+        c.scale(1.0/detector.getPixelSize()[0])  # Assumes x and y pixel sizes in arcsec are the same
 
         throughput = self._opticsTransmission.sampleAt(position=c,
                                                        wavelengths=throughputLambda)

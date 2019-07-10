@@ -978,34 +978,30 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                   ('X_SIZE', 'i4'),
                                                   ('Y_SIZE', 'i4')])
 
-        extent = lsst.geom.Extent2D(self.config.pixelScale, self.config.pixelScale)
-
         for i, detector in enumerate(camera):
             # new version, using proper rotations
             #  but I worry this only works with HSC, as there's a unit inconsistency
-
-            camPoint = detector.getCenter(afwCameraGeom.PIXELS)
+            camPoint = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
+            pixelSize = detector.getPixelSize()[0]  # Assumes x and y pixel sizes in arcsec are the same
+            camPoint.scale(1.0/pixelSize)
             bbox = detector.getBBox()
-            orient = detector.getOrientation()
 
             ccdOffsets['CCDNUM'][i] = detector.getId()
-
-            xform = orient.makePixelFpTransform(extent)
-            pointXform = xform.applyForward(camPoint)
             # this requires a pixelScale
             # Note that this now works properly with HSC, but I need to work on
             # generalizing this properly.  I expect the updates in DM-16490 will
             # generalize these computations, and appropriate tests can be added
             # on that ticket.
-            ccdOffsets['DELTA_RA'][i] = -pointXform.getY() * self.config.pixelScale / 3600.0
-            ccdOffsets['DELTA_DEC'][i] = -pointXform.getX() * self.config.pixelScale / 3600.0
-
+            ccdOffsets['DELTA_RA'][i] = -camPoint.getY() * self.config.pixelScale / 3600.0
+            ccdOffsets['DELTA_DEC'][i] = -camPoint.getX() * self.config.pixelScale / 3600.0
+            boxXform = detector.transform(lsst.geom.Point2D(bbox.getMaxX(), bbox.getMaxY()),
+                                          afwCameraGeom.PIXELS, afwCameraGeom.FOCAL_PLANE)
+            boxXform.scale(1.0/pixelSize)
             # but this does not (for the delta)
-            boxXform = xform.applyForward(lsst.geom.Point2D(bbox.getMaxX(), bbox.getMaxY()))
             ccdOffsets['RA_SIZE'][i] = 2. * np.abs(boxXform.getY() -
-                                                   pointXform.getY()) / 3600.0
+                                                   camPoint.getY()) / 3600.0
             ccdOffsets['DEC_SIZE'][i] = 2. * np.abs(boxXform.getX() -
-                                                    pointXform.getX()) / 3600.0
+                                                    camPoint.getX()) / 3600.0
 
             ccdOffsets['X_SIZE'][i] = bbox.getMaxX()
             ccdOffsets['Y_SIZE'][i] = bbox.getMaxY()
