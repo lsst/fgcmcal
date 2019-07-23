@@ -38,7 +38,7 @@ import numpy as np
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 from lsst.daf.base.dateTime import DateTime
 import lsst.daf.persistence.butlerExceptions as butlerExceptions
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
@@ -476,7 +476,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            List of source CCDs
         """
 
-        bbox = afwGeom.BoxI(afwGeom.PointI(0, 0), afwGeom.PointI(1, 1))
+        bbox = geom.BoxI(geom.PointI(0, 0), geom.PointI(1, 1))
 
         # now loop over visits and get the information
         for i, srcVisit in enumerate(srcVisits):

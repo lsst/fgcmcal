@@ -41,7 +41,6 @@ import numpy as np
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
-import lsst.afw.geom as afwGeom
 import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.geom
 
@@ -979,7 +978,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                   ('X_SIZE', 'i4'),
                                                   ('Y_SIZE', 'i4')])
 
-        extent = afwGeom.Extent2D(self.config.pixelScale, self.config.pixelScale)
+        extent = lsst.geom.Extent2D(self.config.pixelScale, self.config.pixelScale)
 
         for i, detector in enumerate(camera):
             # new version, using proper rotations
@@ -1002,7 +1001,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             ccdOffsets['DELTA_DEC'][i] = -pointXform.getX() * self.config.pixelScale / 3600.0
 
             # but this does not (for the delta)
-            boxXform = xform.applyForward(afwGeom.Point2D(bbox.getMaxX(), bbox.getMaxY()))
+            boxXform = xform.applyForward(lsst.geom.Point2D(bbox.getMaxX(), bbox.getMaxY()))
             ccdOffsets['RA_SIZE'][i] = 2. * np.abs(boxXform.getY() -
                                                    pointXform.getY()) / 3600.0
             ccdOffsets['DEC_SIZE'][i] = 2. * np.abs(boxXform.getX() -
