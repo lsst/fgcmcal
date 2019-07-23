@@ -32,7 +32,7 @@ import numpy as np
 import glob
 
 import lsst.daf.persistence as dafPersistence
-import lsst.afw.geom as afwGeom
+import lsst.geom as geom
 import lsst.log
 from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask, LoadIndexedReferenceObjectsConfig
 import lsst.afw.image as afwImage
@@ -379,7 +379,7 @@ class FgcmcalTestBase(object):
 
         testTrans = butler.get('transmission_atmosphere_fgcm',
                                dataId={visitDataRefName: visitCatalog[0]['visit']})
-        testResp = testTrans.sampleAt(position=afwGeom.Point2D(0, 0),
+        testResp = testTrans.sampleAt(position=geom.Point2D(0, 0),
                                       wavelengths=lutCat[0]['atmLambda'])
 
         # The test fit is performed with the atmosphere parameters frozen
@@ -396,7 +396,7 @@ class FgcmcalTestBase(object):
         # difference so they aren't identical
         testTrans2 = butler.get('transmission_atmosphere_fgcm',
                                 dataId={visitDataRefName: visitCatalog[1]['visit']})
-        testResp2 = testTrans2.sampleAt(position=afwGeom.Point2D(0, 0),
+        testResp2 = testTrans2.sampleAt(position=geom.Point2D(0, 0),
                                         wavelengths=lutCat[0]['atmLambda'])
         self.assertFloatsAlmostEqual(testResp, testResp2, atol=1e-4)
 
