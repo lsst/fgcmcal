@@ -38,9 +38,9 @@ from .fgcmFitCycle import FgcmFitCycleConfig
 from .fgcmOutputProducts import FgcmOutputProductsTask
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
 from .utilities import computeCcdOffsets
-# from .utilities import makeZptSchema, makeZptCat
-# from .utilities import makeAtmSchema, makeAtmCat
-# from .utilities import makeStdSchema, makeStdCat
+from .utilities import makeZptSchema, makeZptCat
+from .utilities import makeAtmSchema, makeAtmCat
+from .utilities import makeStdSchema, makeStdCat
 
 import fgcm
 
@@ -224,10 +224,12 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
             raise RuntimeError("Must run FgcmCalibrateTract with fgcmBuildStars.doReferenceMatches")
 
         self.makeSubtask("fgcmBuildStars", butler=butler)
+        self.makeSubtask("fgcmOutputProducts", butler=butler)
 
         # Run the build stars tasks
-        # tract = 15
+        tract = 15
 
+        # Note that we will need visitCat at the end of the procedure for the outputs
         visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(butler, dataRefs)
         fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(butler,
                                                                                  visitCat)
@@ -244,7 +246,6 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
 
         # Translate the visit catalog into fgcm format
         fgcmExpInfo = translateVisitCatalog(visitCat)
-        del visitCat
 
         camera = butler.get('camera')
         configDict = makeConfigDict(self.config.fgcmFitCycle, self.log, camera,
@@ -317,15 +318,17 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         del fgcmRefCat
 
         converged = False
-        nCycle = 0
+        cycleNumber = 0
 
-        previousReservedRawRepeatability = np.zeros(fgcmFitCycle.fgcmPars.nBands) + 1000.0
+        previousReservedRawRepeatability = np.zeros(fgcmPars.nBands) + 1000.0
         previousParInfo = None
         previousParams = None
         previousSuperStar = None
 
-        while (not converged and nCycle < self.config.maxFitCycles):
-            if nCycle > 0:
+        while (not converged and cycleNumber < self.config.maxFitCycles):
+            fgcmFitCycle.fgcmConfig.cycleNumber = cycleNumber
+
+            if cycleNumber > 0:
                 # Use parameters from previous cycle
                 fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                                   fgcmExpInfo,
@@ -342,20 +345,24 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
             previousParInfo, previousParams = fgcmFitCycle.fgcmPars.parsToArrays()
             previousSuperStar = fgcmFitCycle.fgcmPars.parSuperStarFlat.copy()
 
+            print(previousReservedRawRepeatability)
+            print(fgcmFitCycle.fgcmPars.compReservedRawRepeatability)
+
             # Check for convergence
             if np.alltrue((previousReservedRawRepeatability -
                            fgcmFitCycle.fgcmPars.compReservedRawRepeatability) <
                           self.config.convergenceTolerance):
-                self.log.info("Raw repeatability has converged.")
+                self.log.info("Raw repeatability has converged after cycle number %d." % (cycleNumber))
                 converged = True
             else:
                 fgcmFitCycle.fgcmConfig.expGrayPhotometricCut[:] = fgcmFitCycle.updatedPhotometricCut
+                previousReservedRawRepeatability[:] = fgcmFitCycle.fgcmPars.compReservedRawRepeatability
 
-            nCycle += 1
+            cycleNumber += 1
 
         # Log warning if not converged
         if not converged:
-            self.log.warn("Maximum number of fit cycles exceeded (%d) without convergence." % (nCycle))
+            self.log.warn("Maximum number of fit cycles exceeded (%d) without convergence." % (cycleNumber))
 
         # Do final clean-up iteration
         fgcmFitCycle.fgcmConfig.freezeStdAtmosphere = False
@@ -375,7 +382,7 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         fgcmFitCycle.run()
 
         # Do the outputs.  Need to keep track of tract, blah.
-        """
+
         if self.config.fgcmFitCycle.superStarSubCcd or self.config.fgcmFitCycle.ccdGraySubCcd:
             chebSize = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_CHEB'].shape[1]
         else:
@@ -387,7 +394,14 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         atmSchema = makeAtmSchema()
         atmCat = makeAtmCat(atmSchema, fgcmFitCycle.fgcmZpts.atmStruct)
 
-        stdSchema = makeStdSchema()
+        stdSchema = makeStdSchema(fgcmFitCycle.fgcmPars.nBands)
         stdStruct = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
         stdCat = makeStdCat(stdSchema, stdStruct)
-        """
+
+        retval = self.fgcmOutputProducts.generateOutputProducts(butler, tract,
+                                                                visitCat,
+                                                                zptCat, atmCat, stdCat,
+                                                                self.config.fgcmBuildStars,
+                                                                self.config.fgcmFitCycle)
+
+        return retval

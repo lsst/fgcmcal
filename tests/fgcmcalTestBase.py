@@ -35,7 +35,7 @@ import lsst.daf.persistence as dafPersistence
 import lsst.geom as geom
 import lsst.log
 from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask, LoadIndexedReferenceObjectsConfig
-import lsst.afw.image as afwImage
+from astropy import units
 
 import lsst.fgcmcal as fgcmcal
 
@@ -302,6 +302,7 @@ class FgcmcalTestBase(object):
         config = LoadIndexedReferenceObjectsConfig()
         config.ref_dataset_name = 'fgcm_stars'
         task = LoadIndexedReferenceObjectsTask(butler, config=config)
+
         # Read in a giant radius to get them all
         refStruct = task.loadSkyCircle(rawStars[0].getCoord(), 5.0 * geom.degrees,
                                        filterName='r')
@@ -313,8 +314,8 @@ class FgcmcalTestBase(object):
         test, = np.where(rawStars['id'][0] == refStruct.refCat['id'])
 
         mag = rawStars['mag_std_noabs'][0, 0] + offsets[0]
-        flux = afwImage.fluxFromABMag(mag)
-        fluxErr = afwImage.fluxErrFromABMagErr(rawStars['magErr_std'][0, 0], mag)
+        flux = (mag*units.ABmag).to_value(units.nJy)
+        fluxErr = (np.log(10.) / 2.5) * flux * rawStars['magErr_std'][0, 0]
         self.assertFloatsAlmostEqual(flux, refStruct.refCat['r_flux'][test[0]], rtol=1e-6)
         self.assertFloatsAlmostEqual(fluxErr, refStruct.refCat['r_fluxErr'][test[0]], rtol=1e-6)
 

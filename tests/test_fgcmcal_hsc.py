@@ -146,7 +146,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                                      filterMapping, zpOffsets,
                                      904014, 12, 'i', 1)
 
-    def notest_fgcmcalTract(self):
+    def test_fgcmcalTract(self):
         # Set numpy seed for stability
         np.random.seed(seed=1000)
 

@@ -46,13 +46,13 @@ import lsst.pipe.base as pipeBase
 from lsst.afw.image import TransmissionCurve
 from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask
 from lsst.pipe.tasks.photoCal import PhotoCalTask
-from .fgcmFitCycle import FgcmFitCycleTask
 import lsst.geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 from lsst.meas.algorithms import IndexerRegistry
 from lsst.meas.algorithms import DatasetConfig
+from lsst.meas.algorithms.ingestIndexReferenceTask import addRefCatMetadata
 
 import fgcm
 
@@ -154,6 +154,7 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         self.photoCal.match.sourceSelection.flags.bad = ['flag_badStar']
         self.photoCal.match.sourceSelection.doUnresolved = False
         self.datasetConfig.ref_dataset_name = 'fgcm_stars'
+        self.datasetConfig.format_version = 1
 
 
 class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
@@ -265,7 +266,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         return None
 
     @pipeBase.timeMethod
-    def runDataRef(self, butler, cycleNumber=None):
+    def runDataRef(self, butler):
         """
         Make FGCM output products for use in the stack
 
@@ -286,20 +287,17 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         if not butler.datasetExists('fgcmBuildStars_config'):
             raise RuntimeError("Cannot find fgcmBuildStars_config, which is prereq for fgcmOutputProducts")
 
-        if cycleNumber is None:
-            cycleNumber = self.config.cycleNumber
-
         fgcmBuildStarsConfig = butler.get('fgcmBuildStars_config')
         self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
         self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
         self.filterMap = fgcmBuildStarsConfig.filterMap
 
         # Make sure that the fit config exists, to retrieve bands and other info
-        if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=cycleNumber):
+        if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber):
             raise RuntimeError("Cannot find fgcmFitCycle_config from cycle %d " % (self.config.cycleNumber) +
                                "which is required for fgcmOutputProducts.")
 
-        fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=cycleNumber)
+        fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
         self.bands = fitCycleConfig.bands
         self.superStarSubCcd = fitCycleConfig.superStarSubCcd
         self.chebyshevOrder = fitCycleConfig.superStarSubCcdChebyshevOrder
@@ -309,8 +307,20 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                           "fitCycleConfig.doReferenceCalibration")
 
         # And make sure that the atmosphere was output properly
-        if not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber):
-            raise RuntimeError("The specified fgcm cycle (%d) has not been run on this repo." %
+        if (self.config.doAtmosphereOutput and
+                not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)):
+            raise RuntimeError("Atmosphere parameters are missing for cycle %d." %
+                               (self.config.cycleNumber))
+
+        if ((self.config.doReferenceCalibration or self.config.doRefcatOutput) and
+                (not butler.datasetExists('fgcmStandardStars',
+                                          fgcmcycle=self.config.cycleNumber))):
+            raise RuntimeError("Standard stars are missing for cycle %d." %
+                               (self.config.cycleNumber))
+
+        if (self.config.doZeropointOutput and
+                (not butler.datasetExists('fgcmZeropoints', fgcmcycle=self.config.cycleNumber))):
+            raise RuntimeError("Zeropoints are missing for cycle %d." %
                                (self.config.cycleNumber))
 
         # And make sure this is the last cycle
@@ -318,45 +328,38 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             raise RuntimeError("The task fgcmOutputProducts should only be run"
                                "on the final fit cycle products")
 
-        # Check if we need to run one final cycle to generate standards
-        if not butler.datasetExists('fgcmStandardStars', fgcmcycle=self.config.cycleNumber):
-            self.log.info("Standard stars will be generated using final fgcmFitCycle settings")
-            self._generateFgcmStandardStars(butler)
-            # Increment the cycle number
-            self.useCycle = self.config.cycleNumber + 1
+        if self.config.doReferenceCalibration or self.config.doRefcatOutput:
+            stdCat = butler.get('fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
         else:
-            self.useCycle = self.config.cycleNumber
-
-        # And make sure that the atmosphere was output properly
-        # THIS IS REDUNDANT AND NEED TO CHECK THE CYCLENUMBER STUFF
-        if not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.useCycle):
-            raise RuntimeError("The latest fgcm cycle (%d) has not been run on this repo." %
-                               (self.useCycle))
+            stdCat = None
 
         if self.config.doReferenceCalibration:
-            offsets = self._computeReferenceOffsets(butler)
+            offsets = self._computeReferenceOffsets(butler, stdCat)
         else:
             offsets = np.zeros(len(self.bands))
 
         # Output the standard stars in stack format
         if self.config.doRefcatOutput:
-            self._outputStandardStars(butler, offsets)
+            self._outputStandardStars(butler, stdCat, offsets)
+
+        del stdCat
 
         # Output the gray zeropoints
         if self.config.doZeropointOutput:
-            zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.useCycle)
+            zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
             visitCat = butler.get('fgcmVisitCatalog')
             self._outputZeropoints(butler, zptCat, visitCat, offsets)
 
         # Output the atmospheres
         if self.config.doAtmosphereOutput:
-            atmCat = butler.get('fgcmAtmosphereParameters', fgcmcycle=self.useCycle)
+            atmCat = butler.get('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
             self._outputAtmospheres(butler, atmCat)
 
         # We return the zp offsets
         return pipeBase.Struct(offsets=offsets)
 
-    def generateOutputProducts(self, butler, tract, cycleNumber,
+    def generateOutputProducts(self, butler, tract,
+                               visitCat, zptCat, atmCat, stdCat,
                                fgcmBuildStarsConfig, fgcmFitCycleConfig):
         """
         Generate the output products, as specified in the config.
@@ -367,16 +370,28 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
-        cycleNumber: `int`
-           Final
+        tract: `int`
+           Tract number
+        visitCat: `lsst.afw.table.BaseCatalog`
+           FGCM visitCat from fgcmBuildStarsTask
+        zptCat: `lsst.afw.table.BaseCatalog`
+           FGCM zeropoint catalog from fgcmFitCycleTask
+        atmCat: `lsst.afw.table.BaseCatalog`
+           FGCM atmosphere parameter catalog from fgcmFitCycleTask
+        stdCat: `lsst.afw.table.SimpleCatalog`
+           FGCM standard star catalog from fgcmFitCycleTask
+        fgcmBuildStarsConfig: `lsst.fgcmcal.FgcmBuildStarsConfig`
+           Configuration object from fgcmBuildStarsTask
+        fgcmFitCycleConfig: `lsst.fgcmcal.FgcmFitCycleConfig`
+           Configuration object from fgcmFitCycleTask
         """
-
-        # We need the fgcmAtmosphereParameters, fgcmStandardStars, and
-        # modify outputZeropoints to take a tract
 
         self.bands = fgcmFitCycleConfig.bands
         self.superStarSubCcd = fgcmFitCycleConfig.superStarSubCcd
         self.chebyshevOrder = fgcmFitCycleConfig.superStarSubCcdChebyshevOrder
+        self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
+        self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
+        self.filterMap = fgcmBuildStarsConfig.filterMap
 
         if self.config.doReferenceCalibration and fgcmFitCycleConfig.doReferenceCalibration:
             self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
@@ -386,36 +401,19 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             raise RuntimeError("Cannot do reference catalog output in `tract` mode.")
 
         if self.config.doReferenceCalibration:
-            offsets = self._computeReferenceOffsets(butler)
+            offsets = self._computeReferenceOffsets(butler, stdCat)
         else:
             offsets = np.zeros(len(self.bands))
 
         if self.config.doZeropointOutput:
-            self._outputZeropoints(butler, offsets, tract=tract)
+            self._outputZeropoints(butler, zptCat, visitCat, offsets, tract=tract)
 
         if self.config.doAtmosphereOutput:
-            self._outputAtmospheres(butler, tract=tract)
+            self._outputAtmospheres(butler, atmCat, tract=tract)
 
         return pipeBase.Struct(offsets=offsets)
 
-    def _generateFgcmStandardStars(self, butler):
-        """
-        Call fgcmFitCycle with settings to output the standard stars.
-
-        Parameters
-        ----------
-        butler: `lsst.daf.persistence.Butler`
-        """
-
-        fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
-        fitCycleConfig.cycleNumber += 1
-        fitCycleConfig.maxIter = 0
-        fitCycleConfig.outputStandards = True
-
-        fitCycleTask = FgcmFitCycleTask(butler=butler, config=fitCycleConfig)
-        fitCycleTask.runDataRef(butler)
-
-    def _computeReferenceOffsets(self, butler):
+    def _computeReferenceOffsets(self, butler, stdCat):
         """
         Compute offsets relative to a reference catalog.
 
@@ -428,6 +426,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
+        FIX THIS
 
         Returns
         -------
@@ -435,19 +434,16 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
            Per band zeropoint offsets
         """
 
-        # Load the stars
-        stars = butler.get('fgcmStandardStars', fgcmcycle=self.useCycle)
-
         # Only use stars that are observed in all the bands
         # This will ensure that we use the same healpix pixels for the absolute
         # calibration of each band.
-        minObs = stars['ngood'].min(axis=1)
+        minObs = stdCat['ngood'].min(axis=1)
 
         goodStars = (minObs >= 1)
-        stars = stars[goodStars]
+        stdCat = stdCat[goodStars]
 
         self.log.info("Found %d stars with at least 1 good observation in each band" %
-                      (len(stars)))
+                      (len(stdCat)))
 
         # We have to make a table for each pixel with flux/fluxErr
         # This is a temporary table generated for input to the photoCal task.
@@ -456,7 +452,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # specified by the atmosphere/instrumental parameters), nor are they
         # in Jansky (since they don't have a proper absolute calibration: the overall
         # zeropoint is estimated from the telescope size, etc.)
-        sourceMapper = afwTable.SchemaMapper(stars.schema)
+        sourceMapper = afwTable.SchemaMapper(stdCat.schema)
         sourceMapper.addMinimalSchema(afwTable.SimpleTable.makeMinimalSchema())
         sourceMapper.editOutputSchema().addField('instFlux', type=np.float64,
                                                  doc="instrumental flux (counts)")
@@ -470,8 +466,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # Note that there is an assumption here that the ra/dec coords stored
         # on-disk are in radians, and therefore that starObs['coord_ra'] /
         # starObs['coord_dec'] return radians when used as an array of numpy float64s.
-        theta = np.pi / 2. - stars['coord_dec']
-        phi = stars['coord_ra']
+        theta = np.pi / 2. - stdCat['coord_dec']
+        phi = stdCat['coord_ra']
 
         ipring = hp.ang2pix(self.config.referencePixelizationNside, theta, phi)
         h, rev = esutil.stat.histogram(ipring, rev=True)
@@ -498,14 +494,14 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         results['hpix'] = ipring[rev[rev[gdpix]]]
 
         # We need a boolean index to deal with catalogs...
-        selected = np.zeros(len(stars), dtype=np.bool)
+        selected = np.zeros(len(stdCat), dtype=np.bool)
 
         refFluxFields = [None] * len(self.bands)
 
         for p, pix in enumerate(gdpix):
             i1a = rev[rev[pix]: rev[pix + 1]]
 
-            # the stars afwTable can only be indexed with boolean arrays,
+            # the stdCat afwTable can only be indexed with boolean arrays,
             # and not numpy index arrays (see DM-16497).  This little trick
             # converts the index array into a boolean array
             selected[:] = False
@@ -513,7 +509,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
             for b, band in enumerate(self.bands):
 
-                struct = self._computeOffsetOneBand(sourceMapper, badStarKey, b, band, stars,
+                struct = self._computeOffsetOneBand(sourceMapper, badStarKey, b, band, stdCat,
                                                     selected, refFluxFields)
                 results['nstar'][p, b] = len(i1a)
                 results['nmatch'][p, b] = len(struct.arrays.refMag)
@@ -536,22 +532,22 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         return offsets
 
     def _computeOffsetOneBand(self, sourceMapper, badStarKey,
-                              b, band, stars, selected, refFluxFields):
+                              b, band, stdCat, selected, refFluxFields):
         """
-        Compute the zeropoint offset between the fgcm stars and the reference
+        Compute the zeropoint offset between the fgcm stdCat and the reference
         stars for one pixel in one band
 
         Parameters
         ----------
         sourceMapper: `afwTable.SchemaMapper`
-           Mapper to go from stars to calibratable catalog
+           Mapper to go from stdCat to calibratable catalog
         badStarKey: `afwTable.Key`
            Key for the field with bad stars
         b: `int`
            Index of the band in the star catalog
         band: `str`
            Name of band for reference catalog
-        stars: `afwTable.SimpleCatalog`
+        stdCat: `afwTable.SimpleCatalog`
            FGCM standard stars
         selected: `np.array(dtype=np.bool)`
            Boolean array of which stars are in the pixel
@@ -561,14 +557,14 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         sourceCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
         sourceCat.reserve(selected.sum())
-        sourceCat.extend(stars[selected], mapper=sourceMapper)
-        sourceCat['instFlux'] = 10.**(stars['mag_std_noabs'][selected, b] / (-2.5))
-        sourceCat['instFluxErr'] = (np.log(10.) / 2.5) * (stars['magErr_std'][selected, b] *
+        sourceCat.extend(stdCat[selected], mapper=sourceMapper)
+        sourceCat['instFlux'] = 10.**(stdCat['mag_std_noabs'][selected, b] / (-2.5))
+        sourceCat['instFluxErr'] = (np.log(10.) / 2.5) * (stdCat['magErr_std'][selected, b] *
                                                           sourceCat['instFlux'])
         # Make sure we only use stars that have valid measurements
         # (This is perhaps redundant with requirements above that the
         # stars be observed in all bands, but it can't hurt)
-        badStar = (stars['mag_std_noabs'][selected, b] > 90.0)
+        badStar = (stdCat['mag_std_noabs'][selected, b] > 90.0)
         for rec in sourceCat[badStar]:
             rec.set(badStarKey, True)
 
@@ -578,7 +574,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         if refFluxFields[b] is None:
             # Need to find the flux field in the reference catalog
             # to work around limitations of DirectMatch in PhotoCal
-            ctr = stars[0].getCoord()
+            ctr = stdCat[0].getCoord()
             rad = 0.05 * lsst.geom.degrees
             refDataTest = self.refObjLoader.loadSkyCircle(ctr, rad, band)
             refFluxFields[b] = refDataTest.fluxField
@@ -595,37 +591,38 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         return struct
 
-    def _outputStandardStars(self, butler, offsets):
+    def _outputStandardStars(self, butler, stdCat, offsets):
         """
         Output standard stars in indexed reference catalog format.
 
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
+        stdCat: `lsst.afw.table.SimpleCatalog`
+           FGCM standard star catalog from fgcmFitCycleTask
         offsets: `np.array` of floats
            Per band zeropoint offsets
         """
 
         self.log.info("Outputting standard stars to %s" % (self.config.datasetConfig.ref_dataset_name))
 
-        # Load the stars (this is the full set of stars, no cuts)
-        stars = butler.get('fgcmStandardStars', fgcmcycle=self.useCycle)
-
         # We determine the conversion from the native units (typically radians) to
         # degrees for the first star.  This allows us to treat coord_ra/coord_dec as
         # numpy arrays rather than Angles, which would we approximately 600x slower.
         # TODO: Fix this after DM-16524 (HtmIndexer.indexPoints should take coords
         # (as Angles) for input
-        conv = stars[0]['coord_ra'].asDegrees() / float(stars[0]['coord_ra'])
-        indices = np.array(self.indexer.indexPoints(stars['coord_ra'] * conv,
-                                                    stars['coord_dec'] * conv))
+        conv = stdCat[0]['coord_ra'].asDegrees() / float(stdCat[0]['coord_ra'])
+        indices = np.array(self.indexer.indexPoints(stdCat['coord_ra'] * conv,
+                                                    stdCat['coord_dec'] * conv))
 
-        formattedCat = self._formatCatalog(stars, offsets)
+        formattedCat = self._formatCatalog(stdCat, offsets)
 
         # Write the master schema
         dataId = self.indexer.makeDataId('master_schema',
                                          self.config.datasetConfig.ref_dataset_name)
-        butler.put(afwTable.SimpleCatalog(formattedCat.schema), 'ref_cat', dataId=dataId)
+        masterCat = afwTable.SimpleCatalog(formattedCat.schema)
+        addRefCatMetadata(masterCat)
+        butler.put(masterCat, 'ref_cat', dataId=dataId)
 
         # Break up the pixels using a histogram
         h, rev = esutil.stat.histogram(indices, rev=True)
@@ -685,15 +682,16 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         for b, band in enumerate(self.bands):
             mag = fgcmStarCat['mag_std_noabs'][:, b] + offsets[b]
-            # We want fluxes in Jy from calibrated AB magnitudes
-            # (after applying offset)
-            # TODO: Full implementation of RFC-549 will have all reference
-            # catalogs in nJy instead of Jy.
-            flux = afwImage.fluxFromABMag(mag)
-            fluxErr = afwImage.fluxErrFromABMagErr(fgcmStarCat['magErr_std'][:, b], mag)
+            # We want fluxes in nJy from calibrated AB magnitudes
+            # (after applying offset).  Updated after RFC-549 and RFC-575.
+            flux = (mag*units.ABmag).to_value(units.nJy)
+            fluxErr = (np.log(10.) / 2.5) * flux * fgcmStarCat['magErr_std'][:, b]
+
             formattedCat['%s_flux' % (band)][:] = flux
             formattedCat['%s_fluxErr' % (band)][:] = fluxErr
             formattedCat['%s_nGood' % (band)][:] = fgcmStarCat['ngood'][:, b]
+
+        addRefCatMetadata(formattedCat)
 
         return formattedCat
 
@@ -704,8 +702,10 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
-        zptCat:
-        visitCat:
+        zptCat: `lsst.afw.table.BaseCatalog`
+           FGCM zeropoint catalog from fgcmFitCycleTask
+        visitCat: lsst.afw.table.BaseCatalog`
+           FGCM visitCat from fgcmBuildStarsTask
         offsets: `np.array`
            Float array of absolute calibration offsets, one for each filter
         tract: `int`, optional
@@ -780,7 +780,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             else:
                 butler.put(photoCalib, datasetType,
                            dataId={self.visitDataRefName: int(rec['visit']),
-                                   self.ccdDataRefname: int(rec['ccd']),
+                                   self.ccdDataRefName: int(rec['ccd']),
                                    'filter': filterMapping[rec['filtername']],
                                    'tract': tract})
 
@@ -863,7 +863,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
-        atmCat: ``
+        atmCat: `lsst.afw.table.BaseCatalog`
+           FGCM atmosphere parameter catalog from fgcmFitCycleTask
         tract: `int`, optional
            Tract number to output.  Default is None (global calibration)
         """
