@@ -137,7 +137,10 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         # per band), we use the PhotoCalTask to match stars in a sample of healpix
         # pixels.  These basic settings ensure that only well-measured, good stars
         # from the source and reference catalogs are used for the matching.
-        self.photoCal.applyColorTerms = True
+
+        # applyColorTerms needs to be False if doReferenceCalibration is False,
+        # as is the new default after DM-16702
+        self.photoCal.applyColorTerms = False
         self.photoCal.fluxField = 'instFlux'
         self.photoCal.magErrFloor = 0.003
         self.photoCal.match.referenceSelection.doSignalToNoise = True
@@ -262,13 +265,15 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         return None
 
     @pipeBase.timeMethod
-    def runDataRef(self, butler):
+    def runDataRef(self, butler, cycleNumber=None):
         """
         Make FGCM output products for use in the stack
 
         Parameters
         ----------
         butler:  `lsst.daf.persistence.Butler`
+        cycleNumber: `int`
+           Final fit cycle number, override config.
 
         Returns
         -------
@@ -281,17 +286,20 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         if not butler.datasetExists('fgcmBuildStars_config'):
             raise RuntimeError("Cannot find fgcmBuildStars_config, which is prereq for fgcmOutputProducts")
 
+        if cycleNumber is None:
+            cycleNumber = self.config.cycleNumber
+
         fgcmBuildStarsConfig = butler.get('fgcmBuildStars_config')
         self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
         self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
         self.filterMap = fgcmBuildStarsConfig.filterMap
 
         # Make sure that the fit config exists, to retrieve bands and other info
-        if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber):
+        if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=cycleNumber):
             raise RuntimeError("Cannot find fgcmFitCycle_config from cycle %d " % (self.config.cycleNumber) +
                                "which is required for fgcmOutputProducts.")
 
-        fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
+        fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=cycleNumber)
         self.bands = fitCycleConfig.bands
         self.superStarSubCcd = fitCycleConfig.superStarSubCcd
         self.chebyshevOrder = fitCycleConfig.superStarSubCcdChebyshevOrder
@@ -320,6 +328,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             self.useCycle = self.config.cycleNumber
 
         # And make sure that the atmosphere was output properly
+        # THIS IS REDUNDANT AND NEED TO CHECK THE CYCLENUMBER STUFF
         if not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.useCycle):
             raise RuntimeError("The latest fgcm cycle (%d) has not been run on this repo." %
                                (self.useCycle))
@@ -335,13 +344,58 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         # Output the gray zeropoints
         if self.config.doZeropointOutput:
-            self._outputZeropoints(butler, offsets)
+            zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.useCycle)
+            visitCat = butler.get('fgcmVisitCatalog')
+            self._outputZeropoints(butler, zptCat, visitCat, offsets)
 
         # Output the atmospheres
         if self.config.doAtmosphereOutput:
-            self._outputAtmospheres(butler)
+            atmCat = butler.get('fgcmAtmosphereParameters', fgcmcycle=self.useCycle)
+            self._outputAtmospheres(butler, atmCat)
 
         # We return the zp offsets
+        return pipeBase.Struct(offsets=offsets)
+
+    def generateOutputProducts(self, butler, tract, cycleNumber,
+                               fgcmBuildStarsConfig, fgcmFitCycleConfig):
+        """
+        Generate the output products, as specified in the config.
+
+        This method is here to have an alternate entry-point for
+        FgcmCalibrateTract.
+
+        Parameters
+        ----------
+        butler: `lsst.daf.persistence.Butler`
+        cycleNumber: `int`
+           Final
+        """
+
+        # We need the fgcmAtmosphereParameters, fgcmStandardStars, and
+        # modify outputZeropoints to take a tract
+
+        self.bands = fgcmFitCycleConfig.bands
+        self.superStarSubCcd = fgcmFitCycleConfig.superStarSubCcd
+        self.chebyshevOrder = fgcmFitCycleConfig.superStarSubCcdChebyshevOrder
+
+        if self.config.doReferenceCalibration and fgcmFitCycleConfig.doReferenceCalibration:
+            self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
+                          "fitCycleConfig.doReferenceCalibration")
+
+        if self.config.doRefcatOutput:
+            raise RuntimeError("Cannot do reference catalog output in `tract` mode.")
+
+        if self.config.doReferenceCalibration:
+            offsets = self._computeReferenceOffsets(butler)
+        else:
+            offsets = np.zeros(len(self.bands))
+
+        if self.config.doZeropointOutput:
+            self._outputZeropoints(butler, offsets, tract=tract)
+
+        if self.config.doAtmosphereOutput:
+            self._outputAtmospheres(butler, tract=tract)
+
         return pipeBase.Struct(offsets=offsets)
 
     def _generateFgcmStandardStars(self, butler):
@@ -643,21 +697,27 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         return formattedCat
 
-    def _outputZeropoints(self, butler, offsets):
+    def _outputZeropoints(self, butler, zptCat, visitCat, offsets, tract=None):
         """
         Output the zeropoints in fgcm_photoCalib format.
 
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
+        zptCat:
+        visitCat:
         offsets: `np.array`
            Float array of absolute calibration offsets, one for each filter
+        tract: `int`, optional
+           Tract number to output.  Default is None (global calibration)
         """
 
-        self.log.info("Outputting fgcm_photoCalib objects")
+        if tract is None:
+            datasetType = 'fgcm_photoCalib'
+        else:
+            datasetType = 'fgcm_tract_photoCalib'
 
-        zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.useCycle)
-        visitCat = butler.get('fgcmVisitCatalog')
+        self.log.info("Outputting %s objects" % (datasetType))
 
         # Only output those that we have a calibration
         # See fgcmFitCycle._makeZptSchema for flag definitions
@@ -712,12 +772,19 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                                          offsetMapping[rec['filtername']],
                                                          scaling)
 
-            butler.put(photoCalib, 'fgcm_photoCalib',
-                       dataId={self.visitDataRefName: int(rec['visit']),
-                               self.ccdDataRefName: int(rec['ccd']),
-                               'filter': filterMapping[rec['filtername']]})
+            if tract is None:
+                butler.put(photoCalib, datasetType,
+                           dataId={self.visitDataRefName: int(rec['visit']),
+                                   self.ccdDataRefName: int(rec['ccd']),
+                                   'filter': filterMapping[rec['filtername']]})
+            else:
+                butler.put(photoCalib, datasetType,
+                           dataId={self.visitDataRefName: int(rec['visit']),
+                                   self.ccdDataRefname: int(rec['ccd']),
+                                   'filter': filterMapping[rec['filtername']],
+                                   'tract': tract})
 
-        self.log.info("Done outputting fgcm_photoCalib objects")
+        self.log.info("Done outputting %s objects" % (datasetType))
 
     def _getChebyshevPhotoCalib(self, coefficients, err, xyMax, offset, scaling):
         """
@@ -789,13 +856,16 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         return photoCalib
 
-    def _outputAtmospheres(self, butler):
+    def _outputAtmospheres(self, butler, atmCat, tract=None):
         """
         Output the atmospheres.
 
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
+        atmCat: ``
+        tract: `int`, optional
+           Tract number to output.  Default is None (global calibration)
         """
 
         self.log.info("Outputting atmosphere transmissions")
@@ -824,9 +894,6 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             except (ValueError, IOError) as e:
                 raise RuntimeError("FGCM look-up-table generated with modtran, "
                                    "but modtran not configured to run.") from e
-
-        # Next, we need to grab the atmosphere parameters
-        atmCat = butler.get('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
 
         zenith = np.degrees(np.arccos(1. / atmCat['secZenith']))
 
@@ -861,7 +928,12 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                                             throughputAtMin=atmVals[0],
                                                             throughputAtMax=atmVals[-1])
 
-            butler.put(curve, "transmission_atmosphere_fgcm",
-                       dataId={self.visitDataRefName: visit})
+            if tract is None:
+                butler.put(curve, "transmission_atmosphere_fgcm",
+                           dataId={self.visitDataRefName: visit})
+            else:
+                butler.put(curve, "transmission_atmosphere_fgcm_tract",
+                           dataId={self.visitDataRefName: visit,
+                                   'tract': tract})
 
         self.log.info("Done outputting atmosphere transmissions")

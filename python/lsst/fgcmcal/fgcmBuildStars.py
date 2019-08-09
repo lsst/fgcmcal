@@ -332,29 +332,37 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             if not butler.datasetExists('fgcmLookUpTable'):
                 raise RuntimeError("Must have fgcmLookUpTable if using config.doReferenceMatches")
 
-            # Make a subtask for reference loading
-            self.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
-
         # Make the visit catalog if necessary
         if not butler.datasetExists('fgcmVisitCatalog'):
             # we need to build visitCat
-            visitCat = self._fgcmMakeVisitCatalog(butler, dataRefs)
+            visitCat = self.fgcmMakeVisitCatalog(butler, dataRefs)
         else:
             self.log.info("Found fgcmVisitCatalog.")
             visitCat = butler.get('fgcmVisitCatalog')
 
         # Compile all the stars
         if not butler.datasetExists('fgcmStarObservations'):
-            self._fgcmMakeAllStarObservations(butler, visitCat)
+            fgcmStarObservationCat = self.fgcmMakeAllStarObservations(butler, visitCat)
         else:
             self.log.info("Found fgcmStarObservations")
+            fgcmStarObservationCat = butler.get('fgcmStarObservations')
 
         if not butler.datasetExists('fgcmStarIds') or not butler.datasetExists('fgcmStarIndices'):
-            self._fgcmMatchStars(butler, visitCat)
+            fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = self.fgcmMatchStars(butler,
+                                                                                visitCat,
+                                                                                fgcmStarObservationCat)
         else:
             self.log.info("Found fgcmStarIds and fgcmStarIndices")
 
-    def _fgcmMakeVisitCatalog(self, butler, dataRefs):
+        # Persist catalogs via the butler
+        butler.put(visitCat, 'fgcmVisitCatalog')
+        butler.put(fgcmStarObservationCat, 'fgcmStarObservations')
+        butler.put(fgcmStarIdCat, 'fgcmStarIds')
+        butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
+        if fgcmRefCat is not None:
+            butler.put(fgcmRefCat, 'fgcmReferenceStars')
+
+    def fgcmMakeVisitCatalog(self, butler, dataRefs):
         """
         Make a visit catalog with all the key data from each visit
 
@@ -384,15 +392,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # DM-13730.
 
         if len(dataRefs) == 0:
-            srcVisits, srcCcds = self._findSourceVisits(butler, nCcd)
+            srcVisits, srcCcds = self._findSourceVisitsFromRepo(butler, nCcd)
         else:
-            # get the visits from the datarefs, only for referenceCCD
-            srcVisits = [d.dataId[self.config.visitDataRefName] for d in dataRefs if
-                         d.dataId[self.config.ccdDataRefName] == self.config.referenceCCD]
-            srcCcds = [self.config.referenceCCD] * len(srcVisits)
+            srcVisits, srcCcds = self._findSourceVisitsFromDatarefs(butler, nCcd, dataRefs)
 
         # Sort the visits for searching/indexing
         srcVisits.sort()
+
+        if len(srcVisits) == 0:
+            self.log.fatal("Found 0 visits to calibrate")
+            raise RuntimeError("No visits to calibrate")
 
         self.log.info("Found %d visits in %.2f s" %
                       (len(srcVisits), time.time() - startTime))
@@ -410,9 +419,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         return visitCat
 
-    def _findSourceVisits(self, butler, nCcd):
+    def _findSourceVisitsFromRepo(self, butler, nCcd):
         """
-        Find all source catalogs in the repository
+        Find all visits with source catalogs in the repository
 
         Parameters
         ----------
@@ -425,7 +434,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         (srcVisits, srcCcds): `tuple` of `list`s
         """
 
-        # We did not specify any datarefs, so find all of them
         if not self.config.checkAllCcds:
             # Faster mode, scan through referenceCCD
             allVisits = butler.queryMetadata('src',
@@ -457,6 +465,47 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                         srcVisits.append(dataset[0])
                         srcCcds.append(ccd)
                         # Once we find that a butler dataset exists, break out
+                        break
+
+        return (srcVisits, srcCcds)
+
+    def _findSourceVisitsFromDatarefs(self, butler, nCcd, dataRefs):
+        """
+        Find all visits with source catalogs from dataRefs
+
+        Parameters
+        ----------
+        butler: `lsst.daf.persistence.Butler`
+        nCcd: `int`
+           Number of CCDs in the camera
+        dataRefs: `list` of `lsst.dat.persistence.ButlerDataRef`
+           Data references for the input visits.
+
+        Returns
+        -------
+        (srcVisits, srcCcds): `tuple` of `lists`s
+        """
+
+        srcVisits = []
+        srcCcds = []
+
+        for dataRef in dataRefs:
+            visit = dataRef.dataId[self.config.visitDataRefName]
+
+            if visit in srcVisits:
+                continue
+
+            # First check the referenceCcd, this is preferred for consistency reasons
+            if butler.datasetExists('src', dataId={self.config.visitDataRefName: visit,
+                                                   self.config.ccdDataRefName: self.config.referenceCCD}):
+                srcVisits.append(visit)
+                srcCcds.append(self.config.referenceCCD)
+            else:
+                for ccd in range(nCcd):
+                    if butler.datasetExists('src', dataId={self.config.visitDataRefName: visit,
+                                                           self.config.ccdDataRefName: ccd}):
+                        srcVisits.append(visit)
+                        srcCcds.append(ccd)
                         break
 
         return (srcVisits, srcCcds)
@@ -525,7 +574,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             else:
                 rec['skyBackground'] = -1.0
 
-    def _fgcmMakeAllStarObservations(self, butler, visitCat):
+    def fgcmMakeAllStarObservations(self, butler, visitCat):
         """
         Compile all good star observations from visits in visitCat
 
@@ -534,6 +583,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         butler: `lsst.daf.persistence.Butler`
         visitCat: `afw.table.BaseCatalog`
            Catalog with visit data for FGCM
+
+        Returns
+        -------
+        fgcmStarObservations: `afw.table.BaseCatalog`
+           Full catalog of good observations.  Only returned if
+           returnCatalog is True.
         """
 
         startTime = time.time()
@@ -661,16 +716,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         self.log.info("Found all good star observations in %.2f s" %
                       (time.time() - startTime))
 
-        # Write all the observations
-        butler.put(fullCatalog, 'fgcmStarObservations')
+        return fullCatalog
 
-        # And overwrite the visitCatalog with delta_aper info
-        butler.put(visitCat, 'fgcmVisitCatalog')
-
-        self.log.info("Done with all stars in %.2f s" %
-                      (time.time() - startTime))
-
-    def _fgcmMatchStars(self, butler, visitCat):
+    def fgcmMatchStars(self, butler, visitCat, obsCat):
         """
         Use FGCM code to match observations into unique stars.
 
@@ -678,16 +726,26 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         ----------
         butler: `lsst.daf.persistence.Butler`
         visitCat: `afw.table.BaseCatalog`
-           Catalog with visit data for FGCM
+           Catalog with visit data for fgcm
+        obsCat: `afw.table.BaseCatalog`
+           Full catalog of star observations for fgcm
 
-        Outputs
+        Returns
         -------
-        Butler will output fgcmStarIds (matched star identifiers) and
-        fgcmStarIndices (index values linking fgcmStarObservations to
-        fgcmStarIds).
+        fgcmStarIdCat: `afw.table.BaseCatalog`
+           Catalog of unique star identifiers and index keys
+        fgcmStarIndicesCat: `afwTable.BaseCatalog`
+           Catalog of unique star indices
+        fgcmRefCat: `afw.table.BaseCatalog`
+           Catalog of matched reference stars.
+           Will be None if config.doReferenceMatches is False.
         """
 
-        obsCat = butler.get('fgcmStarObservations')
+        if self.config.doReferenceMatches:
+            # Make a subtask for reference loading
+            self.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
+
+        # obsCat = butler.get('fgcmStarObservations')
 
         # get filter names into a numpy array...
         # This is the type that is expected by the fgcm code
@@ -779,8 +837,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         fgcmStarIdCat['obsArrIndex'][:] = fgcmMakeStars.objIndexCat['obsarrindex']
         fgcmStarIdCat['nObs'][:] = fgcmMakeStars.objIndexCat['nobs']
 
-        butler.put(fgcmStarIdCat, 'fgcmStarIds')
-
         obsSchema = self._makeFgcmObsSchema()
 
         fgcmStarIndicesCat = afwTable.BaseCatalog(obsSchema)
@@ -789,8 +845,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             fgcmStarIndicesCat.addNew()
 
         fgcmStarIndicesCat['obsIndex'][:] = fgcmMakeStars.obsIndexCat['obsindex']
-
-        butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
 
         if self.config.doReferenceMatches:
             refSchema = self._makeFgcmRefSchema(len(referenceFilterNames))
@@ -805,7 +859,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             fgcmRefCat['refMag'][:, :] = fgcmMakeStars.referenceCat['refMag']
             fgcmRefCat['refMagErr'][:, :] = fgcmMakeStars.referenceCat['refMagErr']
 
-            butler.put(fgcmRefCat, 'fgcmReferenceStars')
+        else:
+            fgcmRefCat = None
+
+        return fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat
 
     def _makeFgcmVisitSchema(self, nCcd):
         """

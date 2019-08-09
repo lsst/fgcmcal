@@ -106,7 +106,9 @@ class FgcmcalTestBase(object):
 
         butler = dafPersistence.butler.Butler(self.testDir)
         tempTask = fgcmcal.FgcmFitCycleTask()
-        fgcmLut, lutIndexVals, lutStd = tempTask._loadFgcmLut(butler)
+        lutCat = butler.get('fgcmLookUpTable')
+        fgcmLut, lutIndexVals, lutStd = fgcmcal.utilities.translateFgcmLut(lutCat,
+                                                                           dict(tempTask.config.filterMap))
 
         # Check that we got the requested number of bands...
         self.assertEqual(nBand, len(lutIndexVals[0]['FILTERNAMES']))
@@ -301,7 +303,7 @@ class FgcmcalTestBase(object):
         config.ref_dataset_name = 'fgcm_stars'
         task = LoadIndexedReferenceObjectsTask(butler, config=config)
         # Read in a giant radius to get them all
-        refStruct = task.loadSkyCircle(rawStars[0].getCoord(), 5.0 * lsst.geom.degrees,
+        refStruct = task.loadSkyCircle(rawStars[0].getCoord(), 5.0 * geom.degrees,
                                        filterName='r')
 
         # Make sure all the stars are there
@@ -399,6 +401,47 @@ class FgcmcalTestBase(object):
         testResp2 = testTrans2.sampleAt(position=geom.Point2D(0, 0),
                                         wavelengths=lutCat[0]['atmLambda'])
         self.assertFloatsAlmostEqual(testResp, testResp2, atol=1e-4)
+
+    def _testFgcmCalibrateTract(self, visits, tract, nZp, nGoodZp, nOkZp, nBadZp, nStdStars):
+        """
+        Test running of FgcmCalibrateTractTask
+
+        Parameters
+        ----------
+        visits: `list`
+           List of visits to calibrate
+        tract: `int`
+           Tract number
+        nZp: `int`
+           Number of zeropoints created by the task
+        nGoodZp: `int`
+           Number of good (photometric) zeropoints created
+        nOkZp: `int`
+           Number of constrained zeropoints (photometric or not)
+        nBadZp: `int`
+           Number of unconstrained (bad) zeropoints
+        nStdStars: `int`
+           Number of standard stars produced
+        """
+
+        args = [self.inputDir, '--output', self.testDir,
+                '--id', 'visit='+'^'.join([str(visit) for visit in visits]),
+                '--doraise']
+        args.extend(self.otherArgs)
+
+        # Move into the test directory so the plots will get cleaned in tearDown
+        # In the future, with Gen3, we will probably have a better way of managing
+        # non-data output such as plots.
+        cwd = os.getcwd()
+        os.chdir(self.testDir)
+
+        result = fgcmcal.FgcmCalibrateTractTask.parseAndRun(args=args, config=self.config)
+        self._checkResult(result)
+
+        # Move back to the previous directory
+        os.chdir(cwd)
+
+        # butler = dafPersistence.butler.Butler(self.testDir)
 
     def _checkResult(self, result):
         """
