@@ -6,20 +6,13 @@
 # Any other package whose interface is used should be listed explicitly
 # rather than assuming it will be included recursively.
 
-setupRequired(scons)
 setupRequired(sconsUtils)
-setupRequired(ndarray)
-setupRequired(esutil)
 setupRequired(afw)
 setupRequired(daf_persistence)
 setupRequired(obs_base)
 setupRequired(pex_config)
 setupRequired(pipe_tasks)
-setupRequired(numpy)
 setupRequired(scipy)
-setupRequired(matplotlib)
-setupRequired(healpy)
-setupRequired(pyyaml)
 setupRequired(fgcm)
 setupRequired(jointcal)
 
