@@ -31,7 +31,7 @@ import numpy as np
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-# from lsst.jointcal.dataIds import PerTractCcdDataIdContainer
+from lsst.jointcal.dataIds import PerTractCcdDataIdContainer
 
 from .fgcmBuildStars import FgcmBuildStarsTask
 from .fgcmFitCycle import FgcmFitCycleConfig
@@ -121,10 +121,10 @@ class FgcmCalibrateTractRunner(pipeBase.ButlerInitializedTaskRunner):
 
         exitStatus = 0
         if self.doRaise:
-            task.runDataRef(butler, dataRefList)
+            results = task.runDataRef(butler, dataRefList)
         else:
             try:
-                task.runDataRef(butler, dataRefList)
+                results = task.runDataRef(butler, dataRefList)
             except Exception as e:
                 exitStatus = 1
                 task.log.fatal("Failed: %s" % e)
@@ -133,8 +133,11 @@ class FgcmCalibrateTractRunner(pipeBase.ButlerInitializedTaskRunner):
 
         task.writeMetadata(butler)
 
-        # The task does not return any results:
-        return [pipeBase.Struct(exitStatus=exitStatus)]
+        if self.doReturnResults:
+            return [pipeBase.Struct(exitStatus=exitStatus,
+                                    results=results)]
+        else:
+            return [pipeBase.Struct(exitStatus=exitStatus)]
 
     def run(self, parsedCmd):
         """
@@ -179,16 +182,10 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         """Create an argument parser"""
 
         parser = pipeBase.ArgumentParser(name=cls._DefaultName)
-        parser.add_id_argument("--id", "calexp", help="Data ID, e.g. --id visit=6789")
-        """
         parser.add_id_argument("--id", "calexp", help="Data ID, e.g. --id visit=6789",
                                ContainerClass=PerTractCcdDataIdContainer)
-                               """
-        return parser
 
-    # no saving of config for now
-    def _getConfigName(self):
-        return None
+        return parser
 
     # no saving of metadata for now
     def _getMetadataName(self):
@@ -227,7 +224,8 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         self.makeSubtask("fgcmOutputProducts", butler=butler)
 
         # Run the build stars tasks
-        tract = 15
+        tract = dataRefs[0].dataId['tract']
+        self.log.info("Running on tract %d" % (tract))
 
         # Note that we will need visitCat at the end of the procedure for the outputs
         visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(butler, dataRefs)
@@ -345,8 +343,10 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
             previousParInfo, previousParams = fgcmFitCycle.fgcmPars.parsToArrays()
             previousSuperStar = fgcmFitCycle.fgcmPars.parSuperStarFlat.copy()
 
-            print(previousReservedRawRepeatability)
-            print(fgcmFitCycle.fgcmPars.compReservedRawRepeatability)
+            self.log.info("Raw repeatability after cycle number %d is:")
+            for i, band in enumerate(fgcmFitCycle.fgcmPars.bands):
+                rep = fgcmFitCycle.fgcmPars.compReservedRawRepeatability[i] * 1000.0
+                self.log.info("  Band %s, repeatability: %.2f mmag" % (band, rep))
 
             # Check for convergence
             if np.alltrue((previousReservedRawRepeatability -
@@ -381,6 +381,11 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
 
         fgcmFitCycle.run()
 
+        self.log.info("Raw repeatability after clean-up cycle is:")
+        for i, band in enumerate(fgcmFitCycle.fgcmPars.bands):
+            rep = fgcmFitCycle.fgcmPars.compReservedRawRepeatability[i] * 1000.0
+            self.log.info("  Band %s, repeatability: %.2f mmag" % (band, rep))
+
         # Do the outputs.  Need to keep track of tract, blah.
 
         if self.config.fgcmFitCycle.superStarSubCcd or self.config.fgcmFitCycle.ccdGraySubCcd:
@@ -398,10 +403,11 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         stdStruct = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
         stdCat = makeStdCat(stdSchema, stdStruct)
 
-        retval = self.fgcmOutputProducts.generateOutputProducts(butler, tract,
-                                                                visitCat,
-                                                                zptCat, atmCat, stdCat,
-                                                                self.config.fgcmBuildStars,
-                                                                self.config.fgcmFitCycle)
+        outStruct = self.fgcmOutputProducts.generateOutputProducts(butler, tract,
+                                                                   visitCat,
+                                                                   zptCat, atmCat, stdCat,
+                                                                   self.config.fgcmBuildStars,
+                                                                   self.config.fgcmFitCycle)
+        outStruct.repeatability = fgcmFitCycle.fgcmPars.compReservedRawRepeatability
 
-        return retval
+        return outStruct

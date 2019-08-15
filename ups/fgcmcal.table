@@ -22,6 +22,7 @@ setupRequired(matplotlib)
 setupRequired(healpy)
 setupRequired(pyyaml)
 setupRequired(fgcm)
+setupRequired(jointcal)
 
 # data files for the unittests
 setupOptional(testdata_jointcal)

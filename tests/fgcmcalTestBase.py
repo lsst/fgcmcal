@@ -31,7 +31,7 @@ import shutil
 import numpy as np
 import glob
 
-import lsst.daf.persistence as dafPersistence
+import lsst.daf.persistence as dafPersist
 import lsst.geom as geom
 import lsst.log
 from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask, LoadIndexedReferenceObjectsConfig
@@ -104,7 +104,7 @@ class FgcmcalTestBase(object):
         result = fgcmcal.FgcmMakeLutTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
 
-        butler = dafPersistence.butler.Butler(self.testDir)
+        butler = dafPersist.butler.Butler(self.testDir)
         tempTask = fgcmcal.FgcmFitCycleTask()
         lutCat = butler.get('fgcmLookUpTable')
         fgcmLut, lutIndexVals, lutStd = fgcmcal.utilities.translateFgcmLut(lutCat,
@@ -169,7 +169,7 @@ class FgcmcalTestBase(object):
         result = fgcmcal.FgcmBuildStarsTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
 
-        butler = dafPersistence.butler.Butler(self.testDir)
+        butler = dafPersist.butler.Butler(self.testDir)
 
         visitCat = butler.get('fgcmVisitCatalog')
         self.assertEqual(nVisit, len(visitCat))
@@ -228,7 +228,7 @@ class FgcmcalTestBase(object):
                                        '*.png'))
         self.assertEqual(nPlots, len(plots))
 
-        butler = dafPersistence.butler.Butler(self.testDir)
+        butler = dafPersist.butler.Butler(self.testDir)
 
         zps = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
 
@@ -288,10 +288,11 @@ class FgcmcalTestBase(object):
         # Extract the offsets from the results
         offsets = result.resultList[0].results.offsets
 
-        self.assertFloatsAlmostEqual(offsets[0], zpOffsets[0], atol=1e-6)
-        self.assertFloatsAlmostEqual(offsets[1], zpOffsets[1], atol=1e-6)
+        # self.assertFloatsAlmostEqual(offsets[0], zpOffsets[0], atol=1e-6)
+        # self.assertFloatsAlmostEqual(offsets[1], zpOffsets[1], atol=1e-6)
+        self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-6)
 
-        butler = dafPersistence.butler.Butler(self.testDir)
+        butler = dafPersist.butler.Butler(self.testDir)
 
         # Test the reference catalog stars
 
@@ -403,7 +404,8 @@ class FgcmcalTestBase(object):
                                         wavelengths=lutCat[0]['atmLambda'])
         self.assertFloatsAlmostEqual(testResp, testResp2, atol=1e-4)
 
-    def _testFgcmCalibrateTract(self, visits, tract, nZp, nGoodZp, nOkZp, nBadZp, nStdStars):
+    def _testFgcmCalibrateTract(self, visits, tract,
+                                rawRepeatability, filterNCalibMap):
         """
         Test running of FgcmCalibrateTractTask
 
@@ -413,20 +415,16 @@ class FgcmcalTestBase(object):
            List of visits to calibrate
         tract: `int`
            Tract number
-        nZp: `int`
-           Number of zeropoints created by the task
-        nGoodZp: `int`
-           Number of good (photometric) zeropoints created
-        nOkZp: `int`
-           Number of constrained zeropoints (photometric or not)
-        nBadZp: `int`
-           Number of unconstrained (bad) zeropoints
-        nStdStars: `int`
-           Number of standard stars produced
+        rawRepeatability: `np.array`
+           Expected raw repeatability after convergence.
+           Length should be number of bands.
+        filterNCalibMap: `dict`
+           Mapping from filter name to number of photoCalibs created.
         """
 
         args = [self.inputDir, '--output', self.testDir,
                 '--id', 'visit='+'^'.join([str(visit) for visit in visits]),
+                'tract=%d' % (tract),
                 '--doraise']
         args.extend(self.otherArgs)
 
@@ -436,13 +434,33 @@ class FgcmcalTestBase(object):
         cwd = os.getcwd()
         os.chdir(self.testDir)
 
-        result = fgcmcal.FgcmCalibrateTractTask.parseAndRun(args=args, config=self.config)
+        result = fgcmcal.FgcmCalibrateTractTask.parseAndRun(args=args, config=self.config,
+                                                            doReturnResults=True)
         self._checkResult(result)
 
         # Move back to the previous directory
         os.chdir(cwd)
 
-        # butler = dafPersistence.butler.Butler(self.testDir)
+        # Check that the converged repeatability is what we expect
+        repeatability = result.resultList[0].results.repeatability
+        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=1e-6)
+
+        butler = dafPersist.butler.Butler(self.testDir)
+
+        # Check that the number of photoCalib objects in each filter are what we expect
+        for filterName in filterNCalibMap.keys():
+            subset = butler.subset('fgcm_tract_photoCalib', tract=tract, filter=filterName)
+            tot = 0
+            for dataRef in subset:
+                if butler.datasetExists('fgcm_tract_photoCalib', dataId=dataRef.dataId):
+                    tot += 1
+            self.assertEqual(tot, filterNCalibMap[filterName])
+
+        # Check that every visit got a transmission
+        visits = butler.queryMetadata('fgcm_tract_photoCalib', ('visit'), tract=tract)
+        for visit in visits:
+            self.assertTrue(butler.datasetExists('transmission_atmosphere_fgcm_tract',
+                                                 tract=tract, visit=visit))
 
     def _checkResult(self, result):
         """

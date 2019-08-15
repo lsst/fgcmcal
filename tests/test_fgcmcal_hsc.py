@@ -174,17 +174,16 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.fgcmOutputProducts.doReferenceCalibration = False
         self.config.maxFitCycles = 2
 
-        nZp = 0
-        nGoodZp = 0
-        nOkZp = 0
-        nBadZp = 0
-        nStdStars = 0
+        rawRepeatability = np.array([0.01878903, 0.04578995])
+        filterNCalibMap = {'HSC-R': 13,
+                           'HSC-I': 14}
 
         visits = [903334, 903336, 903338, 903342, 903344, 903346,
                   903986, 903988, 903990, 904010, 904014]
-        tract = 15
+        tract = 0
 
-        self._testFgcmCalibrateTract(visits, tract, nZp, nGoodZp, nOkZp, nBadZp, nStdStars)
+        self._testFgcmCalibrateTract(visits, tract,
+                                     rawRepeatability, filterNCalibMap)
 
     def sdssColorterms(self):
         """
