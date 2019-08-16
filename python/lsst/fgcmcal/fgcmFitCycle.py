@@ -409,6 +409,17 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=bool,
         default=False,
     )
+    useRepeatabilityForExpGrayCuts = pexConfig.Field(
+        doc=("Use star repeatability (instead of exposures) for computing photometric "
+             "cuts?  Recommended for tract/small scale modes."),
+        dtype=bool,
+        default=False,
+    )
+    quietMode = pexConfig.Field(
+        doc="Be less verbose with logging.",
+        dtype=bool,
+        default=False,
+    )
 
     def setDefaults(self):
         pass

@@ -86,7 +86,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         # Build the stars, adding in the reference stars
-        self.config = self.defaultBuildStarsConfig(visitDataRefName, ccdDataRefName)
+        self.config = fgcmcal.FgcmBuildStarsConfig()
+        self.fillDefaultBuildStarsConfig(self.config, visitDataRefName, ccdDataRefName)
         self.otherArgs = []
 
         nVisit = 11
@@ -96,7 +97,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self._testFgcmBuildStars(nVisit, nStar, nObs)
 
         # Perform the fit cycle
-        self.config = self.defaultFitCycleConfig()
+        self.config = fgcmcal.FgcmFitCycleConfig()
+        self.fillDefaultFitCycleConfig(self.config)
         self.otherArgs = []
 
         nZp = 1232
@@ -169,14 +171,13 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         self.config = fgcmcal.FgcmCalibrateTractConfig()
-        self.config.fgcmBuildStars = self.defaultBuildStarsConfig(visitDataRefName, ccdDataRefName)
-        self.config.fgcmFitCycle = self.defaultFitCycleConfig()
-        self.config.fgcmOutputProducts.doReferenceCalibration = False
+        self.fillDefaultBuildStarsConfig(self.config.fgcmBuildStars, visitDataRefName, ccdDataRefName)
+        self.fillDefaultFitCycleConfig(self.config.fgcmFitCycle)
         self.config.maxFitCycles = 2
 
-        rawRepeatability = np.array([0.01878903, 0.04578995])
+        rawRepeatability = np.array([0.006505881543, 0.008963255070])
         filterNCalibMap = {'HSC-R': 13,
-                           'HSC-I': 14}
+                           'HSC-I': 13}
 
         visits = [903334, 903336, 903338, 903342, 903344, 903346,
                   903986, 903988, 903990, 904010, 904014]
@@ -215,23 +216,19 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         return colorterms
 
-    def defaultBuildStarsConfig(self, visitDataRefName, ccdDataRefName):
+    def fillDefaultBuildStarsConfig(self, config, visitDataRefName, ccdDataRefName):
         """
-        Return the default build stars config
+        Fill the config parameters for a build stars configuration
 
         Parameters
         ----------
+        config: `lsst.fgcmcal.FgcmBuildStarsConfig`
         visitDataRefName: `str`
            Name of the dataRef key for the visit
         ccdDataRefName: `str`
            Name of the dataRef key for the ccd
-
-        Returns
-        -------
-        fgcmBuildStarsConfig: `lsst.fgcmcal.FgcmBuildStarsConfig`
         """
 
-        config = fgcmcal.FgcmBuildStarsConfig()
         config.filterMap = {'r': 'r', 'i': 'i'}
         config.requiredBands = ['r', 'i']
         config.primaryBands = ['i']
@@ -248,14 +245,15 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.errField = 'i_fluxErr'
         config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.minimum = 50.0
 
-        return config
-
-    def defaultFitCycleConfig(self):
+    def fillDefaultFitCycleConfig(self, config):
         """
-        Return a default fit cycle config
+        Fill the config parameters for a fit cycle configuration.
+
+        Parameters
+        ----------
+        config: `lsst.fgcmcal.FgcmFitCycleConfig`
         """
 
-        config = fgcmcal.FgcmFitCycleConfig()
         config.outfileBase = 'TestFgcm'
         config.bands = ['r', 'i']
         config.fitFlag = (1, 1)
@@ -291,8 +289,6 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         config.outputZeropointsBeforeFinalCycle = False
         config.outputStandardsBeforeFinalCycle = False
         config.sigmaCalRange = (0.003, 0.003)
-
-        return config
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):

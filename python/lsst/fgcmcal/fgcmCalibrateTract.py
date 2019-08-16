@@ -72,11 +72,18 @@ class FgcmCalibrateTractConfig(pexConfig.Config):
         dtype=int,
         default=5,
     )
+    doDebuggingPlots = pexConfig.Field(
+        doc="Make plots for debugging purposes?",
+        dtype=bool,
+        default=False,
+    )
 
     def setDefaults(self):
         pexConfig.Config.setDefaults(self)
 
         self.fgcmBuildStars.checkAllCcds = True
+        self.fgcmFitCycle.useRepeatabilityForExpGrayCuts = True
+        self.fgcmFitCycle.quietMode = True
         self.fgcmOutputProducts.doReferenceCalibration = False
         self.fgcmOutputProducts.doRefcatOutput = False
         self.fgcmOutputProducts.cycleNumber = 0
@@ -248,7 +255,7 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         camera = butler.get('camera')
         configDict = makeConfigDict(self.config.fgcmFitCycle, self.log, camera,
                                     self.config.fgcmFitCycle.maxIterBeforeFinalCycle,
-                                    True, False)
+                                    True, False, tract=tract)
         # Turn off plotting in tract mode
         configDict['doPlots'] = False
         ccdOffsets = computeCcdOffsets(camera, self.config.fgcmFitCycle.pixelScale)
@@ -263,8 +270,6 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
 
         fgcmFitCycle = fgcm.FgcmFitCycle(configDict, useFits=False,
                                          noFitsDict=noFitsDict)
-
-        fgcmStars = fgcm.FgcmStars(fgcmFitCycle.fgcmConfig)
 
         # We determine the conversion from the native units (typically radians) to
         # degrees for the first star.  This allows us to treat coord_ra/coord_dec as
@@ -284,6 +289,7 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         visitIndex = np.searchsorted(fgcmExpInfo['VISIT'],
                                      fgcmStarObservationCat['visit'][obsIndex])
 
+        fgcmStars = fgcm.FgcmStars(fgcmFitCycle.fgcmConfig)
         fgcmStars.loadStars(fgcmPars,
                             fgcmStarObservationCat['visit'][obsIndex],
                             fgcmStarObservationCat['ccd'][obsIndex],
@@ -310,7 +316,7 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         fgcmFitCycle.setStars(fgcmStars)
 
         # Clear out some memory
-        del fgcmStarObservationCat
+        # del fgcmStarObservationCat
         del fgcmStarIdCat
         del fgcmStarIndicesCat
         del fgcmRefCat
@@ -324,7 +330,8 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         previousSuperStar = None
 
         while (not converged and cycleNumber < self.config.maxFitCycles):
-            fgcmFitCycle.fgcmConfig.cycleNumber = cycleNumber
+
+            fgcmFitCycle.fgcmConfig.updateCycleNumber(cycleNumber)
 
             if cycleNumber > 0:
                 # Use parameters from previous cycle
@@ -333,6 +340,11 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
                                                                   previousParInfo,
                                                                   previousParams,
                                                                   previousSuperStar)
+                # We need to reset the star magnitudes and errors for the next
+                # cycle
+                fgcmFitCycle.fgcmStars.reloadStarMagnitudes(fgcmStarObservationCat['instMag'][obsIndex],
+                                                            fgcmStarObservationCat['instMagErr'][obsIndex])
+                fgcmFitCycle.initialCycle = False
 
             fgcmFitCycle.setPars(fgcmPars)
             fgcmFitCycle.finishSetup()
@@ -343,7 +355,7 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
             previousParInfo, previousParams = fgcmFitCycle.fgcmPars.parsToArrays()
             previousSuperStar = fgcmFitCycle.fgcmPars.parSuperStarFlat.copy()
 
-            self.log.info("Raw repeatability after cycle number %d is:")
+            self.log.info("Raw repeatability after cycle number %d is:" % (cycleNumber))
             for i, band in enumerate(fgcmFitCycle.fgcmPars.bands):
                 rep = fgcmFitCycle.fgcmPars.compReservedRawRepeatability[i] * 1000.0
                 self.log.info("  Band %s, repeatability: %.2f mmag" % (band, rep))
@@ -356,7 +368,14 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
                 converged = True
             else:
                 fgcmFitCycle.fgcmConfig.expGrayPhotometricCut[:] = fgcmFitCycle.updatedPhotometricCut
+                fgcmFitCycle.fgcmConfig.expGrayHighCut[:] = fgcmFitCycle.updatedHighCut
+                fgcmFitCycle.fgcmConfig.precomputeSuperStarInitialCycle = False
+                fgcmFitCycle.fgcmConfig.freezeStdAtmosphere = False
                 previousReservedRawRepeatability[:] = fgcmFitCycle.fgcmPars.compReservedRawRepeatability
+                self.log.info("Setting exposure gray photometricity cuts to:")
+                for i, band in enumerate(fgcmFitCycle.fgcmPars.bands):
+                    cut = fgcmFitCycle.updatedPhotometricCut[i] * 1000.0
+                    self.log.info("  Band %s, photometricity cut: %.2f mmag" % (band, cut))
 
             cycleNumber += 1
 
@@ -370,15 +389,21 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         fgcmFitCycle.fgcmConfig.maxIter = 0
         fgcmFitCycle.fgcmConfig.outputZeropoints = True
         fgcmFitCycle.fgcmConfig.outputStandards = True
+        fgcmFitCycle.fgcmConfig.doPlots = self.config.doDebuggingPlots
+        fgcmFitCycle.fgcmConfig.updateCycleNumber(cycleNumber)
+        fgcmFitCycle.initialCycle = False
 
         fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                           fgcmExpInfo,
                                                           previousParInfo,
                                                           previousParams,
                                                           previousSuperStar)
+        fgcmFitCycle.fgcmStars.reloadStarMagnitudes(fgcmStarObservationCat['instMag'][obsIndex],
+                                                    fgcmStarObservationCat['instMagErr'][obsIndex])
         fgcmFitCycle.setPars(fgcmPars)
         fgcmFitCycle.finishSetup()
 
+        self.log.info("Running final clean-up fit cycle...")
         fgcmFitCycle.run()
 
         self.log.info("Raw repeatability after clean-up cycle is:")

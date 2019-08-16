@@ -35,7 +35,8 @@ import lsst.geom as geom
 import fgcm
 
 
-def makeConfigDict(config, log, camera, maxIter, resetFitParameters, outputZeropoints):
+def makeConfigDict(config, log, camera, maxIter,
+                   resetFitParameters, outputZeropoints, tract=None):
     """
     Make the FGCM fit cycle configuration dict
 
@@ -53,14 +54,15 @@ def makeConfigDict(config, log, camera, maxIter, resetFitParameters, outputZerop
         Reset fit parameters before fitting?
     outputZeropoints: `bool`
         Compute zeropoints for output?
+    tract: `int`, optional
+        Tract number for extending the output file name for debugging.
+        Default is None.
 
     Returns
     -------
     configDict: `dict`
         Configuration dictionary for fgcm
     """
-
-    print(log.__class__)
 
     fitFlag = np.array(config.fitFlag, dtype=np.bool)
     requiredFlag = np.array(config.requiredFlag, dtype=np.bool)
@@ -84,8 +86,13 @@ def makeConfigDict(config, log, camera, maxIter, resetFitParameters, outputZerop
     gains = [amp.getGain() for detector in camera for amp in detector.getAmpInfoCatalog()]
     cameraGain = float(np.median(gains))
 
+    if tract is None:
+        outfileBase = config.outfileBase
+    else:
+        outfileBase = '%s-%06d' % (config.outfileBase, tract)
+
     # create a configuration dictionary for fgcmFitCycle
-    configDict = {'outfileBase': config.outfileBase,
+    configDict = {'outfileBase': outfileBase,
                   'logger': log,
                   'exposureFile': None,
                   'obsFile': None,
@@ -169,7 +176,9 @@ def makeConfigDict(config, log, camera, maxIter, resetFitParameters, outputZerop
                   'instrumentParsPerBand': config.instrumentParsPerBand,
                   'instrumentSlopeMinDeltaT': config.instrumentSlopeMinDeltaT,
                   'fitMirrorChromaticity': config.fitMirrorChromaticity,
+                  'useRepeatabilityForExpGrayCuts': config.useRepeatabilityForExpGrayCuts,
                   'printOnly': False,
+                  'quietMode': config.quietMode,
                   'outputStars': False,
                   'clobber': True,
                   'useSedLUT': False,
