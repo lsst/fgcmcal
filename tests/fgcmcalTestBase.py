@@ -443,7 +443,7 @@ class FgcmcalTestBase(object):
 
         # Check that the converged repeatability is what we expect
         repeatability = result.resultList[0].results.repeatability
-        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=1e-6)
+        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=1e-5)
 
         butler = dafPersist.butler.Butler(self.testDir)
 

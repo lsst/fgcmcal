@@ -269,7 +269,7 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
                       'ccdOffsets': ccdOffsets}
 
         fgcmFitCycle = fgcm.FgcmFitCycle(configDict, useFits=False,
-                                         noFitsDict=noFitsDict)
+                                         noFitsDict=noFitsDict, noOutput=True)
 
         # We determine the conversion from the native units (typically radians) to
         # degrees for the first star.  This allows us to treat coord_ra/coord_dec as

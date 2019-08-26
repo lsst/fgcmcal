@@ -621,7 +621,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         # set up the fitter object
         fgcmFitCycle = fgcm.FgcmFitCycle(configDict, useFits=False,
-                                         noFitsDict=noFitsDict)
+                                         noFitsDict=noFitsDict, noOutput=True)
 
         # create the parameter object
         if (fgcmFitCycle.initialCycle):
