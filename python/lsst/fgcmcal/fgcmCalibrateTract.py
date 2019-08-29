@@ -119,7 +119,7 @@ class FgcmCalibrateTractRunner(pipeBase.ButlerInitializedTaskRunner):
 
         Returns
         -------
-        exitStatus: `list` with `pipeBase.Struct`
+        exitStatus: `list` with `lsst.pipe.base.Struct`
            exitStatus (0: success; 1: failure)
         """
         butler, dataRefList = args
@@ -152,7 +152,7 @@ class FgcmCalibrateTractRunner(pipeBase.ButlerInitializedTaskRunner):
 
         Parameters
         ----------
-        parsedCmd: ArgumentParser parsed command line
+        parsedCmd: `lsst.pipe.base.ArgumentParser` parsed command line
         """
 
         resultList = []
@@ -175,7 +175,7 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
 
     def __init__(self, butler=None, **kwargs):
         """
-        Instantiate an FgcmCalibrateTractTask.
+        Instantiate an `FgcmCalibrateTractTask`.
 
         Parameters
         ----------
@@ -217,7 +217,7 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
 
         Raises
         ------
-        RuntimeError: Raised if config.fgcmBuildStars.doReferenceMatches is
+        RuntimeError: Raised if `config.fgcmBuildStars.doReferenceMatches` is
            not True, or if fgcmLookUpTable is not available.
         """
 
@@ -235,9 +235,11 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         self.log.info("Running on tract %d" % (tract))
 
         # Note that we will need visitCat at the end of the procedure for the outputs
-        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(butler, dataRefs)
-        fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(butler,
+        groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(butler, dataRefs)
+        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(butler, groupedDataRefs)
+        fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                                  visitCat)
+
         fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = \
             self.fgcmBuildStars.fgcmMatchStars(butler,
                                                visitCat,

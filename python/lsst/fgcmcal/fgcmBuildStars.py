@@ -40,7 +40,6 @@ import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
 import lsst.geom as geom
 from lsst.daf.base.dateTime import DateTime
-import lsst.daf.persistence.butlerExceptions as butlerExceptions
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
 from .fgcmLoadReferenceCatalog import FgcmLoadReferenceCatalogTask
@@ -118,7 +117,9 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         default=13,
     )
     checkAllCcds = pexConfig.Field(
-        doc="Check all CCDs.  Necessary for testing",
+        doc=("Check repo for existence of all possible ccds, in case when we have "
+             "incomplete visits and the referenceCCD will be missing.  Primarily "
+             "used in testing."),
         dtype=bool,
         default=False,
     )
@@ -227,7 +228,7 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         Returns
         -------
-        exitStatus: `list` with `pipeBase.Struct`
+        exitStatus: `list` with `lsst.pipe.base.Struct`
            exitStatus (0: success; 1: failure)
         """
         butler, dataRefList = args
@@ -257,7 +258,7 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         Parameters
         ----------
-        parsedCmd: ArgumentParser parsed command line
+        parsedCmd: `lsst.pipe.base.ArgumentParser` parsed command line
         """
 
         resultList = []
@@ -280,7 +281,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
     def __init__(self, butler=None, **kwargs):
         """
-        Instantiate an FgcmBuildStarsTask.
+        Instantiate an `FgcmBuildStarsTask`.
 
         Parameters
         ----------
@@ -323,7 +324,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         Raises
         ------
-        RuntimeErrror: Raised if config.doReferenceMatches is set and
+        RuntimeErrror: Raised if `config.doReferenceMatches` is set and
            an fgcmLookUpTable is not available.
         """
 
@@ -332,17 +333,19 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             if not butler.datasetExists('fgcmLookUpTable'):
                 raise RuntimeError("Must have fgcmLookUpTable if using config.doReferenceMatches")
 
+        groupedDataRefs = self.findAndGroupDataRefs(butler, dataRefs)
+
         # Make the visit catalog if necessary
         if not butler.datasetExists('fgcmVisitCatalog'):
             # we need to build visitCat
-            visitCat = self.fgcmMakeVisitCatalog(butler, dataRefs)
+            visitCat = self.fgcmMakeVisitCatalog(butler, groupedDataRefs)
         else:
             self.log.info("Found fgcmVisitCatalog.")
             visitCat = butler.get('fgcmVisitCatalog')
 
         # Compile all the stars
         if not butler.datasetExists('fgcmStarObservations'):
-            fgcmStarObservationCat = self.fgcmMakeAllStarObservations(butler, visitCat)
+            fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs, visitCat)
         else:
             self.log.info("Found fgcmStarObservations")
             fgcmStarObservationCat = butler.get('fgcmStarObservations')
@@ -362,189 +365,67 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         if fgcmRefCat is not None:
             butler.put(fgcmRefCat, 'fgcmReferenceStars')
 
-    def fgcmMakeVisitCatalog(self, butler, dataRefs):
+    def fgcmMakeVisitCatalog(self, butler, groupedDataRefs):
         """
-        Make a visit catalog with all the key data from each visit
+        Make a visit catalog with all the keys from each visit
 
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
-        dataRefs: `list` of `lsst.daf.persistence.ButlerDataRef`
-           Data references for the input visits.
-           If this is an empty list, all visits with src catalogs in
-           the repository are used.
-           Only one individual dataRef from a visit need be specified
-           and the code will find the other source catalogs from
-           each visit.
+        groupedDataRefs: `dict`
+           Dictionary with visit keys, and `list`s of `lsst.daf.persistence.ButlerDataRef`
 
         Returns
         -------
         visitCat: `afw.table.BaseCatalog`
         """
 
-        startTime = time.time()
-
         camera = butler.get('camera')
         nCcd = len(camera)
-
-        # TODO: related to DM-13730, this dance of looking for source visits
-        # will be unnecessary with Gen3 Butler.  This should be part of
-        # DM-13730.
-
-        if len(dataRefs) == 0:
-            srcVisits, srcCcds = self._findSourceVisitsFromRepo(butler, nCcd)
-        else:
-            srcVisits, srcCcds = self._findSourceVisitsFromDatarefs(butler, nCcd, dataRefs)
-
-        # Sort the visits for searching/indexing
-        srcVisits.sort()
-
-        if len(srcVisits) == 0:
-            self.log.fatal("Found 0 visits to calibrate")
-            raise RuntimeError("No visits to calibrate")
-
-        self.log.info("Found %d visits in %.2f s" %
-                      (len(srcVisits), time.time() - startTime))
 
         schema = self._makeFgcmVisitSchema(nCcd)
 
         visitCat = afwTable.BaseCatalog(schema)
-        visitCat.table.preallocate(len(srcVisits))
+        visitCat.table.preallocate(len(groupedDataRefs))
 
-        startTime = time.time()
-
-        self._fillVisitCatalog(butler, visitCat, srcVisits, srcCcds)
-
-        self.log.info("Found all VisitInfo in %.2f s" % (time.time() - startTime))
+        self._fillVisitCatalog(visitCat, groupedDataRefs)
 
         return visitCat
 
-    def _findSourceVisitsFromRepo(self, butler, nCcd):
-        """
-        Find all visits with source catalogs in the repository
-
-        Parameters
-        ----------
-        butler: `lsst.daf.persistence.Butler`
-        nCcd: `int`
-           Number of CCDs in the camera
-
-        Returns
-        -------
-        (srcVisits, srcCcds): `tuple` of `list`s
-        """
-
-        if not self.config.checkAllCcds:
-            # Faster mode, scan through referenceCCD
-            allVisits = butler.queryMetadata('src',
-                                             format=[self.config.visitDataRefName, 'filter'],
-                                             dataId={self.config.ccdDataRefName:
-                                                     self.config.referenceCCD})
-            srcVisits = []
-            srcCcds = []
-            for dataset in allVisits:
-                if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
-                                                        self.config.ccdDataRefName:
-                                                        self.config.referenceCCD})):
-                    srcVisits.append(dataset[0])
-                    srcCcds.append(self.config.referenceCCD)
-        else:
-            # Slower mode, check all CCDs
-            allVisits = butler.queryMetadata('src',
-                                             format=[self.config.visitDataRefName, 'filter'])
-            srcVisits = []
-            srcCcds = []
-
-            for dataset in allVisits:
-                if dataset[0] in srcVisits:
-                    continue
-                for ccd in range(nCcd):
-                    if (butler.datasetExists('src', dataId={self.config.visitDataRefName: dataset[0],
-                                                            self.config.ccdDataRefName:
-                                                                ccd})):
-                        srcVisits.append(dataset[0])
-                        srcCcds.append(ccd)
-                        # Once we find that a butler dataset exists, break out
-                        break
-
-        return (srcVisits, srcCcds)
-
-    def _findSourceVisitsFromDatarefs(self, butler, nCcd, dataRefs):
-        """
-        Find all visits with source catalogs from dataRefs
-
-        Parameters
-        ----------
-        butler: `lsst.daf.persistence.Butler`
-        nCcd: `int`
-           Number of CCDs in the camera
-        dataRefs: `list` of `lsst.dat.persistence.ButlerDataRef`
-           Data references for the input visits.
-
-        Returns
-        -------
-        (srcVisits, srcCcds): `tuple` of `lists`s
-        """
-
-        srcVisits = []
-        srcCcds = []
-
-        for dataRef in dataRefs:
-            visit = dataRef.dataId[self.config.visitDataRefName]
-
-            if visit in srcVisits:
-                continue
-
-            # First check the referenceCcd, this is preferred for consistency reasons
-            if butler.datasetExists('src', dataId={self.config.visitDataRefName: visit,
-                                                   self.config.ccdDataRefName: self.config.referenceCCD}):
-                srcVisits.append(visit)
-                srcCcds.append(self.config.referenceCCD)
-            else:
-                for ccd in range(nCcd):
-                    if butler.datasetExists('src', dataId={self.config.visitDataRefName: visit,
-                                                           self.config.ccdDataRefName: ccd}):
-                        srcVisits.append(visit)
-                        srcCcds.append(ccd)
-                        break
-
-        return (srcVisits, srcCcds)
-
-    def _fillVisitCatalog(self, butler, visitCat, srcVisits, srcCcds):
+    def _fillVisitCatalog(self, visitCat, groupedDataRefs):
         """
         Fill the visit catalog with visit metadata
 
         Parameters
         ----------
-        butler: `lsst.daf.persistence.Butler`
         visitCat: `afw.table.BaseCatalog`
            Catalog with schema from _createFgcmVisitSchema()
-        srcVisits: `list'
-           List of source visits
-        srcCcds: `list`
-           List of source CCDs
+        groupedDataRefs: `dict`
+           Dictionary with visit keys, and `list`s of `lsst.daf.persistence.ButlerDataRef`
         """
 
         bbox = geom.BoxI(geom.PointI(0, 0), geom.PointI(1, 1))
 
-        # now loop over visits and get the information
-        for i, srcVisit in enumerate(srcVisits):
+        for i, visit in enumerate(sorted(groupedDataRefs)):
             # We don't use the bypasses since we need the psf info which does
             # not have a bypass
             # TODO: When DM-15500 is implemented in the Gen3 Butler, this
             # can be fixed
 
-            dataId = {self.config.visitDataRefName: srcVisit,
-                      self.config.ccdDataRefName: srcCcds[i]}
+            # Note that the reference ccd is first in the list (if available).
 
-            exp = butler.get('calexp_sub', dataId=dataId, bbox=bbox,
-                             flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
+            # The first dataRef in the group will be the reference ccd (if available)
+            dataRef = groupedDataRefs[visit][0]
+
+            exp = dataRef.get(datasetType='calexp_sub', bbox=bbox,
+                              flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
+
             visitInfo = exp.getInfo().getVisitInfo()
             f = exp.getFilter()
             psf = exp.getPsf()
 
             rec = visitCat.addNew()
-            rec['visit'] = srcVisit
+            rec['visit'] = visit
             rec['filtername'] = f.getName()
             radec = visitInfo.getBoresightRaDec()
             rec['telra'] = radec.getRa().asDegrees()
@@ -564,23 +445,112 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
             rec['psfSigma'] = psf.computeShape().getDeterminantRadius()
 
-            if butler.datasetExists('calexpBackground', dataId=dataId):
+            if dataRef.datasetExists(datasetType='calexpBackground'):
                 # Get background for reference CCD
                 # This approximation is good enough for now
                 bgStats = (bg[0].getStatsImage().getImage().array
-                           for bg in butler.get('calexpBackground',
-                                                dataId=dataId))
+                           for bg in dataRef.get(datasetType='calexpBackground'))
                 rec['skyBackground'] = sum(np.median(bg[np.isfinite(bg)]) for bg in bgStats)
             else:
+                self.log.warn('Sky background not found for visit %d / ccd %d' %
+                              (visit, dataRef.dataId[self.config.ccdDataRefName]))
                 rec['skyBackground'] = -1.0
 
-    def fgcmMakeAllStarObservations(self, butler, visitCat):
+    def findAndGroupDataRefs(self, butler, dataRefs):
         """
-        Compile all good star observations from visits in visitCat
+        Find and group dataRefs (by visit).  If dataRefs is an empty list,
+        this will look for all source catalogs in a given repo.
 
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
+        dataRefs: `list` of `lsst.daf.persistence.ButlerDataRef`
+           Data references for the input visits.
+           If this is an empty list, all visits with src catalogs in
+           the repository are used.
+
+        Returns
+        -------
+        groupedDataRefs: `dict`
+           Dictionary with visit keys, and `list`s of `lsst.daf.persistence.ButlerDataRef`
+        """
+
+        camera = butler.get('camera')
+
+        ccdIds = []
+        for detector in camera:
+            ccdIds.append(detector.getId())
+
+        # TODO: related to DM-13730, this dance of looking for source visits
+        # will be unnecessary with Gen3 Butler.  This should be part of
+        # DM-13730.
+
+        # Note that self.config.checkAllCcds means that we will check the repo
+        # for existence of all possible ccds for each (incomplete) visit, in cases
+        # when the referenceCCD will be missing (primarily during testing).
+
+        # scanAllCcds is a local flag that is set when the dataRefs do not include
+        # all relevant ccds.
+
+        scanAllCcds = False
+        if len(dataRefs) == 0:
+            if not self.config.checkAllCcds:
+                # These dataRefs include all possible visits, for each
+                # referenceCCD.  This is much faster than scanning through
+                # all CCDs when none of them have been processed in a given repo.
+                dataRefs = butler.subset('src',
+                                         dataId={self.config.ccdDataRefName:
+                                                 self.config.referenceCCD})
+                scanAllCcds = True
+            else:
+                # These dataRefs include all possible ccds
+                # Note that in the Gen2 era (at least) a valid dataRef in a subset
+                # only says that a given raw is available, and the src may not
+                # be accessible or processed in a specific repo.
+                dataRefs = butler.subset('src')
+
+        groupedDataRefs = {}
+        for dataRef in dataRefs:
+            visit = dataRef.dataId[self.config.visitDataRefName]
+            # If we don't have the dataset, just continue
+            if not dataRef.datasetExists(datasetType='src'):
+                continue
+            # If we need to scan all ccds, do it here
+            if scanAllCcds:
+                dataId = dataRef.dataId.copy()
+                for ccdId in ccdIds:
+                    dataId[self.config.ccdDataRefName] = ccdId
+                    if butler.datasetExists('src', dataId=dataId):
+                        groupedDataRefs[visit].append(butler.dataRef('src', dataId=dataId))
+            else:
+                if visit in groupedDataRefs:
+                    groupedDataRefs[visit].append(dataRef)
+                else:
+                    groupedDataRefs[visit] = [dataRef]
+
+        # Put them in ccd order, with the reference ccd first (if available)
+        def ccdSorter(dataRef):
+            ccdId = dataRef.dataId[self.config.ccdDataRefName]
+            if ccdId == self.config.referenceCCD:
+                return -100
+            else:
+                return ccdId
+
+        # If we did not scan all ccds, put them in ccd order
+        if not scanAllCcds:
+            for visit in groupedDataRefs:
+                groupedDataRefs[visit] = sorted(groupedDataRefs[visit], key=ccdSorter)
+
+        return groupedDataRefs
+
+    def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat):
+        """
+        Compile all good star observations from visits in visitCat.
+
+        Parameters
+        ----------
+        groupedDataRefs: `dict` of `list`s
+           Lists of `lsst.daf.persistence.ButlerDataRef`, grouped by visit.
         visitCat: `afw.table.BaseCatalog`
            Catalog with visit data for FGCM
 
@@ -593,16 +563,20 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         startTime = time.time()
 
-        # create our source schema
-        sourceSchema = butler.get('src_schema', immediate=True).schema
+        # create our source schema.  Use the first valid dataRef
+        dataRef = groupedDataRefs[list(groupedDataRefs.keys())[0]][0]
+        sourceSchema = dataRef.get('src_schema', immediate=True).schema
+
+        # Construct a mapping from ccd number to index
+        camera = dataRef.get('camera')
+        ccdMapping = {}
+        for ccdIndex, detector in enumerate(camera):
+            ccdMapping[detector.getId()] = ccdIndex
 
         sourceMapper = self._makeSourceMapper(sourceSchema)
 
         # We also have a temporary catalog that will accumulate aperture measurements
         aperMapper = self._makeAperMapper(sourceSchema)
-
-        # we need to know the ccds...
-        camera = butler.get('camera')
 
         outputSchema = sourceMapper.getOutputSchema()
         fullCatalog = afwTable.BaseCatalog(outputSchema)
@@ -636,19 +610,11 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # Reset the aperture catalog (per visit)
             aperVisitCatalog = afwTable.BaseCatalog(aperOutputSchema)
 
-            # loop over CCDs
-            for ccdIndex, detector in enumerate(camera):
+            for dataRef in groupedDataRefs[visit['visit']]:
 
-                ccdId = detector.getId()
+                ccdId = dataRef.dataId[self.config.ccdDataRefName]
 
-                try:
-                    sources = butler.get('src', dataId={self.config.visitDataRefName:
-                                                        visit['visit'],
-                                                        self.config.ccdDataRefName: ccdId},
-                                         flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
-                except butlerExceptions.NoResults:
-                    # this is not a problem if this ccd isn't there
-                    continue
+                sources = dataRef.get(datasetType='src', flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
 
                 goodSrc = self.sourceSelector.selectSources(sources)
 
@@ -659,7 +625,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat[ccdKey][:] = ccdId
                 # Compute "magnitude" by scaling flux with exposure time.
                 # Add an arbitrary zeropoint that needs to be investigated.
-                scaledInstFlux = sources[instFluxKey][goodSrc.selected] * visit['scaling'][ccdIndex]
+                scaledInstFlux = sources[instFluxKey][goodSrc.selected] * visit['scaling'][ccdMapping[ccdId]]
                 tempCat[instMagKey][:] = (-2.5 * np.log10(scaledInstFlux) + 2.5 * np.log10(expTime))
                 # instMagErr is computed with original (unscaled) flux
                 k = 2.5 / np.log(10.)
@@ -738,14 +704,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            Catalog of unique star indices
         fgcmRefCat: `afw.table.BaseCatalog`
            Catalog of matched reference stars.
-           Will be None if config.doReferenceMatches is False.
+           Will be None if `config.doReferenceMatches` is False.
         """
 
         if self.config.doReferenceMatches:
             # Make a subtask for reference loading
             self.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
-
-        # obsCat = butler.get('fgcmStarObservations')
 
         # get filter names into a numpy array...
         # This is the type that is expected by the fgcm code

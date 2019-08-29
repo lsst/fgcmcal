@@ -217,7 +217,7 @@ class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
 
         Parameters
         ----------
-        parsedCmd: ArgumentParser parsed command line
+        parsedCmd: `lsst.pipe.base.ArgumentParser` parsed command line
         """
 
         resultList = []
@@ -233,9 +233,6 @@ class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
 class FgcmOutputProductsTask(pipeBase.CmdLineTask):
     """
     Output products from FGCM global calibration.
-
-    Currently this is atmosphere transmission tables, in the future will
-    include zeropoint files.
     """
 
     ConfigClass = FgcmOutputProductsConfig
@@ -278,8 +275,18 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Returns
         -------
-        offsets: `pipeBase.Struct`
+        offsets: `lsst.pipe.base.Struct`
            A structure with array of zeropoint offsets
+
+        Raises
+        ------
+        RuntimeError: Raised if butler cannot find fgcmBuildStars_config, or
+           fgcmFitCycle_config, or fgcmAtmosphereParameters (and
+           `self.config.doAtmosphereOutput` is true), or fgcmStandardStars (and
+           `self.config.doReferenceCalibration or `self.config.doRefcatOutput`
+           is true), or fgcmZeropoints (and self.config.doZeropointOutput is true).
+           Also will raise if the fgcmFitCycle_config does not refer to the
+           final fit cycle.
         """
 
         # Check to make sure that the fgcmBuildStars config exists, to retrieve
@@ -373,17 +380,17 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         tract: `int`
            Tract number
         visitCat: `lsst.afw.table.BaseCatalog`
-           FGCM visitCat from fgcmBuildStarsTask
+           FGCM visitCat from `FgcmBuildStarsTask`
         zptCat: `lsst.afw.table.BaseCatalog`
-           FGCM zeropoint catalog from fgcmFitCycleTask
+           FGCM zeropoint catalog from `FgcmFitCycleTask`
         atmCat: `lsst.afw.table.BaseCatalog`
-           FGCM atmosphere parameter catalog from fgcmFitCycleTask
+           FGCM atmosphere parameter catalog from `FgcmFitCycleTask`
         stdCat: `lsst.afw.table.SimpleCatalog`
-           FGCM standard star catalog from fgcmFitCycleTask
+           FGCM standard star catalog from `FgcmFitCycleTask`
         fgcmBuildStarsConfig: `lsst.fgcmcal.FgcmBuildStarsConfig`
-           Configuration object from fgcmBuildStarsTask
+           Configuration object from `FgcmBuildStarsTask`
         fgcmFitCycleConfig: `lsst.fgcmcal.FgcmFitCycleConfig`
-           Configuration object from fgcmFitCycleTask
+           Configuration object from `FgcmFitCycleTask`
         """
 
         self.bands = fgcmFitCycleConfig.bands
@@ -426,11 +433,12 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         Parameters
         ----------
         butler: `lsst.daf.persistence.Butler`
-        FIX THIS
+        stdCat: `lsst.afw.table.SimpleCatalog`
+           FGCM standard stars
 
         Returns
         -------
-        offsets: `np.array` of floats
+        offsets: `numpy.array` of floats
            Per band zeropoint offsets
         """
 
@@ -539,17 +547,17 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        sourceMapper: `afwTable.SchemaMapper`
+        sourceMapper: `lsst.afw.table.SchemaMapper`
            Mapper to go from stdCat to calibratable catalog
-        badStarKey: `afwTable.Key`
+        badStarKey: `lsst.afw.table.Key`
            Key for the field with bad stars
         b: `int`
            Index of the band in the star catalog
         band: `str`
            Name of band for reference catalog
-        stdCat: `afwTable.SimpleCatalog`
+        stdCat: `lsst.afw.table.SimpleCatalog`
            FGCM standard stars
-        selected: `np.array(dtype=np.bool)`
+        selected: `numpy.array(dtype=np.bool)`
            Boolean array of which stars are in the pixel
         refFluxFields: `list`
            List of names of flux fields for reference catalog
@@ -600,7 +608,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         butler: `lsst.daf.persistence.Butler`
         stdCat: `lsst.afw.table.SimpleCatalog`
            FGCM standard star catalog from fgcmFitCycleTask
-        offsets: `np.array` of floats
+        offsets: `numpy.array` of floats
            Per band zeropoint offsets
         """
 
@@ -654,14 +662,14 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        fgcmStarCat: `afwTable.SimpleCatalog`
+        fgcmStarCat: `lsst.afw.Table.SimpleCatalog`
            SimpleCatalog as output by fgcmcal
         offsets: `list` with len(self.bands) entries
            Zeropoint offsets to apply
 
         Returns
         -------
-        formattedCat: `afwTable.SimpleCatalog`
+        formattedCat: `lsst.afw.table.SimpleCatalog`
            SimpleCatalog suitable for using as a reference catalog
         """
 
@@ -703,10 +711,10 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         ----------
         butler: `lsst.daf.persistence.Butler`
         zptCat: `lsst.afw.table.BaseCatalog`
-           FGCM zeropoint catalog from fgcmFitCycleTask
+           FGCM zeropoint catalog from `FgcmFitCycleTask`
         visitCat: lsst.afw.table.BaseCatalog`
-           FGCM visitCat from fgcmBuildStarsTask
-        offsets: `np.array`
+           FGCM visitCat from `FgcmBuildStarsTask`
+        offsets: `numpy.array`
            Float array of absolute calibration offsets, one for each filter
         tract: `int`, optional
            Tract number to output.  Default is None (global calibration)
@@ -792,7 +800,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        coefficients: `np.array`
+        coefficients: `numpy.array`
            Flattened array of chebyshev coefficients
         err: `float`
            Error on zeropoint

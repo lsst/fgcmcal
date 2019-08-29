@@ -44,9 +44,9 @@ def makeConfigDict(config, log, camera, maxIter,
     ----------
     config: `lsst.fgcmcal.FgcmFitCycleConfig`
         Configuration object
-    log: `lsst.log.BLAH`
+    log: `lsst.log.Log`
         LSST log object
-    camera: 'cameraGeom.Camera`
+    camera: 'lsst.afw.cameraGeom.Camera`
         Camera from the butler
     maxIter: `int`
         Maximum number of iterations
@@ -203,9 +203,9 @@ def translateFgcmLut(lutCat, filterMap):
     -------
     fgcmLut: `lsst.fgcm.FgcmLut`
        Lookup table for FGCM
-    lutIndexVals: `np.ndarray`
+    lutIndexVals: `numpy.ndarray`
        Numpy array with LUT index information for FGCM
-    lutStd: `np.ndarray`
+    lutStd: `numpy.ndarray`
        Numpy array with LUT standard throughput values for FGCM
 
     Notes
@@ -326,11 +326,11 @@ def translateVisitCatalog(visitCat):
     Parameters
     ----------
     visitCat: `lsst.afw.table.BaseCatalog`
-       FGCM visitCat from fgcmBuildStarsTask
+       FGCM visitCat from `lsst.fgcmcal.FgcmBuildStarsTask`
 
     Returns
     -------
-    fgcmExpInfo: `np.ndarray`
+    fgcmExpInfo: `numpy.ndarray`
        Numpy array for visit information for FGCM
 
     Notes
@@ -380,7 +380,7 @@ def computeCcdOffsets(camera, pixelScale):
 
     Returns
     -------
-    ccdOffsets: `np.ndarray`
+    ccdOffsets: `numpy.ndarray`
        Numpy array with ccd offset information for input to FGCM
     """
     # TODO: DM-16490 will simplify and generalize the math.
@@ -436,7 +436,7 @@ def makeZptSchema(chebyshevSize):
 
     Returns
     -------
-    zptSchema: `afwTable.schema`
+    zptSchema: `lsst.afw.table.schema`
     """
 
     zptSchema = afwTable.Schema()
@@ -506,9 +506,9 @@ def makeZptCat(zptSchema, zpStruct):
 
     Parameters
     ----------
-    zptSchema: `afwTable.schema`
+    zptSchema: `lsst.afw.table.Schema`
        Zeropoint catalog schema
-    zpStruct: `np.ndarray`
+    zpStruct: `numpy.ndarray`
        Zeropoint structure from fgcm
 
     Returns
@@ -559,7 +559,7 @@ def makeAtmSchema():
 
     Returns
     -------
-    atmSchema: `afwTable.schema`
+    atmSchema: `lsst.afw.table.Schema`
     """
 
     atmSchema = afwTable.Schema()
@@ -583,14 +583,14 @@ def makeAtmCat(atmSchema, atmStruct):
 
     Parameters
     ----------
-    atmSchema: `afwTable.schema`
+    atmSchema: `lsst.afw.table.Schema`
        Atmosphere catalog schema
-    atmStruct: `np.ndarray`
+    atmStruct: `numpy.ndarray`
        Atmosphere structure from fgcm
 
     Returns
     -------
-    atmCat: `afwTable.BaseCatalog`
+    atmCat: `lsst.afw.table.BaseCatalog`
        Atmosphere catalog for persistence
     """
 
@@ -623,7 +623,7 @@ def makeStdSchema(nBands):
 
     Returns
     -------
-    stdSchema: `afwTable.schema`
+    stdSchema: `lsst.afw.table.Schema`
     """
 
     stdSchema = afwTable.SimpleTable.makeMinimalSchema()
@@ -645,14 +645,14 @@ def makeStdCat(stdSchema, stdStruct):
 
     Parameters
     ----------
-    stdSchema: `afwTable.schema`
+    stdSchema: `lsst.afw.table.Schema`
        Standard star catalog schema
-    stdStruct: `np.ndarray`
+    stdStruct: `numpy.ndarray`
        Standard star structure in FGCM format
 
     Returns
     -------
-    stdCat: `afwTable.BaseCatalog`
+    stdCat: `lsst.afw.table.BaseCatalog`
        Standard star catalog for persistence
     """
 

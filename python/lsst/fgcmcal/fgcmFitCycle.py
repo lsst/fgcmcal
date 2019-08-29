@@ -811,11 +811,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         Returns
         -------
-        inParInfo: `np.ndarray`
+        inParInfo: `numpy.ndarray`
            Numpy array parameter information formatted for input to fgcm
-        inParameters: `np.ndarray`
+        inParameters: `numpy.ndarray`
            Numpy array parameter values formatted for input to fgcm
-        inSuperStar: `np.array`
+        inSuperStar: `numpy.array`
            Superstar flat formatted for input to fgcm
         """
 
@@ -1035,11 +1035,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        parInfo: `np.ndarray`
+        parInfo: `numpy.ndarray`
            Parameter information returned by fgcm
-        pars: `np.ndarray`
+        pars: `numpy.ndarray`
            Parameter values returned by fgcm
-        parSuperStarFlat: `np.array`
+        parSuperStarFlat: `numpy.array`
            Superstar flat values returned by fgcm
         lutFilterNameString: `str`
            Combined string of all the lutFilterNames
@@ -1177,11 +1177,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        parSchema: `afwTable.schema`
+        parSchema: `lsst.afw.table.Schema`
            Parameter catalog schema
-        pars: `np.ndarray`
+        pars: `numpy.ndarray`
            FGCM parameters to put into parCat
-        parSuperStarFlat: `np.array`
+        parSuperStarFlat: `numpy.array`
            FGCM superstar flat array to put into parCat
         lutFilterNameString: `str`
            Combined string of all the lutFilterNames
@@ -1249,7 +1249,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         Returns
         -------
-        flagStarSchema: `afwTable.schema`
+        flagStarSchema: `lsst.afw.table.Schema`
         """
 
         flagStarSchema = afwTable.Schema()
@@ -1265,14 +1265,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        flagStarSchema: `afwTable.schema`
+        flagStarSchema: `lsst.afw.table.Schema`
            Flagged star schema
-        flagStarStruct: `np.ndarray`
+        flagStarStruct: `numpy.ndarray`
            Flagged star structure from fgcm
 
         Returns
         -------
-        flagStarCat: `afwTable.BaseCatalog`
+        flagStarCat: `lsst.afw.table.BaseCatalog`
            Flagged star catalog for persistence
         """
 
