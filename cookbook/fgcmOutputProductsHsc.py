@@ -7,13 +7,13 @@ import os.path
 from lsst.utils import getPackageDir
 
 # Do not do the post-fit reference catalog calibration
-doReferenceCalibration = False
+config.doReferenceCalibration = False
 # Do the standard star catalog output
-doRefcatOutput = True
+config.doRefcatOutput = True
 # Do the atmosphere output
-doAtmosphereOutput = True
+config.doAtmosphereOutput = True
 # Do output the zeropoints in jointcal_photoCalib format (though uses a lot of space)
-doZeropointOutput = True
+config.doZeropointOutput = True
 
 # Last cycle number that was run, preferably with outputStandards == True
 config.cycleNumber = 3

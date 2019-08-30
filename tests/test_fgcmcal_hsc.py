@@ -85,25 +85,9 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
-        colorterms = self.sdssColorterms()
-
         # Build the stars, adding in the reference stars
         self.config = fgcmcal.FgcmBuildStarsConfig()
-        self.config.filterMap = {'r': 'r', 'i': 'i'}
-        self.config.requiredBands = ['r', 'i']
-        self.config.primaryBands = ['i']
-        self.config.checkAllCcds = True
-        self.config.coarseNside = 64
-        self.config.visitDataRefName = visitDataRefName
-        self.config.ccdDataRefName = ccdDataRefName
-        self.config.doReferenceMatches = True
-        self.config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'sdss-dr9-fink-v5b'
-        self.config.fgcmLoadReferenceCatalog.applyColorTerms = True
-        self.config.fgcmLoadReferenceCatalog.colorterms = colorterms
-        self.config.fgcmLoadReferenceCatalog.referenceSelector.doSignalToNoise = True
-        self.config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.fluxField = 'i_flux'
-        self.config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.errField = 'i_fluxErr'
-        self.config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.minimum = 50.0
+        self.fillDefaultBuildStarsConfig(self.config, visitDataRefName, ccdDataRefName)
         self.otherArgs = []
 
         nVisit = 11
@@ -113,7 +97,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self._testFgcmBuildStars(nVisit, nStar, nObs)
 
         # Perform the fit cycle
-        self.config = self.defaultFitCycleConfig()
+        self.config = fgcmcal.FgcmFitCycleConfig()
+        self.fillDefaultFitCycleConfig(self.config)
         self.otherArgs = []
 
         nZp = 1232
@@ -151,6 +136,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # reference stars have been used in the fit, but this needs to
         # be exercised in testing.
         self.config.doReferenceCalibration = True
+        self.config.photoCal.applyColorTerms = True
         self.config.photoCal.photoCatName = 'sdss-dr9-fink-v5b'
         self.config.photoCal.colorterms = self.sdssColorterms()
         self.config.refObjLoader.ref_dataset_name = "sdss-dr9-fink-v5b"
@@ -161,6 +147,44 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
                                      904014, 12, 'i', 1)
+
+    def test_fgcmcalTract(self):
+        # Set numpy seed for stability
+        np.random.seed(seed=1000)
+
+        visitDataRefName = 'visit'
+        ccdDataRefName = 'ccd'
+
+        # First need to make the LUT
+        self.config = fgcmcal.FgcmMakeLutConfig()
+        self.config.filterNames = ['r', 'i']
+        self.config.stdFilterNames = ['r', 'i']
+        self.config.atmosphereTableName = 'fgcm_atm_subaru2_test'
+        self.otherArgs = []
+
+        nBand = 2
+        i0Std = np.array([0.07877351, 0.06464688])
+        i10Std = np.array([-0.00061516, -0.00063434])
+        i0Recon = np.array([0.0689530429, 0.05600673])
+        i10Recon = np.array([-7.01847144, 3.62675740])
+
+        self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
+
+        self.config = fgcmcal.FgcmCalibrateTractConfig()
+        self.fillDefaultBuildStarsConfig(self.config.fgcmBuildStars, visitDataRefName, ccdDataRefName)
+        self.fillDefaultFitCycleConfig(self.config.fgcmFitCycle)
+        self.config.maxFitCycles = 2
+
+        rawRepeatability = np.array([0.006505881543, 0.008963255070])
+        filterNCalibMap = {'HSC-R': 13,
+                           'HSC-I': 13}
+
+        visits = [903334, 903336, 903338, 903342, 903344, 903346,
+                  903986, 903988, 903990, 904010, 904014]
+        tract = 0
+
+        self._testFgcmCalibrateTract(visits, tract,
+                                     rawRepeatability, filterNCalibMap)
 
     def sdssColorterms(self):
         """
@@ -192,12 +216,44 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         return colorterms
 
-    def defaultFitCycleConfig(self):
+    def fillDefaultBuildStarsConfig(self, config, visitDataRefName, ccdDataRefName):
         """
-        Return a default fit cycle config
+        Fill the config parameters for a build stars configuration
+
+        Parameters
+        ----------
+        config: `lsst.fgcmcal.FgcmBuildStarsConfig`
+        visitDataRefName: `str`
+           Name of the dataRef key for the visit
+        ccdDataRefName: `str`
+           Name of the dataRef key for the ccd
         """
 
-        config = fgcmcal.FgcmFitCycleConfig()
+        config.filterMap = {'r': 'r', 'i': 'i'}
+        config.requiredBands = ['r', 'i']
+        config.primaryBands = ['i']
+        config.checkAllCcds = True
+        config.coarseNside = 64
+        config.visitDataRefName = visitDataRefName
+        config.ccdDataRefName = ccdDataRefName
+        config.doReferenceMatches = True
+        config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'sdss-dr9-fink-v5b'
+        config.fgcmLoadReferenceCatalog.applyColorTerms = True
+        config.fgcmLoadReferenceCatalog.colorterms = self.sdssColorterms()
+        config.fgcmLoadReferenceCatalog.referenceSelector.doSignalToNoise = True
+        config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.fluxField = 'i_flux'
+        config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.errField = 'i_fluxErr'
+        config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.minimum = 50.0
+
+    def fillDefaultFitCycleConfig(self, config):
+        """
+        Fill the config parameters for a fit cycle configuration.
+
+        Parameters
+        ----------
+        config: `lsst.fgcmcal.FgcmFitCycleConfig`
+        """
+
         config.outfileBase = 'TestFgcm'
         config.bands = ['r', 'i']
         config.fitFlag = (1, 1)
@@ -233,8 +289,6 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         config.outputZeropointsBeforeFinalCycle = False
         config.outputStandardsBeforeFinalCycle = False
         config.sigmaCalRange = (0.003, 0.003)
-
-        return config
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
