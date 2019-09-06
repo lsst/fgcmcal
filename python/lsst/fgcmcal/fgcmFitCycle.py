@@ -214,11 +214,12 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=None,
     )
-    # TODO: DM-16490 will make this unneccessary
+    # pixelScale is deprecated by DM-16490.
     pixelScale = pexConfig.Field(
         doc="Pixel scale (arcsec/pixel) (temporary)",
         dtype=float,
-        default=None,
+        deprecated="This field is no longer used.  It will be removed after v19.",
+        optional=True,
     )
     brightObsGrayMax = pexConfig.Field(
         doc="Maximum gray extinction to be considered bright observation",
@@ -612,7 +613,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         fgcmExpInfo = translateVisitCatalog(visitCat)
         del visitCat
 
-        ccdOffsets = computeCcdOffsets(camera, self.config.pixelScale)
+        # Use the first orientation.
+        # TODO: DM-21215 will generalize to arbitrary camera orientations
+        ccdOffsets = computeCcdOffsets(camera, fgcmExpInfo['TELROT'][0])
 
         noFitsDict = {'lutIndex': lutIndexVals,
                       'lutStd': lutStd,

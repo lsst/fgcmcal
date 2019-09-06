@@ -31,6 +31,8 @@ import numpy as np
 import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.afw.table as afwTable
 import lsst.geom as geom
+import lsst.afw.geom as afwGeom
+from lsst.afw.cameraGeom import PIXELS, FIELD_ANGLE
 
 import fgcm
 
@@ -348,6 +350,7 @@ def translateVisitCatalog(visitCat):
                                                  ('TELHA', 'f8'),
                                                  ('TELRA', 'f8'),
                                                  ('TELDEC', 'f8'),
+                                                 ('TELROT', 'f8'),
                                                  ('PMB', 'f8'),
                                                  ('FILTERNAME', 'a2')])
     fgcmExpInfo['VISIT'][:] = visitCat['visit']
@@ -357,6 +360,7 @@ def translateVisitCatalog(visitCat):
     fgcmExpInfo['TELHA'][:] = visitCat['telha']
     fgcmExpInfo['TELRA'][:] = visitCat['telra']
     fgcmExpInfo['TELDEC'][:] = visitCat['teldec']
+    fgcmExpInfo['TELROT'][:] = visitCat['telrot']
     fgcmExpInfo['PMB'][:] = visitCat['pmb']
     fgcmExpInfo['PSFSIGMA'][:] = visitCat['psfSigma']
     fgcmExpInfo['DELTA_APER'][:] = visitCat['deltaAper']
@@ -368,22 +372,22 @@ def translateVisitCatalog(visitCat):
     return fgcmExpInfo
 
 
-def computeCcdOffsets(camera, pixelScale):
+def computeCcdOffsets(camera, defaultOrientation):
     """
     Compute the CCD offsets in ra/dec and x/y space
 
     Parameters
     ----------
-    camera: ``
-    pixelScale: `float`
-       Pixel scale of the camera.  Required because of HSC.
+    camera: `lsst.afw.cameraGeom.Camera`
+    defaultOrientation: `float`
+       Default camera orientation (degrees)
 
     Returns
     -------
     ccdOffsets: `numpy.ndarray`
        Numpy array with ccd offset information for input to FGCM
     """
-    # TODO: DM-16490 will simplify and generalize the math.
+    # TODO: DM-21215 will fully generalize to arbitrary camera orientations
 
     # and we need to know the ccd offsets from the camera geometry
     ccdOffsets = np.zeros(len(camera), dtype=[('CCDNUM', 'i4'),
@@ -394,30 +398,36 @@ def computeCcdOffsets(camera, pixelScale):
                                               ('X_SIZE', 'i4'),
                                               ('Y_SIZE', 'i4')])
 
+    # Generate fake WCSs centered at 180/0 to avoid the RA=0/360 problem,
+    # since we are looking for relative positions
+    boresight = geom.SpherePoint(180.0*geom.degrees, 0.0*geom.degrees)
+    # TODO: DM-17597 will update testdata_jointcal so that the test data
+    # does not have nan as the boresight angle for HSC data.  For the
+    # time being, there is this ungainly hack.
+    if camera.getName() == 'HSC' and np.isnan(defaultOrientation):
+        orientation = 270*geom.degrees
+    else:
+        orientation = defaultOrientation*geom.degrees
+    flipX = False
+
     for i, detector in enumerate(camera):
-        # new version, using proper rotations
-        #  but I worry this only works with HSC, as there's a unit inconsistency
-        camPoint = detector.getCenter(afwCameraGeom.FOCAL_PLANE)
-        pixelSize = detector.getPixelSize()[0]  # Assumes x and y pixel sizes in arcsec are the same
-        camPoint.scale(1.0/pixelSize)
+        ccdOffsets['CCDNUM'][i] = detector.getId()
+
+        pixelsToFieldAngle = detector.getTransform(detector.makeCameraSys(PIXELS),
+                                                   detector.makeCameraSys(FIELD_ANGLE))
+        wcs = afwGeom.makeSkyWcs(pixelsToFieldAngle, orientation, flipX, boresight)
+
+        detCenter = wcs.pixelToSky(detector.getCenter(afwCameraGeom.PIXELS))
+        ccdOffsets['DELTA_RA'][i] = (detCenter.getRa() - boresight.getRa()).asDegrees()
+        ccdOffsets['DELTA_DEC'][i] = (detCenter.getDec() - boresight.getDec()).asDegrees()
+
         bbox = detector.getBBox()
 
-        ccdOffsets['CCDNUM'][i] = detector.getId()
-        # this requires a pixelScale
-        # Note that this now works properly with HSC, but I need to work on
-        # generalizing this properly.  I expect the updates in DM-16490 will
-        # generalize these computations, and appropriate tests can be added
-        # on that ticket.
-        ccdOffsets['DELTA_RA'][i] = -camPoint.getY() * pixelScale / 3600.0
-        ccdOffsets['DELTA_DEC'][i] = -camPoint.getX() * pixelScale / 3600.0
-        boxXform = detector.transform(geom.Point2D(bbox.getMaxX(), bbox.getMaxY()),
-                                      afwCameraGeom.PIXELS, afwCameraGeom.FOCAL_PLANE)
-        boxXform.scale(1.0/pixelSize)
-        # but this does not (for the delta)
-        ccdOffsets['RA_SIZE'][i] = 2. * np.abs(boxXform.getY() -
-                                               camPoint.getY()) / 3600.0
-        ccdOffsets['DEC_SIZE'][i] = 2. * np.abs(boxXform.getX() -
-                                                camPoint.getX()) / 3600.0
+        detCorner1 = wcs.pixelToSky(geom.Point2D(bbox.getMin()))
+        detCorner2 = wcs.pixelToSky(geom.Point2D(bbox.getMax()))
+
+        ccdOffsets['RA_SIZE'][i] = np.abs((detCorner2.getRa() - detCorner1.getRa()).asDegrees())
+        ccdOffsets['DEC_SIZE'][i] = np.abs((detCorner2.getDec() - detCorner1.getDec()).asDegrees())
 
         ccdOffsets['X_SIZE'][i] = bbox.getMaxX()
         ccdOffsets['Y_SIZE'][i] = bbox.getMaxY()

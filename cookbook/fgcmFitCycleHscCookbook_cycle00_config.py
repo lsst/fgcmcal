@@ -29,8 +29,6 @@ config.washMjds = (56700.0, 57500.0, 57700.0, 58050.0)
 config.epochMjds = (56700., 57420., 57606.)
 # Latitude of the observatory
 config.latitude = 19.8256
-# Pixel scale (arcseconds)
-config.pixelScale = 0.17
 # Amount of gray extinction to be considered "photometric".  This will
 # get ratcheded down in further cycles.
 config.expGrayPhotometricCut = (-0.05, -0.05, -0.05, -0.05, -0.05)

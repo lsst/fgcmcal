@@ -431,6 +431,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             rec['telra'] = radec.getRa().asDegrees()
             rec['teldec'] = radec.getDec().asDegrees()
             rec['telha'] = visitInfo.getBoresightHourAngle().asDegrees()
+            rec['telrot'] = visitInfo.getBoresightRotAngle().asDegrees()
             rec['mjd'] = visitInfo.getDate().get(system=DateTime.MJD)
             rec['exptime'] = visitInfo.getExposureTime()
             # convert from Pa to millibar
@@ -849,6 +850,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         schema.addField('telra', type=np.float64, doc="Pointing RA (deg)")
         schema.addField('teldec', type=np.float64, doc="Pointing Dec (deg)")
         schema.addField('telha', type=np.float64, doc="Pointing Hour Angle (deg)")
+        schema.addField('telrot', type=np.float64, doc="Camera rotation (deg)")
         schema.addField('mjd', type=np.float64, doc="MJD of visit")
         schema.addField('exptime', type=np.float32, doc="Exposure time")
         schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
