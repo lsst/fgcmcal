@@ -260,7 +260,10 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
                                     True, False, tract=tract)
         # Turn off plotting in tract mode
         configDict['doPlots'] = False
-        ccdOffsets = computeCcdOffsets(camera, self.config.fgcmFitCycle.pixelScale)
+
+        # Use the first orientation.
+        # TODO: DM-21215 will generalize to arbitrary camera orientations
+        ccdOffsets = computeCcdOffsets(camera, fgcmExpInfo['TELROT'][0])
         del camera
 
         # Set up the fit cycle task
