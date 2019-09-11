@@ -267,7 +267,6 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         config.washMjds = (0.0, )
         config.epochMjds = (0.0, 100000.0)
         config.latitude = 19.8256
-        config.pixelScale = 0.17
         config.expGrayPhotometricCut = (-0.05, -0.05)
         config.expGrayHighCut = (0.2, 0.2)
         config.aperCorrFitNBins = 0
