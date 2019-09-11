@@ -12,7 +12,6 @@ setupRequired(daf_persistence)
 setupRequired(obs_base)
 setupRequired(pex_config)
 setupRequired(pipe_tasks)
-setupRequired(scipy)
 setupRequired(fgcm)
 setupRequired(jointcal)
 
