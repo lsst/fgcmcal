@@ -214,11 +214,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=None,
     )
-    # pixelScale is deprecated by DM-16490.
     pixelScale = pexConfig.Field(
         doc="Pixel scale (arcsec/pixel) (temporary)",
         dtype=float,
-        deprecated="This field is no longer used.  It will be removed after v19.",
+        deprecated=("This field is no longer used, and has been deprecated by DM-16490. "
+                    "It will be removed after v19."),
         optional=True,
     )
     brightObsGrayMax = pexConfig.Field(

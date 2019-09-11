@@ -21,7 +21,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """Test the fgcmcal computeCcdOffsets code with testdata_jointcal.
-
 """
 
 import unittest
@@ -63,6 +62,8 @@ class FgcmCcdOffsetsTest(lsst.utils.tests.TestCase):
         # Spot check relative orientations of some of the ccds
         # This is based on
         # https://subarutelescope.org/Observing/Instruments/HSC/CCDPosition_20170212.png
+        # The goal here is to check that North is Up, South is Down,
+        # East is Left, and West is Right.
         self.assertLess(ccdOffsets['DELTA_RA'][15], ccdOffsets['DELTA_RA'][10])
         self.assertLess(ccdOffsets['DELTA_RA'][95], ccdOffsets['DELTA_RA'][90])
         self.assertGreater(ccdOffsets['DELTA_RA'][46], 0.0)
@@ -72,6 +73,14 @@ class FgcmCcdOffsetsTest(lsst.utils.tests.TestCase):
         self.assertGreater(ccdOffsets['DELTA_DEC'][97], 0.0)
 
         # Check the sizes
+        # The projected size of the ccds varies with radius over the large
+        # HSC field-of-view. Empirically, the x size is between 0.07 and 0.10 deg
+        # and the y size is between 0.17 and 0.20 deg for the non-rotated CCDs.
+        # This test checks that the orientations of the CCDs are as expected for
+        # rotated/non-rotated CCDs (relative size of RA/DEC), and that the size
+        # is roughly correct.  Because these values are only used for visualization
+        # in the fgcm code, this does not need to be perfect.
+
         rotatedCcds = [100, 101, 102, 103]
 
         for i, ccd in enumerate(ccdOffsets['CCDNUM']):

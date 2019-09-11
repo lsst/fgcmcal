@@ -30,9 +30,9 @@ import numpy as np
 
 import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.afw.table as afwTable
+import lsst.afw.image as afwImage
 import lsst.geom as geom
-import lsst.afw.geom as afwGeom
-from lsst.afw.cameraGeom import PIXELS, FIELD_ANGLE
+from lsst.obs.base import createInitialSkyWcs
 
 import fgcm
 
@@ -385,7 +385,8 @@ def computeCcdOffsets(camera, defaultOrientation):
     Returns
     -------
     ccdOffsets: `numpy.ndarray`
-       Numpy array with ccd offset information for input to FGCM
+       Numpy array with ccd offset information for input to FGCM.
+       Angular units are degrees, and x/y units are pixels.
     """
     # TODO: DM-21215 will fully generalize to arbitrary camera orientations
 
@@ -401,6 +402,7 @@ def computeCcdOffsets(camera, defaultOrientation):
     # Generate fake WCSs centered at 180/0 to avoid the RA=0/360 problem,
     # since we are looking for relative positions
     boresight = geom.SpherePoint(180.0*geom.degrees, 0.0*geom.degrees)
+
     # TODO: DM-17597 will update testdata_jointcal so that the test data
     # does not have nan as the boresight angle for HSC data.  For the
     # time being, there is this ungainly hack.
@@ -410,12 +412,15 @@ def computeCcdOffsets(camera, defaultOrientation):
         orientation = defaultOrientation*geom.degrees
     flipX = False
 
+    # Create a temporary visitInfo for input to createInitialSkyWcs
+    visitInfo = afwImage.VisitInfo(boresightRaDec=boresight,
+                                   boresightRotAngle=orientation,
+                                   rotType=afwImage.visitInfo.RotType.SKY)
+
     for i, detector in enumerate(camera):
         ccdOffsets['CCDNUM'][i] = detector.getId()
 
-        pixelsToFieldAngle = detector.getTransform(detector.makeCameraSys(PIXELS),
-                                                   detector.makeCameraSys(FIELD_ANGLE))
-        wcs = afwGeom.makeSkyWcs(pixelsToFieldAngle, orientation, flipX, boresight)
+        wcs = createInitialSkyWcs(visitInfo, detector, flipX)
 
         detCenter = wcs.pixelToSky(detector.getCenter(afwCameraGeom.PIXELS))
         ccdOffsets['DELTA_RA'][i] = (detCenter.getRa() - boresight.getRa()).asDegrees()
