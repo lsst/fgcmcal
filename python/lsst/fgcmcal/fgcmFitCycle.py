@@ -293,9 +293,16 @@ class FgcmFitCycleConfig(pexConfig.Config):
         default=0.05,
     )
     aperCorrFitNBins = pexConfig.Field(
-        doc="Aperture correction number of bins",
+        doc="Number of bins used in aperture correction fit.",
         dtype=int,
-        default=None,
+        default=10,
+    )
+    aperCorrInputParameters = pexConfig.ListField(
+        doc=("Aperture correction input slope parameters.  There should be one "
+             "slope per band.  This is used when there is insufficient data to "
+             "fit the parameters from the data itself (e.g. tract mode)."),
+        dtype=float,
+        default=[],
     )
     sedFudgeFactors = pexConfig.ListField(
         doc="Fudge factors for computing linear SED from colors",

@@ -154,6 +154,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'illegalValue': -9999.0,  # internally used by fgcm.
                   'starColorCuts': starColorCutList,
                   'aperCorrFitNBins': config.aperCorrFitNBins,
+                  'aperCorrInputParameters': np.array(config.aperCorrInputParameters),
                   'sedFudgeFactors': np.array(config.sedFudgeFactors),
                   'colorSplitIndices': np.array(config.colorSplitIndices),
                   'sigFgcmMaxErr': config.sigFgcmMaxErr,
