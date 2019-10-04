@@ -509,6 +509,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 # only says that a given raw is available, and the src may not
                 # be accessible or processed in a specific repo.
                 dataRefs = butler.subset('src')
+        elif self.config.checkAllCcds:
+            scanAllCcds = True
 
         groupedDataRefs = {}
         for dataRef in dataRefs:
@@ -522,10 +524,18 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 for ccdId in ccdIds:
                     dataId[self.config.ccdDataRefName] = ccdId
                     if butler.datasetExists('src', dataId=dataId):
-                        groupedDataRefs[visit].append(butler.dataRef('src', dataId=dataId))
+                        goodDataRef = butler.dataRef('src', dataId=dataId)
+                        if visit in groupedDataRefs:
+                            if (goodDataRef.dataId[self.config.ccdDataRefName] not in
+                               [d.dataId[self.config.ccdDataRefName] for d in groupedDataRefs[visit]]):
+                                groupedDataRefs[visit].append(goodDataRef)
+                        else:
+                            groupedDataRefs[visit] = [goodDataRef]
             else:
                 if visit in groupedDataRefs:
-                    groupedDataRefs[visit].append(dataRef)
+                    if (dataRef.dataId[self.config.ccdDataRefName] not in
+                       [d.dataId[self.config.ccdDataRefName] for d in groupedDataRefs[visit]]):
+                        groupedDataRefs[visit].append(dataRef)
                 else:
                     groupedDataRefs[visit] = [dataRef]
 

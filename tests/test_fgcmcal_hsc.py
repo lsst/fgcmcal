@@ -172,6 +172,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self.config = fgcmcal.FgcmCalibrateTractConfig()
         self.fillDefaultBuildStarsConfig(self.config.fgcmBuildStars, visitDataRefName, ccdDataRefName)
+        self.config.fgcmBuildStars.checkAllCcds = False
+
         self.fillDefaultFitCycleConfig(self.config.fgcmFitCycle)
         self.config.maxFitCycles = 2
 

@@ -81,7 +81,7 @@ class FgcmCalibrateTractConfig(pexConfig.Config):
     def setDefaults(self):
         pexConfig.Config.setDefaults(self)
 
-        self.fgcmBuildStars.checkAllCcds = True
+        self.fgcmBuildStars.checkAllCcds = False
         self.fgcmFitCycle.useRepeatabilityForExpGrayCuts = True
         self.fgcmFitCycle.quietMode = True
         self.fgcmOutputProducts.doReferenceCalibration = False
@@ -226,6 +226,8 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
 
         if not self.config.fgcmBuildStars.doReferenceMatches:
             raise RuntimeError("Must run FgcmCalibrateTract with fgcmBuildStars.doReferenceMatches")
+        if self.config.fgcmBuildStars.checkAllCcds:
+            raise RuntimeError("Cannot run FgcmCalibrateTract with fgcmBuildStars.checkAllCcds set to True")
 
         self.makeSubtask("fgcmBuildStars", butler=butler)
         self.makeSubtask("fgcmOutputProducts", butler=butler)
