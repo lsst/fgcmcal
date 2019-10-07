@@ -37,8 +37,12 @@ config.expGrayPhotometricCut = (-0.05, -0.05, -0.05, -0.05, -0.05)
 config.expGrayHighCut = (0.2, 0.2, 0.2, 0.2, 0.2)
 # Number of bins to do aperture correction.  Not currently supported in LSST stack.
 config.aperCorrFitNBins = 0
-# "Fudge factors" for computing SED slope (best values for HSC not determined yet)
-config.sedFudgeFactors = (1.0, 1.0, 1.0, 1.0, 1.0)
+# Aperture correction input slope parameters.  There should be one slope ber band.
+# This is used when there is insufficient data to fit the parameters from the data
+# itself (e.g. tract mode or RC2).
+config.aperCorrInputParameters = (-1.0150, -0.9694, -1.7229, -1.4549, -1.1998)
+# "Fudge factors" for computing SED slope
+config.sedFudgeFactors = (0.25, 1.0, 1.0, 0.25, 0.25)
 # Color cuts for stars to use for calibration.  Each element is a string with
 # band1, band2, range_low, range_high such that range_low < (band1 - band2) < range_high
 config.starColorCuts = ('g,r,-0.25,2.25',

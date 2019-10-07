@@ -27,8 +27,8 @@ The environment should be set up as follows:
 ```
 setup lsst_distrib
 
-export RCRERUN=RC/w_2019_18/DM-19151-sfm
-export COOKBOOKRERUN=fgcm_cookbook_w_2019_18
+export RCRERUN=RC/w_2019_38/DM-21386-sfm
+export COOKBOOKRERUN=fgcm_cookbook_w_2019_38
 ```
 
 The `RCRERUN` env variable should be set to the most recent completed rerun
