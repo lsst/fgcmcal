@@ -177,6 +177,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.fillDefaultFitCycleConfig(self.config.fgcmFitCycle)
         self.config.maxFitCycles = 2
 
+        self.config.fgcmOutputProducts.doRefcatOutput = True
+
         rawRepeatability = np.array([0.007070288705, 0.0074971053995])
         filterNCalibMap = {'HSC-R': 13,
                            'HSC-I': 13}

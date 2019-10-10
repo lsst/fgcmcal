@@ -347,7 +347,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         # Output the standard stars in stack format
         if self.config.doRefcatOutput:
-            self._outputStandardStars(butler, stdCat, offsets)
+            self._outputStandardStars(butler, stdCat, offsets, self.config.datasetConfig)
 
         del stdCat
 
@@ -404,13 +404,17 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
                           "fitCycleConfig.doReferenceCalibration")
 
-        if self.config.doRefcatOutput:
-            raise RuntimeError("Cannot do reference catalog output in `tract` mode.")
-
         if self.config.doReferenceCalibration:
             offsets = self._computeReferenceOffsets(butler, stdCat)
         else:
             offsets = np.zeros(len(self.bands))
+
+        if self.config.doRefcatOutput:
+            # Create a special config that has the tract number in it
+            datasetConfig = copy.copy(self.config.datasetConfig)
+            datasetConfig.ref_dataset_name = '%s_%d' % (self.config.datasetConfig.ref_dataset_name,
+                                                        tract)
+            self._outputStandardStars(butler, stdCat, offsets, datasetConfig)
 
         if self.config.doZeropointOutput:
             self._outputZeropoints(butler, zptCat, visitCat, offsets, tract=tract)
@@ -599,7 +603,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         return struct
 
-    def _outputStandardStars(self, butler, stdCat, offsets):
+    def _outputStandardStars(self, butler, stdCat, offsets, datasetConfig):
         """
         Output standard stars in indexed reference catalog format.
 
@@ -610,9 +614,11 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
            FGCM standard star catalog from fgcmFitCycleTask
         offsets: `numpy.array` of floats
            Per band zeropoint offsets
+        datasetConfig: `lsst.meas.algorithms.DatasetConfig`
+           Config for reference dataset
         """
 
-        self.log.info("Outputting standard stars to %s" % (self.config.datasetConfig.ref_dataset_name))
+        self.log.info("Outputting standard stars to %s" % (datasetConfig.ref_dataset_name))
 
         # We determine the conversion from the native units (typically radians) to
         # degrees for the first star.  This allows us to treat coord_ra/coord_dec as
@@ -627,7 +633,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         # Write the master schema
         dataId = self.indexer.makeDataId('master_schema',
-                                         self.config.datasetConfig.ref_dataset_name)
+                                         datasetConfig.ref_dataset_name)
         masterCat = afwTable.SimpleCatalog(formattedCat.schema)
         addRefCatMetadata(masterCat)
         butler.put(masterCat, 'ref_cat', dataId=dataId)
@@ -647,12 +653,12 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
             # Write the individual pixel
             dataId = self.indexer.makeDataId(indices[i1a[0]],
-                                             self.config.datasetConfig.ref_dataset_name)
+                                             datasetConfig.ref_dataset_name)
             butler.put(formattedCat[selected], 'ref_cat', dataId=dataId)
 
         # And save the dataset configuration
-        dataId = self.indexer.makeDataId(None, self.config.datasetConfig.ref_dataset_name)
-        butler.put(self.config.datasetConfig, 'ref_cat_config', dataId=dataId)
+        dataId = self.indexer.makeDataId(None, datasetConfig.ref_dataset_name)
+        butler.put(datasetConfig, 'ref_cat_config', dataId=dataId)
 
         self.log.info("Done outputting standard stars.")
 
