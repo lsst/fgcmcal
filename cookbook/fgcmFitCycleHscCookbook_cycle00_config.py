@@ -42,6 +42,8 @@ config.aperCorrFitNBins = 0
 # itself (e.g. tract mode or RC2).
 config.aperCorrInputParameters = (-1.0150, -0.9694, -1.7229, -1.4549, -1.1998)
 # "Fudge factors" for computing SED slope
+# These are approximating by looking at stellar SED templates, and are the same
+# as used in DES calibrations (-E. Rykoff)
 config.sedFudgeFactors = (0.25, 1.0, 1.0, 0.25, 0.25)
 # Color cuts for stars to use for calibration.  Each element is a string with
 # band1, band2, range_low, range_high such that range_low < (band1 - band2) < range_high

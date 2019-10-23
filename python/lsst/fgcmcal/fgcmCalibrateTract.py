@@ -435,11 +435,11 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         stdStruct = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
         stdCat = makeStdCat(stdSchema, stdStruct)
 
-        outStruct = self.fgcmOutputProducts.generateOutputProducts(butler, tract,
-                                                                   visitCat,
-                                                                   zptCat, atmCat, stdCat,
-                                                                   self.config.fgcmBuildStars,
-                                                                   self.config.fgcmFitCycle)
+        outStruct = self.fgcmOutputProducts.generateTractOutputProducts(butler, tract,
+                                                                        visitCat,
+                                                                        zptCat, atmCat, stdCat,
+                                                                        self.config.fgcmBuildStars,
+                                                                        self.config.fgcmFitCycle)
         outStruct.repeatability = fgcmFitCycle.fgcmPars.compReservedRawRepeatability
 
         return outStruct

@@ -365,11 +365,11 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # We return the zp offsets
         return pipeBase.Struct(offsets=offsets)
 
-    def generateOutputProducts(self, butler, tract,
-                               visitCat, zptCat, atmCat, stdCat,
-                               fgcmBuildStarsConfig, fgcmFitCycleConfig):
+    def generateTractOutputProducts(self, butler, tract,
+                                    visitCat, zptCat, atmCat, stdCat,
+                                    fgcmBuildStarsConfig, fgcmFitCycleConfig):
         """
-        Generate the output products, as specified in the config.
+        Generate the output products for a given tract, as specified in the config.
 
         This method is here to have an alternate entry-point for
         FgcmCalibrateTract.
