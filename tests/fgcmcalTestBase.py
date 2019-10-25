@@ -460,6 +460,12 @@ class FgcmcalTestBase(object):
             self.assertTrue(butler.datasetExists('transmission_atmosphere_fgcm_tract',
                                                  tract=tract, visit=visit))
 
+        # Check that we got the reference catalog output.
+        # This will raise an exception if the catalog is not there.
+        config = LoadIndexedReferenceObjectsConfig()
+        config.ref_dataset_name = 'fgcm_stars_%d' % (tract)
+        task = LoadIndexedReferenceObjectsTask(butler, config=config)  # noqa F841
+
     def _checkResult(self, result):
         """
         Check the result output from the task

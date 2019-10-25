@@ -105,7 +105,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nGoodZp = 26
         nOkZp = 26
         nBadZp = 1206
-        nStdStars = 389
+        nStdStars = 390
         nPlots = 34
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -142,7 +142,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.refObjLoader.ref_dataset_name = "sdss-dr9-fink-v5b"
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([-0.001419307198, -0.001693746657])
+        zpOffsets = np.array([-0.0013903317740, -0.0020539460238])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
@@ -172,10 +172,13 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self.config = fgcmcal.FgcmCalibrateTractConfig()
         self.fillDefaultBuildStarsConfig(self.config.fgcmBuildStars, visitDataRefName, ccdDataRefName)
+        self.config.fgcmBuildStars.checkAllCcds = False
         self.fillDefaultFitCycleConfig(self.config.fgcmFitCycle)
         self.config.maxFitCycles = 2
 
-        rawRepeatability = np.array([0.006505881543, 0.008963255070])
+        self.config.fgcmOutputProducts.doRefcatOutput = True
+
+        rawRepeatability = np.array([0.007070288705, 0.0074971053995])
         filterNCalibMap = {'HSC-R': 13,
                            'HSC-I': 13}
 
@@ -270,6 +273,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         config.expGrayPhotometricCut = (-0.05, -0.05)
         config.expGrayHighCut = (0.2, 0.2)
         config.aperCorrFitNBins = 0
+        config.aperCorrInputSlopes = (-0.9694, -1.7229)
         config.sedFudgeFactors = (1.0, 1.0)
         config.starColorCuts = ('r,i,-0.50,2.25',)
         config.freezeStdAtmosphere = True

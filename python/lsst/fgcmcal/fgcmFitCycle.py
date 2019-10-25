@@ -62,13 +62,15 @@ class FgcmFitCycleConfig(pexConfig.Config):
     fitFlag = pexConfig.ListField(
         doc=("Flag for which bands are directly constrained in the FGCM fit. "
              "Bands set to 0 will have the atmosphere constrained from observations "
-             "in other bands on the same night."),
+             "in other bands on the same night.  Must be same length as config.bands, "
+             "and matched band-by-band."),
         dtype=int,
         default=(0,),
     )
     requiredFlag = pexConfig.ListField(
         doc=("Flag for which bands are required for a star to be considered a calibration "
-             "star in the FGCM fit.  Typically this should be the same as fitFlag."),
+             "star in the FGCM fit.  Typically this should be the same as fitFlag.  Must "
+             "be same length as config.bands, and matched band-by-band."),
         dtype=int,
         default=(0,),
     )
@@ -263,13 +265,13 @@ class FgcmFitCycleConfig(pexConfig.Config):
     )
     expGrayPhotometricCut = pexConfig.ListField(
         doc=("Maximum (negative) exposure gray for a visit to be considered photometric. "
-             "There will be one value per band."),
+             "Must be same length as config.bands, and matched band-by-band."),
         dtype=float,
         default=(0.0,),
     )
     expGrayHighCut = pexConfig.ListField(
         doc=("Maximum (positive) exposure gray for a visit to be considered photometric. "
-             "There will be one value per band."),
+             "Must be same length as config.bands, and matched band-by-band."),
         dtype=float,
         default=(0.0,),
     )
@@ -293,12 +295,24 @@ class FgcmFitCycleConfig(pexConfig.Config):
         default=0.05,
     )
     aperCorrFitNBins = pexConfig.Field(
-        doc="Aperture correction number of bins",
+        doc=("Number of aperture bins used in aperture correction fit.  When set to 0"
+             "no fit will be performed, and the config.aperCorrInputSlopes will be "
+             "used if available."),
         dtype=int,
-        default=None,
+        default=10,
+    )
+    aperCorrInputSlopes = pexConfig.ListField(
+        doc=("Aperture correction input slope parameters.  These are used on the first "
+             "fit iteration, and aperture correction parameters will be updated from "
+             "the data if config.aperCorrFitNBins > 0.  It is recommended to set this"
+             "when there is insufficient data to fit the parameters (e.g. tract mode). "
+             "If set, must be same length as config.bands, and matched band-by-band."),
+        dtype=float,
+        default=[],
     )
     sedFudgeFactors = pexConfig.ListField(
-        doc="Fudge factors for computing linear SED from colors",
+        doc=("Fudge factors for computing linear SED from colors.  Must be same length as "
+             "config.bands, and matched band-by-band."),
         dtype=float,
         default=(0,),
     )
@@ -318,7 +332,9 @@ class FgcmFitCycleConfig(pexConfig.Config):
         default=0.10,
     )
     approxThroughput = pexConfig.ListField(
-        doc="Approximate overall throughput at start of calibration observations",
+        doc=("Approximate overall throughput at start of calibration observations. "
+             "May be 1 element (same for all bands) or the same length as config.bands, "
+             "and matched band-by-band."),
         dtype=float,
         default=(1.0, ),
     )
