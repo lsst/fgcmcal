@@ -774,7 +774,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
                 scaling = scalingMapping[rec['visit']][ccdMapping[rec['ccd']]]
                 photoCalib = self._getChebyshevPhotoCalib(rec['fgcmfZptCheb'],
-                                                          rec['fgcmZptErr'],
+                                                          np.sqrt(rec['fgcmZptVar']),
                                                           rec['fgcmfZptChebXyMax'],
                                                           offsetMapping[rec['filtername']],
                                                           scaling)
@@ -782,7 +782,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 # Spatially constant zeropoint
 
                 scaling = scalingMapping[rec['visit']][ccdMapping[rec['ccd']]]
-                photoCalib = self._getConstantPhotoCalib(rec['fgcmZpt'], rec['fgcmZptErr'],
+                photoCalib = self._getConstantPhotoCalib(rec['fgcmZpt'],
+                                                         np.sqrt(rec['fgcmZptVar']),
                                                          offsetMapping[rec['filtername']],
                                                          scaling)
 
