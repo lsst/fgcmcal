@@ -695,11 +695,11 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # Note that we don't have to set `resolved` because the default is False
 
         for b, band in enumerate(self.bands):
-            mag = fgcmStarCat['mag_std_noabs'][:, b] + offsets[b]
+            mag = fgcmStarCat['mag_std_noabs'][:, b].astype(np.float64) + offsets[b]
             # We want fluxes in nJy from calibrated AB magnitudes
             # (after applying offset).  Updated after RFC-549 and RFC-575.
             flux = (mag*units.ABmag).to_value(units.nJy)
-            fluxErr = (np.log(10.) / 2.5) * flux * fgcmStarCat['magErr_std'][:, b]
+            fluxErr = (np.log(10.) / 2.5) * flux * fgcmStarCat['magErr_std'][:, b].astype(np.float64)
 
             formattedCat['%s_flux' % (band)][:] = flux
             formattedCat['%s_fluxErr' % (band)][:] = fluxErr
