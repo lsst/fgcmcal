@@ -312,11 +312,13 @@ class FgcmcalTestBase(object):
         # And make sure the numbers are consistent
         test, = np.where(rawStars['id'][0] == refStruct.refCat['id'])
 
-        mag = rawStars['mag_std_noabs'][0, 0] + offsets[0]
-        flux = (mag*units.ABmag).to_value(units.nJy)
-        fluxErr = (np.log(10.) / 2.5) * flux * rawStars['magErr_std'][0, 0]
-        self.assertFloatsAlmostEqual(flux, refStruct.refCat['r_flux'][test[0]], rtol=1e-6)
-        self.assertFloatsAlmostEqual(fluxErr, refStruct.refCat['r_fluxErr'][test[0]], rtol=1e-6)
+        # Perform math on numpy arrays to maintain datatypes
+        mags = rawStars['mag_std_noabs'][:, 0].astype(np.float64) + offsets[0]
+        fluxes = (mags*units.ABmag).to_value(units.nJy)
+        fluxErrs = (np.log(10.) / 2.5) * fluxes * rawStars['magErr_std'][:, 0].astype(np.float64)
+        # Only check the first one
+        self.assertFloatsAlmostEqual(fluxes[0], refStruct.refCat['r_flux'][test[0]])
+        self.assertFloatsAlmostEqual(fluxErrs[0], refStruct.refCat['r_fluxErr'][test[0]])
 
         # Test the joincal_photoCalib output
 
