@@ -320,12 +320,6 @@ class FgcmcalTestBase(object):
         self.assertFloatsAlmostEqual(fluxes[0], refStruct.refCat['r_flux'][test[0]])
         self.assertFloatsAlmostEqual(fluxErrs[0], refStruct.refCat['r_fluxErr'][test[0]])
 
-        mag = rawStars['mag_std_noabs'][0, 0] + offsets[0]
-        flux = (mag*units.ABmag).to_value(units.nJy)
-        fluxErr = (np.log(10.) / 2.5) * flux * rawStars['magErr_std'][0, 0]
-        self.assertFloatsAlmostEqual(flux, refStruct.refCat['r_flux'][test[0]], rtol=1e-6)
-        self.assertFloatsAlmostEqual(fluxErr, refStruct.refCat['r_fluxErr'][test[0]], rtol=1e-6)
-
         # Test the joincal_photoCalib output
 
         zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
