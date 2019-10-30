@@ -645,11 +645,16 @@ def makeStdSchema(nBands):
     stdSchema = afwTable.SimpleTable.makeMinimalSchema()
     stdSchema.addField('ngood', type='ArrayI', doc='Number of good observations',
                        size=nBands)
+    stdSchema.addField('ntotal', type='ArrayI', doc='Number of total observations',
+                       size=nBands)
     stdSchema.addField('mag_std_noabs', type='ArrayF',
                        doc='Standard magnitude (no absolute calibration)',
                        size=nBands)
     stdSchema.addField('magErr_std', type='ArrayF',
                        doc='Standard magnitude error',
+                       size=nBands)
+    stdSchema.addField('npsfcand', type='ArrayI',
+                       doc='Number of observations flagged as psf candidates',
                        size=nBands)
 
     return stdSchema
@@ -682,7 +687,9 @@ def makeStdCat(stdSchema, stdStruct):
     stdCat['coord_ra'][:] = stdStruct['RA'] * geom.degrees
     stdCat['coord_dec'][:] = stdStruct['DEC'] * geom.degrees
     stdCat['ngood'][:, :] = stdStruct['NGOOD'][:, :]
+    stdCat['ntotal'][:, :] = stdStruct['NTOTAL'][:, :]
     stdCat['mag_std_noabs'][:, :] = stdStruct['MAG_STD'][:, :]
     stdCat['magErr_std'][:, :] = stdStruct['MAGERR_STD'][:, :]
+    stdCat['npsfcand'][:, :] = stdStruct['NPSFCAND'][:, :]
 
     return stdCat

@@ -143,6 +143,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=str,
         default="base_Jacobian_value"
     )
+    psfCandidateName = pexConfig.Field(
+        doc="Name of field with psf candidate flag for propagation",
+        dtype=str,
+        default="calib_psfCandidate"
+    )
     sourceSelector = sourceSelectorRegistry.makeField(
         doc="How to select sources",
         default="science"
@@ -899,6 +904,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                 'jacobian')
         sourceMapper.addMapping(sourceSchema['slot_Centroid_x'].asKey(), 'x')
         sourceMapper.addMapping(sourceSchema['slot_Centroid_y'].asKey(), 'y')
+        sourceMapper.addMapping(sourceSchema[self.config.psfCandidateName].asKey(),
+                                'psf_candidate')
 
         # and add the fields we want
         sourceMapper.editOutputSchema().addField(

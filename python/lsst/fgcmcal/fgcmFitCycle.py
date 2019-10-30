@@ -716,6 +716,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                             starIds['nObs'][:],
                             obsX=starObs['x'][starIndices['obsIndex']],
                             obsY=starObs['y'][starIndices['obsIndex']],
+                            psfCandidate=starObs['psf_candidate'][starIndices['obsIndex']],
                             refID=refId,
                             refMag=refMag,
                             refMagErr=refMagErr,

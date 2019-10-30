@@ -687,6 +687,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         sourceMapper.addMinimalSchema(minSchema)
         for band in self.bands:
             sourceMapper.editOutputSchema().addField('%s_nGood' % (band), type=np.int32)
+            sourceMapper.editOutputSchema().addField('%s_nTotal' % (band), type=np.int32)
+            sourceMapper.editOutputSchema().addField('%s_nPsfCandidate' % (band), type=np.int32)
 
         formattedCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
         formattedCat.reserve(len(fgcmStarCat))
@@ -704,6 +706,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             formattedCat['%s_flux' % (band)][:] = flux
             formattedCat['%s_fluxErr' % (band)][:] = fluxErr
             formattedCat['%s_nGood' % (band)][:] = fgcmStarCat['ngood'][:, b]
+            formattedCat['%s_nTotal' % (band)][:] = fgcmStarCat['ntotal'][:, b]
+            formattedCat['%s_nPsfCandidate' % (band)][:] = fgcmStarCat['npsfcand'][:, b]
 
         addRefCatMetadata(formattedCat)
 
