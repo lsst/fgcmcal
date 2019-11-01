@@ -43,6 +43,7 @@ from lsst.daf.base.dateTime import DateTime
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
 from .fgcmLoadReferenceCatalog import FgcmLoadReferenceCatalogTask
+from .utilities import computeApproxPixelAreaFields
 
 import fgcm
 
@@ -136,12 +137,21 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     applyJacobian = pexConfig.Field(
         doc="Apply Jacobian correction?",
         dtype=bool,
+        deprecated=("This field is no longer used, and has been deprecated by DM-20163. "
+                    "It will be removed after v20."),
         default=False
     )
     jacobianName = pexConfig.Field(
         doc="Name of field with jacobian correction",
         dtype=str,
+        deprecated=("This field is no longer used, and has been deprecated by DM-20163. "
+                    "It will be removed after v20."),
         default="base_Jacobian_value"
+    )
+    doApplyWcsJacobian = pexConfig.Field(
+        doc="Apply the jacobian of the WCS to the star observations prior to fit?",
+        dtype=bool,
+        default=True
     )
     psfCandidateName = pexConfig.Field(
         doc="Name of field with psf candidate flag for propagation",
@@ -340,17 +350,20 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         groupedDataRefs = self.findAndGroupDataRefs(butler, dataRefs)
 
+        camera = butler.get('camera')
+
         # Make the visit catalog if necessary
         if not butler.datasetExists('fgcmVisitCatalog'):
             # we need to build visitCat
-            visitCat = self.fgcmMakeVisitCatalog(butler, groupedDataRefs)
+            visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs)
         else:
             self.log.info("Found fgcmVisitCatalog.")
             visitCat = butler.get('fgcmVisitCatalog')
 
         # Compile all the stars
         if not butler.datasetExists('fgcmStarObservations'):
-            fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs, visitCat)
+            fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
+                                                                      visitCat)
         else:
             self.log.info("Found fgcmStarObservations")
             fgcmStarObservationCat = butler.get('fgcmStarObservations')
@@ -370,28 +383,29 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         if fgcmRefCat is not None:
             butler.put(fgcmRefCat, 'fgcmReferenceStars')
 
-    def fgcmMakeVisitCatalog(self, butler, groupedDataRefs):
+    def fgcmMakeVisitCatalog(self, camera, groupedDataRefs):
         """
         Make a visit catalog with all the keys from each visit
 
         Parameters
         ----------
-        butler: `lsst.daf.persistence.Butler`
+        camera: `lsst.afw.cameraGeom.Camera`
+           Camera from the butler
         groupedDataRefs: `dict`
-           Dictionary with visit keys, and `list`s of `lsst.daf.persistence.ButlerDataRef`
+           Dictionary with visit keys, and `list`s of
+           `lsst.daf.persistence.ButlerDataRef`
 
         Returns
         -------
         visitCat: `afw.table.BaseCatalog`
         """
 
-        camera = butler.get('camera')
         nCcd = len(camera)
 
         schema = self._makeFgcmVisitSchema(nCcd)
 
         visitCat = afwTable.BaseCatalog(schema)
-        visitCat.table.preallocate(len(groupedDataRefs))
+        visitCat.reserve(len(groupedDataRefs))
 
         self._fillVisitCatalog(visitCat, groupedDataRefs)
 
@@ -404,9 +418,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         Parameters
         ----------
         visitCat: `afw.table.BaseCatalog`
-           Catalog with schema from _createFgcmVisitSchema()
+           Catalog with schema from _makeFgcmVisitSchema()
         groupedDataRefs: `dict`
-           Dictionary with visit keys, and `list`s of `lsst.daf.persistence.ButlerDataRef`
+           Dictionary with visit keys, and `list`s of
+           `lsst.daf.persistence.ButlerDataRef`
         """
 
         bbox = geom.BoxI(geom.PointI(0, 0), geom.PointI(1, 1))
@@ -573,8 +588,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         Returns
         -------
         fgcmStarObservations: `afw.table.BaseCatalog`
-           Full catalog of good observations.  Only returned if
-           returnCatalog is True.
+           Full catalog of good observations.
         """
 
         startTime = time.time()
@@ -588,6 +602,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         ccdMapping = {}
         for ccdIndex, detector in enumerate(camera):
             ccdMapping[detector.getId()] = ccdIndex
+
+        approxPixelAreaFields = computeApproxPixelAreaFields(camera)
 
         sourceMapper = self._makeSourceMapper(sourceSchema)
 
@@ -648,12 +664,18 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat[instMagErrKey][:] = k * (sources[instFluxErrKey][goodSrc.selected] /
                                                  sources[instFluxKey][goodSrc.selected])
 
-                if self.config.applyJacobian:
+                # Compute the jacobian from an approximate PixelAreaBoundedField
+                tempCat['jacobian'] = approxPixelAreaFields[ccdId].evaluate(tempCat['x'],
+                                                                            tempCat['y'])
+
+                # Apply the jacobian if configured
+                if self.config.doApplyWcsJacobian:
                     tempCat[instMagKey][:] -= 2.5 * np.log10(tempCat['jacobian'][:])
 
                 fullCatalog.extend(tempCat)
 
                 # And the aperture information
+                # This does not need the jacobian because it is all locally relative
                 tempAperCat = afwTable.BaseCatalog(aperVisitCatalog.schema)
                 tempAperCat.reserve(goodSrc.selected.sum())
                 tempAperCat.extend(sources[goodSrc.selected], mapper=aperMapper)
@@ -900,8 +922,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # map to ra/dec
         sourceMapper.addMapping(sourceSchema['coord_ra'].asKey(), 'ra')
         sourceMapper.addMapping(sourceSchema['coord_dec'].asKey(), 'dec')
-        sourceMapper.addMapping(sourceSchema[self.config.jacobianName].asKey(),
-                                'jacobian')
         sourceMapper.addMapping(sourceSchema['slot_Centroid_x'].asKey(), 'x')
         sourceMapper.addMapping(sourceSchema['slot_Centroid_y'].asKey(), 'y')
         sourceMapper.addMapping(sourceSchema[self.config.psfCandidateName].asKey(),
@@ -916,6 +936,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             "instMag", type=np.float32, doc="Instrumental magnitude")
         sourceMapper.editOutputSchema().addField(
             "instMagErr", type=np.float32, doc="Instrumental magnitude error")
+        sourceMapper.editOutputSchema().addField(
+            "jacobian", type=np.float32, doc="Relative pixel scale from wcs jacobian")
 
         return sourceMapper
 
