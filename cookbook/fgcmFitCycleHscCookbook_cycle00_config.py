@@ -40,7 +40,7 @@ config.aperCorrFitNBins = 0
 # Aperture correction input slope parameters.  There should be one slope ber band.
 # This is used when there is insufficient data to fit the parameters from the data
 # itself (e.g. tract mode or RC2).
-config.aperCorrInputParameters = (-1.0150, -0.9694, -1.7229, -1.4549, -1.1998)
+config.aperCorrInputSlopes = (-1.0150, -0.9694, -1.7229, -1.4549, -1.1998)
 # "Fudge factors" for computing SED slope
 # These are approximating by looking at stellar SED templates, and are the same
 # as used in DES calibrations (-E. Rykoff)

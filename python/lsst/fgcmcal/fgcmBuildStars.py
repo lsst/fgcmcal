@@ -146,7 +146,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
     psfCandidateName = pexConfig.Field(
         doc="Name of field with psf candidate flag for propagation",
         dtype=str,
-        default="calib_psfCandidate"
+        default="calib_psf_candidate"
     )
     sourceSelector = sourceSelectorRegistry.makeField(
         doc="How to select sources",
