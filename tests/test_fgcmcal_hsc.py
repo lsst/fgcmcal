@@ -240,6 +240,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         config.visitDataRefName = visitDataRefName
         config.ccdDataRefName = ccdDataRefName
         config.doReferenceMatches = True
+        # The testdata catalogs have the old name
+        config.psfCandidateName = 'calib_psfCandidate'
         config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'sdss-dr9-fink-v5b'
         config.fgcmLoadReferenceCatalog.applyColorTerms = True
         config.fgcmLoadReferenceCatalog.colorterms = self.sdssColorterms()

@@ -82,6 +82,7 @@ class FgcmCalibrateTractConfig(pexConfig.Config):
         pexConfig.Config.setDefaults(self)
 
         self.fgcmBuildStars.checkAllCcds = False
+        self.fgcmBuildStars.densityCutMaxPerPixel = 10000
         self.fgcmFitCycle.useRepeatabilityForExpGrayCuts = True
         self.fgcmFitCycle.quietMode = True
         self.fgcmOutputProducts.doReferenceCalibration = False
@@ -312,6 +313,7 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
                             fgcmStarIdCat['nObs'][:],
                             obsX=fgcmStarObservationCat['x'][obsIndex],
                             obsY=fgcmStarObservationCat['y'][obsIndex],
+                            psfCandidate=fgcmStarObservationCat['psf_candidate'][obsIndex],
                             refID=fgcmRefCat['fgcm_id'][:],
                             refMag=fgcmRefCat['refMag'][:, :],
                             refMagErr=fgcmRefCat['refMagErr'][:, :],

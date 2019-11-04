@@ -320,6 +320,12 @@ class FgcmcalTestBase(object):
         self.assertFloatsAlmostEqual(fluxes[0], refStruct.refCat['r_flux'][test[0]])
         self.assertFloatsAlmostEqual(fluxErrs[0], refStruct.refCat['r_fluxErr'][test[0]])
 
+        # Test the psf candidate counting, ratio should be between 0.0 and 1.0
+        candRatio = (refStruct.refCat['r_nPsfCandidate'].astype(np.float64) /
+                     refStruct.refCat['r_nTotal'].astype(np.float64))
+        self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
+        self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
+
         # Test the joincal_photoCalib output
 
         zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
@@ -466,7 +472,17 @@ class FgcmcalTestBase(object):
         # This will raise an exception if the catalog is not there.
         config = LoadIndexedReferenceObjectsConfig()
         config.ref_dataset_name = 'fgcm_stars_%d' % (tract)
-        task = LoadIndexedReferenceObjectsTask(butler, config=config)  # noqa F841
+        task = LoadIndexedReferenceObjectsTask(butler, config=config)
+
+        coord = geom.SpherePoint(320.0*geom.degrees, 0.0*geom.degrees)
+
+        refStruct = task.loadSkyCircle(coord, 5.0 * geom.degrees, filterName='r')
+
+        # Test the psf candidate counting, ratio should be between 0.0 and 1.0
+        candRatio = (refStruct.refCat['r_nPsfCandidate'].astype(np.float64) /
+                     refStruct.refCat['r_nTotal'].astype(np.float64))
+        self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
+        self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
 
     def _checkResult(self, result):
         """
