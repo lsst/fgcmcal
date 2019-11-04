@@ -85,7 +85,7 @@ def makeConfigDict(config, log, camera, maxIter,
     mirrorArea = np.pi*(camera.telescopeDiameter*100./2.)**2.
 
     # Get approximate average camera gain:
-    gains = [amp.getGain() for detector in camera for amp in detector.getAmpInfoCatalog()]
+    gains = [amp.getGain() for detector in camera for amp in detector.getAmplifiers()]
     cameraGain = float(np.median(gains))
 
     if tract is None:
