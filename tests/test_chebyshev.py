@@ -34,6 +34,7 @@ matplotlib.use("Agg")  # noqa E402
 import unittest
 import numpy as np
 
+import lsst.pex.exceptions
 import lsst.afw.math as afwMath
 import lsst.geom
 

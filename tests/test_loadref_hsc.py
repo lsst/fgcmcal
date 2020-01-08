@@ -31,6 +31,7 @@ import healpy as hp
 import esutil
 
 import lsst.utils
+import lsst.pex.exceptions
 import lsst.pipe.tasks
 import lsst.daf.persistence as dafPersist
 
@@ -42,7 +43,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
     def setUpClass(cls):
         try:
             cls.dataDir = lsst.utils.getPackageDir('testdata_jointcal')
-        except LookupError:
+        except lsst.pex.exceptions.NotFoundError:
             raise unittest.SkipTest("testdata_jointcal not setup")
 
     def setUp(self):
