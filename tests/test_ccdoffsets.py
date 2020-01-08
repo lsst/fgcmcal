@@ -37,7 +37,7 @@ class FgcmCcdOffsetsTest(lsst.utils.tests.TestCase):
     def setUpClass(cls):
         try:
             cls.dataDir = lsst.utils.getPackageDir('testdata_jointcal')
-        except lsst.pex.exceptions.NotFoundError:
+        except LookupError:
             raise unittest.SkipTest("testdata_jointcal not setup")
 
     def test_fgcmCcdOffsetsHsc(self):
