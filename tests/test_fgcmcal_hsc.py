@@ -57,9 +57,9 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
     def setUp(self):
         inputDir = os.path.join(self.dataDir, 'hsc')
 
-        self.testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
+        testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
 
-        self.setUp_base(inputDir=inputDir, testDir=self.testDir)
+        self.setUp_base(inputDir=inputDir, testDir=testDir)
 
         lsst.log.setLevel("HscMapper", lsst.log.FATAL)
 
