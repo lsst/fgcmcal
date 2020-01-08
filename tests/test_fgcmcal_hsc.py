@@ -49,6 +49,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
     def setUpClass(cls):
         try:
             cls.dataDir = lsst.utils.getPackageDir('testdata_jointcal')
+            os.environ['ASTROMETRY_NET_DATA_DIR'] = os.path.join(cls.dataDir, 'hsc_and_index')
         except LookupError:
             raise unittest.SkipTest("testdata_jointcal not setup")
 
