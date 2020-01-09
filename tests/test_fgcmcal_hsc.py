@@ -34,7 +34,6 @@ import tempfile
 import numpy as np
 
 import lsst.utils
-import lsst.pex.exceptions
 import lsst.pipe.tasks
 from lsst.pipe.tasks.colorterms import ColortermLibrary
 
@@ -50,16 +49,15 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
     def setUpClass(cls):
         try:
             cls.dataDir = lsst.utils.getPackageDir('testdata_jointcal')
-            os.environ['ASTROMETRY_NET_DATA_DIR'] = os.path.join(cls.dataDir, 'hsc_and_index')
-        except lsst.pex.exceptions.NotFoundError:
+        except LookupError:
             raise unittest.SkipTest("testdata_jointcal not setup")
 
     def setUp(self):
         inputDir = os.path.join(self.dataDir, 'hsc')
 
-        testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
+        self.testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
 
-        self.setUp_base(inputDir=inputDir, testDir=testDir)
+        self.setUp_base(inputDir=inputDir, testDir=self.testDir)
 
         lsst.log.setLevel("HscMapper", lsst.log.FATAL)
 
