@@ -447,7 +447,7 @@ def computeCcdOffsets(camera, defaultOrientation):
 
 def computeReferencePixelScale(camera):
     """
-    Compute the average pixel scale in the camera
+    Compute the median pixel scale in the camera
 
     Returns
     -------
