@@ -432,6 +432,22 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=bool,
         default=False,
     )
+    autoPhotometricCutNSig = pexConfig.Field(
+        doc=("Number of sigma for automatic computation of (low) photometric cut. "
+             "Cut is based on exposure gray width (per band), unless "
+             "useRepeatabilityForExpGrayCuts is set, in which case the star "
+             "repeatability is used (also per band)."),
+        dtype=float,
+        default=3.0,
+    )
+    autoHighCutNSig = pexConfig.Field(
+        doc=("Number of sigma for automatic computation of (high) outlier cut. "
+             "Cut is based on exposure gray width (per band), unless "
+             "useRepeatabilityForExpGrayCuts is set, in which case the star "
+             "repeatability is used (also per band)."),
+        dtype=float,
+        default=4.0,
+    )
     quietMode = pexConfig.Field(
         doc="Be less verbose with logging.",
         dtype=bool,
@@ -1024,11 +1040,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         # Save the zeropoint information and atmospheres only if desired
         if self.outputZeropoints:
-            if self.config.superStarSubCcd or self.config.ccdGraySubCcd:
-                chebSize = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_CHEB'].shape[1]
-            else:
-                chebSize = 0
-            zptSchema = makeZptSchema(chebSize)
+            superStarChebSize = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_SSTAR_CHEB'].shape[1]
+            zptChebSize = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_CHEB'].shape[1]
+
+            zptSchema = makeZptSchema(superStarChebSize, zptChebSize)
             zptCat = makeZptCat(zptSchema, fgcmFitCycle.fgcmZpts.zpStruct)
 
             butler.put(zptCat, 'fgcmZeropoints', fgcmcycle=self.config.cycleNumber)

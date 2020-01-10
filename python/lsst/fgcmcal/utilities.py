@@ -31,6 +31,7 @@ import numpy as np
 import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
+import lsst.afw.math as afwMath
 import lsst.geom as geom
 from lsst.obs.base import createInitialSkyWcs
 
@@ -48,7 +49,7 @@ def makeConfigDict(config, log, camera, maxIter,
         Configuration object
     log: `lsst.log.Log`
         LSST log object
-    camera: 'lsst.afw.cameraGeom.Camera`
+    camera: `lsst.afw.cameraGeom.Camera`
         Camera from the butler
     maxIter: `int`
         Maximum number of iterations
@@ -180,12 +181,15 @@ def makeConfigDict(config, log, camera, maxIter,
                   'instrumentSlopeMinDeltaT': config.instrumentSlopeMinDeltaT,
                   'fitMirrorChromaticity': config.fitMirrorChromaticity,
                   'useRepeatabilityForExpGrayCuts': config.useRepeatabilityForExpGrayCuts,
+                  'autoPhotometricCutNSig': config.autoPhotometricCutNSig,
+                  'autoHighCutNSig': config.autoHighCutNSig,
                   'printOnly': False,
                   'quietMode': config.quietMode,
                   'outputStars': False,
                   'clobber': True,
                   'useSedLUT': False,
                   'resetParameters': resetFitParameters,
+                  'outputFgcmcalZpts': True,  # when outputting zpts, use fgcmcal format
                   'outputZeropoints': outputZeropoints}
 
     return configDict
@@ -441,13 +445,88 @@ def computeCcdOffsets(camera, defaultOrientation):
     return ccdOffsets
 
 
-def makeZptSchema(chebyshevSize):
+def computeReferencePixelScale(camera):
+    """
+    Compute the median pixel scale in the camera
+
+    Returns
+    -------
+    pixelScale: `float`
+       Average pixel scale (arcsecond) over the camera
+    """
+
+    boresight = geom.SpherePoint(180.0*geom.degrees, 0.0*geom.degrees)
+    orientation = 0.0*geom.degrees
+    flipX = False
+
+    # Create a temporary visitInfo for input to createInitialSkyWcs
+    visitInfo = afwImage.VisitInfo(boresightRaDec=boresight,
+                                   boresightRotAngle=orientation,
+                                   rotType=afwImage.visitInfo.RotType.SKY)
+
+    pixelScales = np.zeros(len(camera))
+    for i, detector in enumerate(camera):
+        wcs = createInitialSkyWcs(visitInfo, detector, flipX)
+        pixelScales[i] = wcs.getPixelScale().asArcseconds()
+
+    ok, = np.where(pixelScales > 0.0)
+    return np.median(pixelScales[ok])
+
+
+def computeApproxPixelAreaFields(camera):
+    """
+    Compute the approximate pixel area bounded fields from the camera
+    geometry.
+
+    Parameters
+    ----------
+    camera: `lsst.afw.cameraGeom.Camera`
+
+    Returns
+    -------
+    approxPixelAreaFields: `dict`
+       Dictionary of approximate area fields, keyed with detector ID
+    """
+
+    areaScaling = 1. / computeReferencePixelScale(camera)**2.
+
+    # Generate fake WCSs centered at 180/0 to avoid the RA=0/360 problem,
+    # since we are looking for relative scales
+    boresight = geom.SpherePoint(180.0*geom.degrees, 0.0*geom.degrees)
+
+    flipX = False
+    # Create a temporary visitInfo for input to createInitialSkyWcs
+    # The orientation does not matter for the area computation
+    visitInfo = afwImage.VisitInfo(boresightRaDec=boresight,
+                                   boresightRotAngle=0.0*geom.degrees,
+                                   rotType=afwImage.visitInfo.RotType.SKY)
+
+    approxPixelAreaFields = {}
+
+    for i, detector in enumerate(camera):
+        key = detector.getId()
+
+        wcs = createInitialSkyWcs(visitInfo, detector, flipX)
+        bbox = detector.getBBox()
+
+        areaField = afwMath.PixelAreaBoundedField(bbox, wcs,
+                                                  unit=geom.arcseconds, scaling=areaScaling)
+        approxAreaField = afwMath.ChebyshevBoundedField.approximate(areaField)
+
+        approxPixelAreaFields[key] = approxAreaField
+
+    return approxPixelAreaFields
+
+
+def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
     """
     Make the zeropoint schema
 
     Parameters
     ----------
-    chebyshevSize: `int`
+    superStarChebyshevSize: `int`
+       Length of the superstar chebyshev array
+    zptChebyshevSize: `int`
        Length of the zeropoint chebyshev array
 
     Returns
@@ -469,12 +548,14 @@ def makeZptSchema(chebyshevSize):
     zptSchema.addField('fgcmZpt', type=np.float32, doc='FGCM zeropoint (center of CCD)')
     zptSchema.addField('fgcmZptErr', type=np.float32,
                        doc='Error on zeropoint, estimated from repeatability + number of obs')
-    if chebyshevSize > 0:
-        zptSchema.addField('fgcmfZptCheb', type='ArrayD',
-                           size=chebyshevSize,
-                           doc='Chebyshev parameters (flattened) for zeropoint')
-        zptSchema.addField('fgcmfZptChebXyMax', type='ArrayD', size=2,
-                           doc='maximum x/maximum y to scale to apply chebyshev parameters')
+    zptSchema.addField('fgcmfZptChebXyMax', type='ArrayD', size=2,
+                       doc='maximum x/maximum y to scale to apply chebyshev parameters')
+    zptSchema.addField('fgcmfZptCheb', type='ArrayD',
+                       size=zptChebyshevSize,
+                       doc='Chebyshev parameters (flattened) for zeropoint')
+    zptSchema.addField('fgcmfZptSstarCheb', type='ArrayD',
+                       size=superStarChebyshevSize,
+                       doc='Chebyshev parameters (flattened) for superStarFlat')
     zptSchema.addField('fgcmI0', type=np.float32, doc='Integral of the passband')
     zptSchema.addField('fgcmI10', type=np.float32, doc='Normalized chromatic integral')
     zptSchema.addField('fgcmR0', type=np.float32,
@@ -545,9 +626,9 @@ def makeZptCat(zptSchema, zpStruct):
     zptCat['fgcmFlag'][:] = zpStruct['FGCM_FLAG']
     zptCat['fgcmZpt'][:] = zpStruct['FGCM_ZPT']
     zptCat['fgcmZptErr'][:] = zpStruct['FGCM_ZPTERR']
-    if 'FGCM_FZPT_CHEB_XYMAX' in zpStruct.dtype.names:
-        zptCat['fgcmfZptCheb'][:, :] = zpStruct['FGCM_FZPT_CHEB']
-        zptCat['fgcmfZptChebXyMax'][:, :] = zpStruct['FGCM_FZPT_CHEB_XYMAX']
+    zptCat['fgcmfZptChebXyMax'][:, :] = zpStruct['FGCM_FZPT_XYMAX']
+    zptCat['fgcmfZptCheb'][:, :] = zpStruct['FGCM_FZPT_CHEB']
+    zptCat['fgcmfZptSstarCheb'][:, :] = zpStruct['FGCM_FZPT_SSTAR_CHEB']
     zptCat['fgcmI0'][:] = zpStruct['FGCM_I0']
     zptCat['fgcmI10'][:] = zpStruct['FGCM_I10']
     zptCat['fgcmR0'][:] = zpStruct['FGCM_R0']

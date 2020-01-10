@@ -239,7 +239,8 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
 
         # Note that we will need visitCat at the end of the procedure for the outputs
         groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(butler, dataRefs)
-        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(butler, groupedDataRefs)
+        camera = butler.get('camera')
+        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(camera, groupedDataRefs)
         fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                                  visitCat)
 
@@ -420,14 +421,12 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
             rep = fgcmFitCycle.fgcmPars.compReservedRawRepeatability[i] * 1000.0
             self.log.info("  Band %s, repeatability: %.2f mmag" % (band, rep))
 
-        # Do the outputs.  Need to keep track of tract, blah.
+        # Do the outputs.  Need to keep track of tract.
 
-        if self.config.fgcmFitCycle.superStarSubCcd or self.config.fgcmFitCycle.ccdGraySubCcd:
-            chebSize = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_CHEB'].shape[1]
-        else:
-            chebSize = 0
+        superStarChebSize = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_SSTAR_CHEB'].shape[1]
+        zptChebSize = fgcmFitCycle.fgcmZpts.zpStruct['FGCM_FZPT_CHEB'].shape[1]
 
-        zptSchema = makeZptSchema(chebSize)
+        zptSchema = makeZptSchema(superStarChebSize, zptChebSize)
         zptCat = makeZptCat(zptSchema, fgcmFitCycle.fgcmZpts.zpStruct)
 
         atmSchema = makeAtmSchema()

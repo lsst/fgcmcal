@@ -233,24 +233,24 @@ class FgcmcalTestBase(object):
         zps = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
 
         # Check the numbers of zeropoints in all, good, okay, and bad
-        self.assertEqual(nZp, len(zps))
+        self.assertEqual(len(zps), nZp)
 
         gd, = np.where(zps['fgcmFlag'] == 1)
-        self.assertEqual(nGoodZp, len(gd))
+        self.assertEqual(len(gd), nGoodZp)
 
         ok, = np.where(zps['fgcmFlag'] < 16)
-        self.assertEqual(nOkZp, len(ok))
+        self.assertEqual(len(ok), nOkZp)
 
         bd, = np.where(zps['fgcmFlag'] >= 16)
-        self.assertEqual(nBadZp, len(bd))
+        self.assertEqual(len(bd), nBadZp)
 
         # Check that there are no illegal values with the ok zeropoints
         test, = np.where(zps['fgcmZpt'][gd] < -9000.0)
-        self.assertEqual(0, len(test))
+        self.assertEqual(len(test), 0)
 
         stds = butler.get('fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
 
-        self.assertEqual(nStdStars, len(stds))
+        self.assertEqual(len(stds), nStdStars)
 
     def _testFgcmOutputProducts(self, visitDataRefName, ccdDataRefName, filterMapping,
                                 zpOffsets, testVisit, testCcd, testFilter, testBandIndex):
@@ -326,7 +326,7 @@ class FgcmcalTestBase(object):
         self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
         self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
 
-        # Test the joincal_photoCalib output
+        # Test the fgcm_photoCalib output
 
         zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
         selected = (zptCat['fgcmFlag'] < 16)

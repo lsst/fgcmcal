@@ -54,6 +54,8 @@ from lsst.meas.algorithms import IndexerRegistry
 from lsst.meas.algorithms import DatasetConfig
 from lsst.meas.algorithms.ingestIndexReferenceTask import addRefCatMetadata
 
+from .utilities import computeApproxPixelAreaFields
+
 import fgcm
 
 __all__ = ['FgcmOutputProductsConfig', 'FgcmOutputProductsTask', 'FgcmOutputProductsRunner']
@@ -91,6 +93,11 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         doc="Output zeropoints in fgcm_photoCalib format",
         dtype=bool,
         default=True,
+    )
+    doComposeWcsJacobian = pexConfig.Field(
+        doc="Compose Jacobian of WCS with fgcm calibration for output photoCalib?",
+        dtype=bool,
+        default=False,
     )
     refObjLoader = pexConfig.ConfigurableField(
         target=LoadIndexedReferenceObjectsTask,
@@ -299,6 +306,10 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
         self.filterMap = fgcmBuildStarsConfig.filterMap
 
+        if self.config.doComposeWcsJacobian and not fgcmBuildStarsConfig.doApplyWcsJacobian:
+            raise RuntimeError("Cannot compose the WCS jacobian if it hasn't been applied "
+                               "in fgcmBuildStarsTask.")
+
         # Make sure that the fit config exists, to retrieve bands and other info
         if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber):
             raise RuntimeError("Cannot find fgcmFitCycle_config from cycle %d " % (self.config.cycleNumber) +
@@ -306,8 +317,6 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
         self.bands = fitCycleConfig.bands
-        self.superStarSubCcd = fitCycleConfig.superStarSubCcd
-        self.chebyshevOrder = fitCycleConfig.superStarSubCcdChebyshevOrder
 
         if self.config.doReferenceCalibration and fitCycleConfig.doReferenceCalibration:
             self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
@@ -355,6 +364,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         if self.config.doZeropointOutput:
             zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
             visitCat = butler.get('fgcmVisitCatalog')
+
             self._outputZeropoints(butler, zptCat, visitCat, offsets)
 
         # Output the atmospheres
@@ -394,8 +404,6 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         """
 
         self.bands = fgcmFitCycleConfig.bands
-        self.superStarSubCcd = fgcmFitCycleConfig.superStarSubCcd
-        self.chebyshevOrder = fgcmFitCycleConfig.superStarSubCcdChebyshevOrder
         self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
         self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
         self.filterMap = fgcmBuildStarsConfig.filterMap
@@ -403,6 +411,10 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         if self.config.doReferenceCalibration and fgcmFitCycleConfig.doReferenceCalibration:
             self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
                           "fitCycleConfig.doReferenceCalibration")
+
+        if self.config.doComposeWcsJacobian and not fgcmBuildStarsConfig.doApplyWcsJacobian:
+            raise RuntimeError("Cannot compose the WCS jacobian if it hasn't been applied "
+                               "in fgcmBuildStarsTask.")
 
         if self.config.doReferenceCalibration:
             offsets = self._computeReferenceOffsets(butler, stdCat)
@@ -722,7 +734,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         butler: `lsst.daf.persistence.Butler`
         zptCat: `lsst.afw.table.BaseCatalog`
            FGCM zeropoint catalog from `FgcmFitCycleTask`
-        visitCat: lsst.afw.table.BaseCatalog`
+        visitCat: `lsst.afw.table.BaseCatalog`
            FGCM visitCat from `FgcmBuildStarsTask`
         offsets: `numpy.array`
            Float array of absolute calibration offsets, one for each filter
@@ -771,24 +783,39 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         for rec in visitCat:
             scalingMapping[rec['visit']] = rec['scaling']
 
+        if self.config.doComposeWcsJacobian:
+            approxPixelAreaFields = computeApproxPixelAreaFields(camera)
+
         for rec in zptCat[selected]:
 
-            if self.superStarSubCcd:
-                # Spatially varying zeropoint
+            # Retrieve overall scaling
+            scaling = scalingMapping[rec['visit']][ccdMapping[rec['ccd']]]
 
-                scaling = scalingMapping[rec['visit']][ccdMapping[rec['ccd']]]
-                photoCalib = self._getChebyshevPhotoCalib(rec['fgcmfZptCheb'],
-                                                          rec['fgcmZptErr'],
+            fgcmSuperStarField = self._getChebyshevBoundedField(rec['fgcmfZptSstarCheb'],
+                                                                rec['fgcmfZptChebXyMax'])
+            # Convert from FGCM AB to nJy
+            fgcmZptField = self._getChebyshevBoundedField((rec['fgcmfZptCheb']*units.AB).to_value(units.nJy),
                                                           rec['fgcmfZptChebXyMax'],
-                                                          offsetMapping[rec['filtername']],
-                                                          scaling)
-            else:
-                # Spatially constant zeropoint
+                                                          offset=offsetMapping[rec['filtername']],
+                                                          scaling=scaling)
 
-                scaling = scalingMapping[rec['visit']][ccdMapping[rec['ccd']]]
-                photoCalib = self._getConstantPhotoCalib(rec['fgcmZpt'], rec['fgcmZptErr'],
-                                                         offsetMapping[rec['filtername']],
-                                                         scaling)
+            if self.config.doComposeWcsJacobian:
+
+                fgcmField = afwMath.ProductBoundedField([approxPixelAreaFields[rec['ccd']],
+                                                         fgcmSuperStarField,
+                                                         fgcmZptField])
+            else:
+                # The photoCalib is just the product of the fgcmSuperStarField and the
+                # fgcmZptField
+                fgcmField = afwMath.ProductBoundedField([fgcmSuperStarField, fgcmZptField])
+
+            # The "mean" calibration will be set to the center of the ccd for reference
+            calibCenter = fgcmField.evaluate(fgcmField.getBBox().getCenter())
+            calibErr = (np.log(10.0) / 2.5) * calibCenter * rec['fgcmZptErr']
+            photoCalib = afwImage.PhotoCalib(calibrationMean=calibCenter,
+                                             calibrationErr=calibErr,
+                                             calibration=fgcmField,
+                                             isConstant=False)
 
             if tract is None:
                 butler.put(photoCalib, datasetType,
@@ -804,75 +831,39 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         self.log.info("Done outputting %s objects" % (datasetType))
 
-    def _getChebyshevPhotoCalib(self, coefficients, err, xyMax, offset, scaling):
+    def _getChebyshevBoundedField(self, coefficients, xyMax, offset=0.0, scaling=1.0):
         """
-        Get the PhotoCalib object from a chebyshev polynomial zeropoint.
+        Make a ChebyshevBoundedField from fgcm coefficients, with optional offset
+        and scaling.
 
         Parameters
         ----------
         coefficients: `numpy.array`
            Flattened array of chebyshev coefficients
-        err: `float`
-           Error on zeropoint
         xyMax: `list` of length 2
            Maximum x and y of the chebyshev bounding box
-        offset: `float`
-           Absolute calibration offset
-        scaling: `float`
-           Flat scaling value from fgcmBuildStars
+        offset: `float`, optional
+           Absolute calibration offset.  Default is 0.0
+        scaling: `float`, optional
+           Flat scaling value from fgcmBuildStars.  Default is 1.0
 
         Returns
         -------
-        photoCalib: `afwImage.PhotoCalib`
+        boundedField: `lsst.afw.math.ChebyshevBoundedField`
         """
 
-        orderPlus1 = self.chebyshevOrder + 1
+        orderPlus1 = int(np.sqrt(coefficients.size))
         pars = np.zeros((orderPlus1, orderPlus1))
 
         bbox = lsst.geom.Box2I(lsst.geom.Point2I(0.0, 0.0),
                                lsst.geom.Point2I(*xyMax))
-        # Take the zeropoint, apply the absolute relative calibration offset,
-        # and whatever flat-field scaling was applied
+
         pars[:, :] = (coefficients.reshape(orderPlus1, orderPlus1) *
-                      (offset*units.ABmag).to_value(units.nJy) * scaling)
+                      (10.**(offset / -2.5)) * scaling)
 
-        field = afwMath.ChebyshevBoundedField(bbox, pars)
-        calibMean = field.mean()
+        boundedField = afwMath.ChebyshevBoundedField(bbox, pars)
 
-        calibErr = (np.log(10.) / 2.5) * calibMean * err
-
-        photoCalib = afwImage.PhotoCalib(field, calibErr)
-
-        return photoCalib
-
-    def _getConstantPhotoCalib(self, zeropoint, err, offset, scaling):
-        """
-        Get the PhotoCalib object from a constant zeropoint.
-
-        Parameters
-        ----------
-        zeropoint: `float`
-           Zeropoint value (mag)
-        err: `float`
-           Error on zeropoint
-        offset: `float`
-           Absolute calibration offset
-        scaling: `float`
-           Flat scaling value from fgcmBuildStars
-
-        Returns
-        -------
-        photoCalib: `afwImage.PhotoCalib`
-        """
-
-        # Take the zeropoint, apply the absolute relative calibration offset,
-        # and whatever flat-field scaling was applied
-
-        calibMean = ((zeropoint + offset)*units.ABmag).to_value(units.nJy) * scaling
-        calibErr = (np.log(10.) / 2.5) * calibMean * err
-        photoCalib = afwImage.PhotoCalib(calibMean, calibErr)
-
-        return photoCalib
+        return boundedField
 
     def _outputAtmospheres(self, butler, atmCat, tract=None):
         """
