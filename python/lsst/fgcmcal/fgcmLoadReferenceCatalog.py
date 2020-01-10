@@ -85,8 +85,8 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
     """
     Load multi-band reference objects from a reference catalog.
 
-    Paramters
-    ---------
+    Parameters
+    ----------
     butler: `lsst.daf.persistence.Butler`
        Data butler for reading catalogs
     """
@@ -114,7 +114,14 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         Get a reference catalog that overlaps a healpix pixel, using multiple
         filters.  In addition, apply colorterms if available.
 
-        Return format is a numpy recarray for use with fgcm.
+        Return format is a numpy recarray for use with fgcm, with the format:
+
+        dtype = ([('ra', `np.float64`),
+                  ('dec', `np.float64`),
+                  ('refMag', `np.float32`, len(filterList)),
+                  ('refMagErr', `np.float32`, len(filterList)])
+
+        Reference magnitudes (AB) will be 99 for non-detections.
 
         Parameters
         ----------
@@ -130,17 +137,6 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         Returns
         -------
         fgcmRefCat: `np.recarray`
-           Numpy recarray with the following fields:
-           ra: `np.float64`
-              Right ascension, degrees
-           dec: `np.float64`
-              Declination, degrees
-           refMag: (`np.float32`, len(filterList))
-              Reference magnitude for filterList bands
-              Will be 99 for non-detections.
-           refMagErr: (`np.float32`, len(filterList))
-              Reference magnitude error for filterList bands
-              Will be 99 for non-detections.
         """
 
         # Determine the size of the sky circle to load
@@ -176,6 +172,13 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
 
         Return format is a numpy recarray for use with fgcm.
 
+        dtype = ([('ra', `np.float64`),
+                  ('dec', `np.float64`),
+                  ('refMag', `np.float32`, len(filterList)),
+                  ('refMagErr', `np.float32`, len(filterList)])
+
+        Reference magnitudes (AB) will be 99 for non-detections.
+
         Parameters
         ----------
         ra: `float`
@@ -190,17 +193,6 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         Returns
         -------
         fgcmRefCat: `np.recarray`
-           Numpy recarray with the following fields:
-           ra: `np.float64`
-              Right ascension, degrees
-           dec: `np.float64`
-              Declination, degrees
-           refMag: (`np.float32`, len(filterList))
-              Reference magnitude for filterList bands
-              Will be 99 for non-detections.
-           refMagErr: (`np.float32`, len(filterList))
-              Reference magnitude error for filterList bands
-              Will be 99 for non-detections.
         """
 
         center = lsst.geom.SpherePoint(ra * lsst.geom.degrees, dec * lsst.geom.degrees)

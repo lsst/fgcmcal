@@ -49,8 +49,9 @@ class SedboundarytermDict(Config):
 
     To construct a SedboundarytermDict use keyword arguments:
     SedboundarytermDict(data=dataDict)
-    where dataDict is a Python dict of name to Sedterm
+    where dataDict is a Python dict of name: Sedterm
     For example:
+
     SedboundarytermDict(data={
         'gr': Sedboundaryterm(primary="g", secondary="r"),
         'ri': Sedboundaryterm(primary="r", secondary="i"),
@@ -89,9 +90,12 @@ class Sedterm(Config):
     primaryBand, secondaryBand, and tertiaryBand are band names.
 
     To construct a Sedterm, use keyword arguments:
+
     Sedterm(primaryTerm=primaryTermName, secondaryTerm=secondaryTermName,
             extrapolated=False, constant=1.0)
+
     or
+
     Sedterm(primaryTerm=primaryTermName, secondaryTerm=secondaryTermName,
             extrapolated=True, constant=1.0, primaryBand=primaryBandName,
             secondaryBand=secondaryBandName, tertiaryBand=tertiaryBandName)
@@ -128,6 +132,7 @@ class SedtermDict(Config):
     SedtermDict(data=dataDict)
     where dataDict is a Python dict of band to Sedterm
     For example:
+
     SedtermDict(data={
         'g': Sedterm(primaryTerm='gr', secondaryTerm='ri', extrapolated=True, constant=0.25,
                      primaryBand='g', secondaryBand='r', tertiaryBand='i'),
