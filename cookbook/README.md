@@ -106,20 +106,25 @@ In order to make the fit cycles tractable without redoing processor-intensive
 steps, all data are collated and star observations are matched and indexed
 before the fit runs are started.  Depending on how many visits are being
 processed, and where the data are located, this step can take quite a while.
-(In the future, with a database backend for the butler, I believe this step
+(In the future, with a database backend for the Gen3 butler, I believe this step
 will be much faster).
 
-The FGCM code can run on a list of visits specified by the `--id` parameter on
-the command line, or it can search the input repository for all visits with
-`src` catalogs generated from `calexps`.  Be aware that FGCM uses **entire
-visits** even if only one CCD is specified.  Also note that input processing
-will be much faster if you specify a single CCD with the visits if `--id` is
-used.  E.g., `--id visit=13376^13450 ccd=13`.  For HSC, using a reference CCD
-to scan for available `src` catalogs speeds things up by x100, which is
-necessary.  You can also specify by field or other valid dataId. A [sample
-config](fgcmBuildStarsHsc.py) for HSC is available.
+The FGCM code runs on calexp source catalogs from visits constrained by the
+`--id` parameter on the command line.  Best results are obtained when FGCM is
+run with **full visits**.  Due to limitations in the Gen2 Butler (the only
+Butler currently supported by `fgcmcal`), optimal performance is obtained by
+specifying a single "reference" ccd on the command line (e.g. `ccd=13`) and
+setting the config variable `checkAllCcds = True` (which is the default).  The
+alternative is to specify all the desired CCDs and set `checkAllCcds=False`,
+e.g., "--ccd 0..8^10..103".  However, this is slower than the first option, and
+the improvement in speed in the first option is greater the more visits are
+specified.  If instead you want to process all the visits in a rerun selected
+by filter, field, or some other dataid field, then by using a reference ccd and
+setting `checkAllCcds=True` you can speed things up by a factor of
+approximately 100 relative to the alternative (naming CCDs specifically).  For
+config settings, please see the [sample config](fgcmBuildStarsHsc.py).
 
-If `doReferenceCalibration = True` in the configuration (the new default), then
+If `doReferenceCalibration = True` in the configuration (the default), then
 stars from a reference catalog (e.g. PS1) will be loaded and matched to the
 internal stars.  The signal-to-noise cut specified here should be the minimum
 one expects to use in the actual fit, and the fit may also be performed without
@@ -132,9 +137,9 @@ on `lsst-dev01`:
 
 ```bash
 fgcmBuildStars.py /datasets/hsc/repo --rerun \
-private/${USER}/${COOKBOOKRERUN}/lut:private/${USER}/${COOKBOOKRERUN}/wide \
---configfile $FGCMCAL_DIR/cookbook/fgcmBuildStarsHsc.py --id field=SSP_WIDE ccd=13 \
-filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y
+private/${USER}/${COOKBOOKRERUN}/lut:private/${USER}/${COOKBOOKRERUN}/wide+deep \
+--configfile $FGCMCAL_DIR/cookbook/fgcmBuildStarsHsc.py \
+--id ccd=13 filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y
 ```
 
 ## Running a Fit Cycle
@@ -176,7 +181,7 @@ run on `lsst-dev01`.
 
 ```bash
 fgcmFitCycle.py /datasets/hsc/repo --rerun \
-private/${USER}/${COOKBOOKRERUN}/wide:private/${USER}/${COOKBOOKRERUN}/fit1 \
+private/${USER}/${COOKBOOKRERUN}/wide+deep:private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile $FGCMCAL_DIR/cookbook/fgcmFitCycleHscCookbook_cycle00_config.py \
 |& tee fgcmFitCycleHscCookbook_cycle00.log
 ```

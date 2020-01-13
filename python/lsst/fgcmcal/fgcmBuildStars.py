@@ -118,11 +118,12 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         default=13,
     )
     checkAllCcds = pexConfig.Field(
-        doc=("Check repo for existence of all possible ccds, in case when we have "
-             "incomplete visits and the referenceCCD will be missing.  Primarily "
-             "used in testing."),
+        doc=("Check repo for all CCDs for each visit specified.  To be used when the "
+             "full set of ids (visit/ccd) are not specified on the command line.  For "
+             "Gen2, specifying one ccd and setting checkAllCcds=True is significantly "
+             "faster than the alternatives."),
         dtype=bool,
-        default=False,
+        default=True,
     )
     visitDataRefName = pexConfig.Field(
         doc="dataRef name for the 'visit' field",
@@ -313,7 +314,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         """Create an argument parser"""
 
         parser = pipeBase.ArgumentParser(name=cls._DefaultName)
-        parser.add_id_argument("--id", "calexp", help="Data ID, e.g. --id visit=6789 (optional)")
+        parser.add_id_argument("--id", "calexp", help="Data ID, e.g. --id visit=6789")
 
         return parser
 
@@ -506,41 +507,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # will be unnecessary with Gen3 Butler.  This should be part of
         # DM-13730.
 
-        # Note that self.config.checkAllCcds means that we will check the repo
-        # for existence of all possible ccds for each (incomplete) visit, in cases
-        # when the referenceCCD will be missing (primarily during testing).
-
-        # scanAllCcds is a local flag that is set when the dataRefs do not include
-        # all relevant ccds.
-
-        scanAllCcds = False
-        if len(dataRefs) == 0:
-            if not self.config.checkAllCcds:
-                # These dataRefs include all possible visits, for each
-                # referenceCCD.  This is much faster than scanning through
-                # all CCDs when none of them have been processed in a given repo.
-                dataRefs = butler.subset('src',
-                                         dataId={self.config.ccdDataRefName:
-                                                 self.config.referenceCCD})
-                scanAllCcds = True
-            else:
-                # These dataRefs include all possible ccds
-                # Note that in the Gen2 era (at least) a valid dataRef in a subset
-                # only says that a given raw is available, and the src may not
-                # be accessible or processed in a specific repo.
-                dataRefs = butler.subset('src')
-        elif self.config.checkAllCcds:
-            scanAllCcds = True
-
         groupedDataRefs = {}
         for dataRef in dataRefs:
             visit = dataRef.dataId[self.config.visitDataRefName]
             # If we don't have the dataset, just continue
             if not dataRef.datasetExists(datasetType='src'):
                 continue
-            # If we need to scan all ccds, do it here
-            if scanAllCcds:
+            # If we need to check all ccds, do it here
+            if self.config.checkAllCcds:
                 dataId = dataRef.dataId.copy()
+                # For each ccd we must check that a valid source catalog exists.
                 for ccdId in ccdIds:
                     dataId[self.config.ccdDataRefName] = ccdId
                     if butler.datasetExists('src', dataId=dataId):
@@ -552,6 +528,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                         else:
                             groupedDataRefs[visit] = [goodDataRef]
             else:
+                # We have already confirmed that the dataset exists, so no need
+                # to check here.
                 if visit in groupedDataRefs:
                     if (dataRef.dataId[self.config.ccdDataRefName] not in
                        [d.dataId[self.config.ccdDataRefName] for d in groupedDataRefs[visit]]):
@@ -567,8 +545,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             else:
                 return ccdId
 
-        # If we did not scan all ccds, put them in ccd order
-        if not scanAllCcds:
+        # If we did not check all ccds, put them in ccd order
+        if not self.config.checkAllCcds:
             for visit in groupedDataRefs:
                 groupedDataRefs[visit] = sorted(groupedDataRefs[visit], key=ccdSorter)
 
