@@ -31,6 +31,8 @@ config.matchNside = 4096
 config.primaryBands = ['i']
 # Match reference catalog as additional constraint on calibration
 config.doReferenceMatches = True
+# Subtract the local background before performing calibration?
+config.doSubtractLocalBackground = True
 
 # Reference object loader configuration parameters
 config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'

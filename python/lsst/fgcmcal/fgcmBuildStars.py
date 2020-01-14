@@ -159,6 +159,21 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=str,
         default="calib_psf_candidate"
     )
+    doSubtractLocalBackground = pexConfig.Field(
+        doc="Subtract the local background before performing calibration?",
+        dtype=bool,
+        default=False
+    )
+    calibFluxApertureRadius = pexConfig.Field(
+        doc="Calibration flux aperture radius (pixels)",
+        dtype=float,
+        default=12.0
+    )
+    localBackgroundFluxField = pexConfig.Field(
+        doc="Name of the local background instFlux field to use.",
+        dtype=str,
+        default='base_LocalBackground_instFlux'
+    )
     sourceSelector = sourceSelectorRegistry.makeField(
         doc="How to select sources",
         default="science"
@@ -199,6 +214,10 @@ class FgcmBuildStarsConfig(pexConfig.Config):
                                     'slot_Centroid_flag',
                                     fluxFlagName]
 
+        if self.doSubtractLocalBackground:
+            localBackgroundFlagName = self.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
+            sourceSelector.flags.bad.append(localBackgroundFlagName)
+
         sourceSelector.doFlags = True
         sourceSelector.doUnresolved = True
         sourceSelector.doSignalToNoise = True
@@ -210,7 +229,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         sourceSelector.signalToNoise.maximum = 1000.0
 
         # FGCM operates on unresolved sources, and this setting is
-        # appropriate for the current base_classificationExtendedness
+        # appropriate for the current base_ClassificationExtendedness
         sourceSelector.unresolved.maximum = 0.5
 
 
@@ -600,6 +619,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         instMagKey = outputSchema['instMag'].asKey()
         instMagErrKey = outputSchema['instMagErr'].asKey()
 
+        # Prepare local background if desired
+        if self.config.doSubtractLocalBackground:
+            localBackgroundFluxKey = sourceSchema[self.config.localBackgroundFluxField].asKey()
+            localBackgroundArea = np.pi * self.config.calibFluxApertureRadius**2.
+        else:
+            localBackground = 0.0
+
         aperOutputSchema = aperMapper.getOutputSchema()
 
         instFluxAperInKey = sourceSchema[self.config.apertureInnerInstFluxField].asKey()
@@ -610,6 +636,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         instMagErrInKey = aperOutputSchema['instMagErr_aper_inner'].asKey()
         instMagOutKey = aperOutputSchema['instMag_aper_outer'].asKey()
         instMagErrOutKey = aperOutputSchema['instMagErr_aper_outer'].asKey()
+
+        k = 2.5 / np.log(10.)
 
         # loop over visits
         for visit in visitCat:
@@ -626,6 +654,25 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 sources = dataRef.get(datasetType='src', flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
 
+                # If we are subtracting the local background, then correct here
+                # before we do the s/n selection.  This ensures we do not have
+                # bad stars after local background subtraction.
+
+                if self.config.doSubtractLocalBackground:
+                    # At the moment we only adjust the flux and not the flux
+                    # error by the background because the error on
+                    # base_LocalBackground_instFlux is the rms error in the
+                    # background annulus, not the error on the mean in the
+                    # background estimate (which is much smaller, by sqrt(n)
+                    # pixels used to estimate the background, which we do not
+                    # have access to in this task).  In the default settings,
+                    # the annulus is sufficiently large such that these
+                    # additional errors are are negligibly small (much less
+                    # than a mmag in quadrature).
+
+                    localBackground = localBackgroundArea * sources[localBackgroundFluxKey]
+                    sources[instFluxKey] -= localBackground
+
                 goodSrc = self.sourceSelector.selectSources(sources)
 
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
@@ -633,12 +680,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat.extend(sources[goodSrc.selected], mapper=sourceMapper)
                 tempCat[visitKey][:] = visit['visit']
                 tempCat[ccdKey][:] = ccdId
-                # Compute "magnitude" by scaling flux with exposure time.
-                # Add an arbitrary zeropoint that needs to be investigated.
-                scaledInstFlux = sources[instFluxKey][goodSrc.selected] * visit['scaling'][ccdMapping[ccdId]]
+
+                # Compute "instrumental magnitude" by scaling flux with exposure time.
+                scaledInstFlux = (sources[instFluxKey][goodSrc.selected] *
+                                  visit['scaling'][ccdMapping[ccdId]])
                 tempCat[instMagKey][:] = (-2.5 * np.log10(scaledInstFlux) + 2.5 * np.log10(expTime))
-                # instMagErr is computed with original (unscaled) flux
-                k = 2.5 / np.log(10.)
+
+                # Compute instMagErr from instFluxErr / instFlux, any scaling
+                # will cancel out.
+
                 tempCat[instMagErrKey][:] = k * (sources[instFluxErrKey][goodSrc.selected] /
                                                  sources[instFluxKey][goodSrc.selected])
 
