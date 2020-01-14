@@ -911,7 +911,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         schema = afwTable.Schema()
         schema.addField('visit', type=np.int32, doc="Visit number")
         # Note that the FGCM code currently handles filternames up to 2 characters long
-        schema.addField('filtername', type=str, size=2, doc="Filter name")
+        schema.addField('filtername', type=str, size=10, doc="Filter name")
         schema.addField('telra', type=np.float64, doc="Pointing RA (deg)")
         schema.addField('teldec', type=np.float64, doc="Pointing Dec (deg)")
         schema.addField('telha', type=np.float64, doc="Pointing Hour Angle (deg)")

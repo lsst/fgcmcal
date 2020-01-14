@@ -592,7 +592,7 @@ def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
     zptSchema.addField('fgcmFlat', type=np.float32, doc='Superstarflat illumination correction')
     zptSchema.addField('fgcmAperCorr', type=np.float32, doc='Aperture correction estimated by fgcm')
     zptSchema.addField('exptime', type=np.float32, doc='Exposure time')
-    zptSchema.addField('filtername', type=str, size=2, doc='Filter name')
+    zptSchema.addField('filtername', type=str, size=10, doc='Filter name')
 
     return zptSchema
 
