@@ -6,6 +6,8 @@ import os.path
 
 from lsst.utils import getPackageDir
 
+# Check repo for all CCDs for each visit
+config.checkAllCcds = True
 # Minimum number of observations per band for a star to be considered for calibration
 config.minPerBand = 2
 # Match radius to associate stars from src catalogs (arcseconds)

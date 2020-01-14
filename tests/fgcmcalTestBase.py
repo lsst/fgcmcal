@@ -144,14 +144,14 @@ class FgcmcalTestBase(object):
 
         self.assertFloatsAlmostEqual(i10Recon, i1 / i0, msg='i10Recon', rtol=1e-5)
 
-    def _testFgcmBuildStars(self, nVisit, nStar, nObs):
+    def _testFgcmBuildStars(self, visits, nStar, nObs):
         """
         Test running of FgcmBuildStarsTask
 
         Parameters
         ----------
-        nVisit: `int`
-           Number of visits expected
+        visits: `list`
+           List of visits to calibrate
         nStar: `int`
            Number of stars expected
         nObs: `int`
@@ -163,6 +163,7 @@ class FgcmcalTestBase(object):
         """
 
         args = [self.inputDir, '--output', self.testDir,
+                '--id', 'visit='+'^'.join([str(visit) for visit in visits]),
                 '--doraise']
         args.extend(self.otherArgs)
 
@@ -172,7 +173,7 @@ class FgcmcalTestBase(object):
         butler = dafPersist.butler.Butler(self.testDir)
 
         visitCat = butler.get('fgcmVisitCatalog')
-        self.assertEqual(nVisit, len(visitCat))
+        self.assertEqual(len(visits), len(visitCat))
 
         starIds = butler.get('fgcmStarIds')
         self.assertEqual(nStar, len(starIds))

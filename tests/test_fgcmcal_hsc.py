@@ -88,11 +88,13 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.fillDefaultBuildStarsConfig(self.config, visitDataRefName, ccdDataRefName)
         self.otherArgs = []
 
-        nVisit = 11
+        visits = [903334, 903336, 903338, 903342, 903344, 903346,
+                  903986, 903988, 903990, 904010, 904014]
+
         nStar = 472
         nObs = 5431
 
-        self._testFgcmBuildStars(nVisit, nStar, nObs)
+        self._testFgcmBuildStars(visits, nStar, nObs)
 
         # Perform the fit cycle
         self.config = fgcmcal.FgcmFitCycleConfig()
@@ -170,7 +172,6 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self.config = fgcmcal.FgcmCalibrateTractConfig()
         self.fillDefaultBuildStarsConfig(self.config.fgcmBuildStars, visitDataRefName, ccdDataRefName)
-        self.config.fgcmBuildStars.checkAllCcds = False
         self.fillDefaultFitCycleConfig(self.config.fgcmFitCycle)
         self.config.maxFitCycles = 3
 
@@ -233,7 +234,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         config.filterMap = {'r': 'r', 'i': 'i'}
         config.requiredBands = ['r', 'i']
         config.primaryBands = ['i']
-        config.checkAllCcds = True
+        config.checkAllCcds = False
         config.coarseNside = 64
         config.visitDataRefName = visitDataRefName
         config.ccdDataRefName = ccdDataRefName
