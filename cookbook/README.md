@@ -115,12 +115,12 @@ run with **full visits**.  Due to limitations in the Gen2 Butler (the only
 Butler currently supported by `fgcmcal`), optimal performance is obtained by
 specifying a single "reference" ccd on the command line (e.g. `ccd=13`) and
 setting the config variable `checkAllCcds = True` (which is the default).  The
-alternative is to specify all the desired CCDs and set `checkAllCcds=False`,
-e.g., "--ccd 0..8^10..103".  However, this is slower than the first option, and
+alternative is to specify all the desired CCDs and set `checkAllCcds = False`,
+e.g., "ccd=0..8^10..103".  However, this is slower than the first option, and
 the improvement in speed in the first option is greater the more visits are
 specified.  If instead you want to process all the visits in a rerun selected
 by filter, field, or some other dataid field, then by using a reference ccd and
-setting `checkAllCcds=True` you can speed things up by a factor of
+setting `checkAllCcds = True` you can speed things up by a factor of
 approximately 100 relative to the alternative (naming CCDs specifically).  For
 config settings, please see the [sample config](fgcmBuildStarsHsc.py).
 
