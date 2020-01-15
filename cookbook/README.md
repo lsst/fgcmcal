@@ -146,9 +146,9 @@ private/${USER}/${COOKBOOKRERUN}/lut:private/${USER}/${COOKBOOKRERUN}/wide+deep 
 
 ### The First Fit Cycle (Cycle 0)
 
-See the [sample config](fgcmFitCycleHsc_cycle00_config.py) for a sample config
-file.  In this config is a place to describe the observational epochs (divided
-by MJD) which should correspond to changes in observing (years, camera
+See the [sample config](fgcmFitCycleHscCookbook_cycle00_config.py) for a sample
+config file.  In this config is a place to describe the observational epochs
+(divided by MJD) which should correspond to changes in observing (years, camera
 warm-ups, etc), preferably coordinated with when new flat-fields were
 generated.  At the moment flats are regenerated for HSC every couple of weeks
 which is too frequent for a good fit from FGCM.  This is being
