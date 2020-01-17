@@ -50,6 +50,12 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
         target=LoadIndexedReferenceObjectsTask,
         doc="Reference object loader for photometry",
     )
+    refFilterMap = pexConfig.DictField(
+        doc="Mapping from camera 'filterName` to reference filter name.",
+        keytype=str,
+        itemtype=str,
+        default={},
+    )
     applyColorTerms = pexConfig.Field(
         doc=("Apply photometric color terms to reference stars?"
              "Requires that colorterms be set to a ColorTermLibrary"),
@@ -67,6 +73,9 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
 
     def validate(self):
         super().validate()
+        if not self.refFilterMap:
+            msg = 'Must set refFilterMap'
+            raise pexConfig.FieldValidationError(FgcmLoadReferenceCatalogConfig.refFilterMap, self, msg)
         if self.applyColorTerms and len(self.colorterms.data) == 0:
             msg = "applyColorTerms=True requires the `colorterms` field be set to a ColortermLibrary."
             raise pexConfig.FieldValidationError(FgcmLoadReferenceCatalogConfig.colorterms, self, msg)
@@ -305,11 +314,19 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         foundReferenceFilter = False
         for filterName in filterList:
             try:
+                refFilterName = self.config.refFilterMap[filterName]
+            except KeyError:
+                # It is okay to not have a match in the reference catalog, but warn
+                self.log.warn(f'Camera filter {filterName} not defined in refFilterMap')
+                # Go to the next filterName
+                continue
+
+            try:
                 results = self.refObjLoader.loadSkyCircle(center,
                                                           0.05 * lsst.geom.degrees,
-                                                          filterName)
+                                                          refFilterName)
                 foundReferenceFilter = True
-                self._referenceFilter = filterName
+                self._referenceFilter = refFilterName
                 break
             except RuntimeError:
                 # This just means that the filterName wasn't listed
@@ -324,9 +341,19 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         self._fluxFields = []
         for filterName in filterList:
             try:
-                fluxField = getRefFluxField(results.refCat.schema, filterName=filterName)
-            except RuntimeError:
-                # This flux field isn't available.  Set to None
+                refFilterName = self.config.refFilterMap[filterName]
+            except KeyError:
+                refFilterName = None
                 fluxField = None
+
+            if refFilterName is not None:
+                try:
+                    fluxField = getRefFluxField(results.refCat.schema, filterName=refFilterName)
+                except RuntimeError:
+                    # This flux field isn't available.  Set to None
+                    fluxField = None
+
+            if fluxField is None:
+                self.log.warn(f'No reference flux field for camera filter {filterName}')
 
             self._fluxFields.append(fluxField)
