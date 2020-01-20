@@ -358,7 +358,7 @@ def translateVisitCatalog(visitCat):
                                                  ('TELDEC', 'f8'),
                                                  ('TELROT', 'f8'),
                                                  ('PMB', 'f8'),
-                                                 ('FILTERNAME', 'a2')])
+                                                 ('FILTERNAME', 'a10')])
     fgcmExpInfo['VISIT'][:] = visitCat['visit']
     fgcmExpInfo['MJD'][:] = visitCat['mjd']
     fgcmExpInfo['EXPTIME'][:] = visitCat['exptime']
