@@ -43,7 +43,7 @@ from lsst.daf.base.dateTime import DateTime
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
 from .fgcmLoadReferenceCatalog import FgcmLoadReferenceCatalogTask
-from .utilities import computeApproxPixelAreaFields
+from .utilities import computeApproxPixelAreaFields, computeApertureRadius
 
 import fgcm
 
@@ -160,14 +160,10 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         default="calib_psf_candidate"
     )
     doSubtractLocalBackground = pexConfig.Field(
-        doc="Subtract the local background before performing calibration?",
+        doc=("Subtract the local background before performing calibration? "
+             "This is only supported for circular aperture calibration fluxes."),
         dtype=bool,
         default=False
-    )
-    calibFluxApertureRadius = pexConfig.Field(
-        doc="Calibration flux aperture radius (pixels)",
-        dtype=float,
-        default=12.0
     )
     localBackgroundFluxField = pexConfig.Field(
         doc="Name of the local background instFlux field to use.",
@@ -360,13 +356,25 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         Raises
         ------
         RuntimeErrror: Raised if `config.doReferenceMatches` is set and
-           an fgcmLookUpTable is not available.
+           an fgcmLookUpTable is not available, or if computeFluxApertureRadius()
+           fails if the calibFlux is not a CircularAperture flux.
         """
 
         if self.config.doReferenceMatches:
             # Ensure that we have a LUT
             if not butler.datasetExists('fgcmLookUpTable'):
                 raise RuntimeError("Must have fgcmLookUpTable if using config.doReferenceMatches")
+        # Compute aperture radius if necessary.  This is useful to do now before
+        # any heavy lifting has happened (fail early).
+        if self.config.doSubtractLocalBackground:
+            sourceSchema = butler.get('src_schema').schema
+            try:
+                self.calibFluxApertureRadius = computeApertureRadius(sourceSchema,
+                                                                     self.config.instFluxField)
+            except (RuntimeError, LookupError):
+                raise RuntimeError("Could not determine aperture radius from %s. "
+                                   "Cannot use doSubtractLocalBackground." %
+                                   (self.config.instFluxField))
 
         groupedDataRefs = self.findAndGroupDataRefs(butler, dataRefs)
 
@@ -586,6 +594,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         -------
         fgcmStarObservations: `afw.table.BaseCatalog`
            Full catalog of good observations.
+
+        Raises
+        ------
+        RuntimeError: Raised if computeApertureRadius() fails.
         """
 
         startTime = time.time()
@@ -622,7 +634,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # Prepare local background if desired
         if self.config.doSubtractLocalBackground:
             localBackgroundFluxKey = sourceSchema[self.config.localBackgroundFluxField].asKey()
-            localBackgroundArea = np.pi * self.config.calibFluxApertureRadius**2.
+            localBackgroundArea = np.pi*self.calibFluxApertureRadius**2.
         else:
             localBackground = 0.0
 
@@ -670,7 +682,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     # additional errors are are negligibly small (much less
                     # than a mmag in quadrature).
 
-                    localBackground = localBackgroundArea * sources[localBackgroundFluxKey]
+                    localBackground = localBackgroundArea*sources[localBackgroundFluxKey]
                     sources[instFluxKey] -= localBackground
 
                 goodSrc = self.sourceSelector.selectSources(sources)
@@ -684,13 +696,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 # Compute "instrumental magnitude" by scaling flux with exposure time.
                 scaledInstFlux = (sources[instFluxKey][goodSrc.selected] *
                                   visit['scaling'][ccdMapping[ccdId]])
-                tempCat[instMagKey][:] = (-2.5 * np.log10(scaledInstFlux) + 2.5 * np.log10(expTime))
+                tempCat[instMagKey][:] = (-2.5*np.log10(scaledInstFlux) + 2.5*np.log10(expTime))
 
                 # Compute instMagErr from instFluxErr / instFlux, any scaling
                 # will cancel out.
 
-                tempCat[instMagErrKey][:] = k * (sources[instFluxErrKey][goodSrc.selected] /
-                                                 sources[instFluxKey][goodSrc.selected])
+                tempCat[instMagErrKey][:] = k*(sources[instFluxErrKey][goodSrc.selected] /
+                                               sources[instFluxKey][goodSrc.selected])
 
                 # Compute the jacobian from an approximate PixelAreaBoundedField
                 tempCat['jacobian'] = approxPixelAreaFields[ccdId].evaluate(tempCat['x'],
@@ -698,7 +710,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 # Apply the jacobian if configured
                 if self.config.doApplyWcsJacobian:
-                    tempCat[instMagKey][:] -= 2.5 * np.log10(tempCat['jacobian'][:])
+                    tempCat[instMagKey][:] -= 2.5*np.log10(tempCat['jacobian'][:])
 
                 fullCatalog.extend(tempCat)
 
@@ -713,14 +725,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     # nans below.
                     np.warnings.simplefilter("ignore")
 
-                    tempAperCat[instMagInKey][:] = -2.5 * np.log10(
+                    tempAperCat[instMagInKey][:] = -2.5*np.log10(
                         sources[instFluxAperInKey][goodSrc.selected])
-                    tempAperCat[instMagErrInKey][:] = (2.5 / np.log(10.)) * (
+                    tempAperCat[instMagErrInKey][:] = (2.5/np.log(10.))*(
                         sources[instFluxErrAperInKey][goodSrc.selected] /
                         sources[instFluxAperInKey][goodSrc.selected])
-                    tempAperCat[instMagOutKey][:] = -2.5 * np.log10(
+                    tempAperCat[instMagOutKey][:] = -2.5*np.log10(
                         sources[instFluxAperOutKey][goodSrc.selected])
-                    tempAperCat[instMagErrOutKey][:] = (2.5 / np.log(10.)) * (
+                    tempAperCat[instMagErrOutKey][:] = (2.5/np.log(10.))*(
                         sources[instFluxErrAperOutKey][goodSrc.selected] /
                         sources[instFluxAperOutKey][goodSrc.selected])
 
