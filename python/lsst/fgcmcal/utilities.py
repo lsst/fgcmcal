@@ -27,6 +27,7 @@ and do not need to be part of a task.
 """
 
 import numpy as np
+import re
 
 import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.afw.table as afwTable
@@ -592,7 +593,7 @@ def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
     zptSchema.addField('fgcmFlat', type=np.float32, doc='Superstarflat illumination correction')
     zptSchema.addField('fgcmAperCorr', type=np.float32, doc='Aperture correction estimated by fgcm')
     zptSchema.addField('exptime', type=np.float32, doc='Exposure time')
-    zptSchema.addField('filtername', type=str, size=2, doc='Filter name')
+    zptSchema.addField('filtername', type=str, size=10, doc='Filter name')
 
     return zptSchema
 
@@ -774,3 +775,37 @@ def makeStdCat(stdSchema, stdStruct):
     stdCat['npsfcand'][:, :] = stdStruct['NPSFCAND'][:, :]
 
     return stdCat
+
+
+def computeApertureRadius(schema, fluxField):
+    """
+    Compute the radius associated with a CircularApertureFlux field or
+    associated slot.
+
+    Parameters
+    ----------
+    schema : `lsst.afw.table.schema`
+    fluxField : `str`
+       CircularApertureFlux field or associated slot.
+
+    Returns
+    -------
+    apertureRadius: `float`
+       Radius of the aperture field, in pixels.
+
+    Raises
+    ------
+    RuntimeError: Raised if flux field is not a CircularApertureFlux
+       or associated slot.
+    """
+    fluxFieldName = schema[fluxField].asField().getName()
+
+    m = re.search(r'CircularApertureFlux_(\d+)_(\d+)_', fluxFieldName)
+
+    if m is None:
+        raise RuntimeError("Flux field %s does not correspond to a circular aperture"
+                           % (fluxField))
+
+    apertureRadius = float(m.groups()[0]) + float(m.groups()[1])/10.
+
+    return apertureRadius
