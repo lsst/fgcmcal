@@ -321,10 +321,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=0.01,
     )
-    sigFgcmMaxEGray = pexConfig.Field(
-        doc="Maximum (absolute) gray value for observation in sigma_FGCM",
+    sigFgcmMaxEGray = pexConfig.ListField(
+        doc=("Maximum (absolute) gray value for observation in sigma_FGCM. "
+             "May be 1 element (same for all bands) or the same length as config.bands."),
         dtype=float,
-        default=0.05,
+        default=(0.05,),
     )
     ccdGrayMaxStarErr = pexConfig.Field(
         doc="Maximum error on a star observation to use in ccd gray computation",
@@ -333,8 +334,7 @@ class FgcmFitCycleConfig(pexConfig.Config):
     )
     approxThroughput = pexConfig.ListField(
         doc=("Approximate overall throughput at start of calibration observations. "
-             "May be 1 element (same for all bands) or the same length as config.bands, "
-             "and matched band-by-band."),
+             "May be 1 element (same for all bands) or the same length as config.bands."),
         dtype=float,
         default=(1.0, ),
     )
@@ -426,11 +426,12 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=bool,
         default=False,
     )
-    useRepeatabilityForExpGrayCuts = pexConfig.Field(
+    useRepeatabilityForExpGrayCuts = pexConfig.ListField(
         doc=("Use star repeatability (instead of exposures) for computing photometric "
-             "cuts?  Recommended for tract/small scale modes."),
+             "cuts? Recommended for tract mode or bands with few exposures. "
+             "May be 1 element (same for all bands) or the same length as config.bands."),
         dtype=bool,
-        default=False,
+        default=(False,),
     )
     autoPhotometricCutNSig = pexConfig.Field(
         doc=("Number of sigma for automatic computation of (low) photometric cut. "
