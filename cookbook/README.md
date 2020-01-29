@@ -222,6 +222,12 @@ private/${USER}/${COOKBOOKRERUN}/fit1 \
 fgcmFitCycleHscCookbook_cycle02.log
 ```
 
+```bash
+fgcmFitCycle.py /datasets/hsc/repo --rerun \
+private/${USER}/${COOKBOOKRERUN}/fit1 \
+--configfile fgcmFitCycleHscCookbook_cycle03_config.py |& tee \
+fgcmFitCycleHscCookbook_cycle03.log
+```
 
 ### Final fit cycle
 
@@ -235,9 +241,9 @@ cycle run should only take 2-3 minutes.
 
 ```bash
 fgcmFitCycle.py /datasets/hsc/repo --rerun private/${USER}/${COOKBOOKRERUN}/fit1 \
---configfile fgcmFitCycleHscCookbook_cycle03_config.py \
+--configfile fgcmFitCycleHscCookbook_cycle04_config.py \
 --config isFinalCycle=True |& tee \
-fgcmFitCycleHscCookbook_cycle03.log
+fgcmFitCycleHscCookbook_cycle04.log
 ```
 
 ## Outputs
@@ -331,7 +337,7 @@ be converged and should be output.  This should take around 5 minutes on `lsst-d
 fgcmOutputProducts.py /datasets/hsc/repo --rerun \
 private/${USER}/${COOKBOOKRERUN}/wide:private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile $FGCMCAL_DIR/cookbook/fgcmOutputProductsHsc.py \
---config cycleNumber=3 |& tee fgcmFitCycleHscCookbook_output.log
+--config cycleNumber=4 |& tee fgcmFitCycleHscCookbook_output.log
 ```
 
 In the output repo

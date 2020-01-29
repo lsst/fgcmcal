@@ -97,7 +97,7 @@ class FgcmOutputProductsConfig(pexConfig.Config):
     doComposeWcsJacobian = pexConfig.Field(
         doc="Compose Jacobian of WCS with fgcm calibration for output photoCalib?",
         dtype=bool,
-        default=False,
+        default=True,
     )
     refObjLoader = pexConfig.ConfigurableField(
         target=LoadIndexedReferenceObjectsTask,
@@ -310,6 +310,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             raise RuntimeError("Cannot compose the WCS jacobian if it hasn't been applied "
                                "in fgcmBuildStarsTask.")
 
+        if not self.config.doComposeWcsJacobian and fgcmBuildStarsConfig.doApplyWcsJacobian:
+            self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
+
         # Make sure that the fit config exists, to retrieve bands and other info
         if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber):
             raise RuntimeError("Cannot find fgcmFitCycle_config from cycle %d " % (self.config.cycleNumber) +
@@ -415,6 +418,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         if self.config.doComposeWcsJacobian and not fgcmBuildStarsConfig.doApplyWcsJacobian:
             raise RuntimeError("Cannot compose the WCS jacobian if it hasn't been applied "
                                "in fgcmBuildStarsTask.")
+
+        if not self.config.doComposeWcsJacobian and fgcmBuildStarsConfig.doApplyWcsJacobian:
+            self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
 
         if self.config.doReferenceCalibration:
             offsets = self._computeReferenceOffsets(butler, stdCat)

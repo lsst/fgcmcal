@@ -316,6 +316,14 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=(0,),
     )
+    sedExtrapolate = pexConfig.ListField(
+        doc=("Extrapolation direction for computing linear SED from colors.  0 sets to "
+             "interpolation.  +1 is extrapolate SED from redder bands (e.g. g, r, i -> g), "
+             "and -1 is extrapolate from bluer bands (e.g. i, z, y -> y). Must be same "
+             "length as config.bands."),
+        dtype=int,
+        default=(0,),
+    )
     sigFgcmMaxErr = pexConfig.Field(
         doc="Maximum mag error for fitting sigma_FGCM",
         dtype=float,

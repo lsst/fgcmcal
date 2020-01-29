@@ -280,6 +280,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         config.aperCorrFitNBins = 0
         config.aperCorrInputSlopes = (-0.9694, -1.7229)
         config.sedFudgeFactors = (1.0, 1.0)
+        config.sedExtrapolate = (0, 0)
         config.starColorCuts = ('r,i,-0.50,2.25',)
         config.freezeStdAtmosphere = True
         config.precomputeSuperStarInitialCycle = False

@@ -45,6 +45,9 @@ config.aperCorrInputSlopes = (-1.0150, -0.9694, -1.7229, -1.4549, -1.1998)
 # These are approximating by looking at stellar SED templates, and are the same
 # as used in DES calibrations (-E. Rykoff)
 config.sedFudgeFactors = (0.25, 1.0, 1.0, 0.25, 0.25)
+# Extrapolation direction for computing linear SED from colors.  0 sets to
+# interpolation.  -1 is extrapolate from blueward, +1 is extrapolate from redward.
+config.sedExtrapolate = (1, 0, 0, 0, -1)
 # Color cuts for stars to use for calibration.  Each element is a string with
 # band1, band2, range_low, range_high such that range_low < (band1 - band2) < range_high
 config.starColorCuts = ('g,r,-0.25,2.25',

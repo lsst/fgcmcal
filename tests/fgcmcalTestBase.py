@@ -360,6 +360,14 @@ class FgcmcalTestBase(object):
                               (zptCat['ccd'] == testCcd))
         fgcmZpt = zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex]
 
+        if self.config.doComposeWcsJacobian:
+            # The raw zeropoint needs to be modified to know about the wcs jacobian
+            camera = butler.get('camera')
+            approxPixelAreaFields = fgcmcal.utilities.computeApproxPixelAreaFields(camera)
+            center = approxPixelAreaFields[testCcd].getBBox().getCenter()
+            pixAreaCorr = approxPixelAreaFields[testCcd].evaluate(center)
+            fgcmZpt += -2.5*np.log10(pixAreaCorr)
+
         # This is the magnitude through the mean calibration
         photoCalMeanCalMags = np.zeros(gdSrc.sum())
         # This is the magnitude through the full focal-plane variable mags
