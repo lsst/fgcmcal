@@ -2,6 +2,8 @@
 HSC-specific overrides for FgcmFitCycle
 """
 
+from lsst.fgcmcal import Sedterm, Sedboundaryterm
+
 # Output file base name for diagnostic plots
 config.outfileBase = 'fgcmFitCycleHscCookbook'
 # Bands to be used in the fit
@@ -41,13 +43,19 @@ config.aperCorrFitNBins = 0
 # This is used when there is insufficient data to fit the parameters from the data
 # itself (e.g. tract mode or RC2).
 config.aperCorrInputSlopes = (-1.0150, -0.9694, -1.7229, -1.4549, -1.1998)
-# "Fudge factors" for computing SED slope
-# These are approximating by looking at stellar SED templates, and are the same
-# as used in DES calibrations (-E. Rykoff)
-config.sedFudgeFactors = (0.25, 1.0, 1.0, 0.25, 0.25)
-# Extrapolation direction for computing linear SED from colors.  0 sets to
-# interpolation.  -1 is extrapolate from blueward, +1 is extrapolate from redward.
-config.sedExtrapolate = (1, 0, 0, 0, -1)
+# Mapping from bands to SED boundary term names used is sedterms.
+config.sedboundaryterms.data = {'gr': Sedboundaryterm(primary='g', secondary='r'),
+                                'ri': Sedboundaryterm(primary='r', secondary='i'),
+                                'iz': Sedboundaryterm(primary='i', secondary='z'),
+                                'zy': Sedboundaryterm(primary='z', secondary='y')}
+# Mapping from terms to bands for fgcm linear SED approximations.
+config.sedterms.data = {'g': Sedterm(primaryTerm='gr', secondaryTerm='ri', constant=1.6),
+                        'r': Sedterm(primaryTerm='gr', secondaryTerm='ri', constant=0.9),
+                        'i': Sedterm(primaryTerm='ri', secondaryTerm='iz', constant=1.0),
+                        'z': Sedterm(primaryTerm='iz', secondaryTerm='zy', constant=1.0),
+                        'y': Sedterm(primaryTerm='zy', secondaryTerm='iz', constant=0.25,
+                                     extrapolated=True, primaryBand='y', secondaryBand='z',
+                                     tertiaryBand='i')}
 # Color cuts for stars to use for calibration.  Each element is a string with
 # band1, band2, range_low, range_high such that range_low < (band1 - band2) < range_high
 config.starColorCuts = ('g,r,-0.25,2.25',
@@ -64,6 +72,10 @@ config.precomputeSuperStarInitialCycle = True
 config.superStarSubCcd = True
 # Chebyshev order of sub-ccd superstar fits
 config.superStarSubCcdChebyshevOrder = 2
+# Compute CCD gray terms on sub-ccd scale
+config.ccdGraySubCcd = True
+# Order of the 2D chebyshev polynomials for sub-ccd gray fit
+config.ccdGraySubCcdChebyshevOrder = 1
 # Model instrumental variation over time per band
 config.instrumentParsPerBand = True
 # Use reference catalog as additional constraint on calibration

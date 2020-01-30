@@ -11,13 +11,10 @@ Requirements
 This cookbook assumes access to
 [lsst-dev](https://developer.lsst.io/services/lsst-dev.html) and the existence
 of the HSC RC dataset from PDR1.  This is regularly reprocessed, starting with
-[DM-10404](https://jira.lsstcorp.org/browse/DM-10404).  See Epic "Dataset
-Reprocessing Campaigns (FY18b-2)"
-[DM-14950](https://jira.lsstcorp.org/browse/DM-14950) for the list of tickets
-with the most recent reprocessing.  On `lsst-dev` the recent reprocessing can
-be listed at `/datasets/hsc/repo/rerun/RC/`.  However, I do recommend checking
-the tickets at the linked Epic to confirm that the most recent processing
-actually has been completed.
+[DM-10404](https://jira.lsstcorp.org/browse/DM-10404).  On `lsst-dev` the
+recent reprocessing can be listed at `/datasets/hsc/repo/rerun/RC/`.  However,
+I do recommend checking any relevant tickets to confirm that the most
+recent processing actually has been completed.
 
 Setup
 -----
@@ -27,8 +24,8 @@ The environment should be set up as follows:
 ```
 setup lsst_distrib
 
-export RCRERUN=RC/w_2019_38/DM-21386-sfm
-export COOKBOOKRERUN=fgcm_cookbook_w_2019_38
+export RCRERUN=RC/w_2020_03/DM-23121-sfm
+export COOKBOOKRERUN=fgcm_cookbook_w_2020_03
 ```
 
 The `RCRERUN` env variable should be set to the most recent completed rerun
@@ -137,7 +134,7 @@ on `lsst-dev01`:
 
 ```bash
 fgcmBuildStars.py /datasets/hsc/repo --rerun \
-private/${USER}/${COOKBOOKRERUN}/lut:private/${USER}/${COOKBOOKRERUN}/wide+deep \
+private/${USER}/${COOKBOOKRERUN}/lut:private/${USER}/${COOKBOOKRERUN}/wide+deep+udeep \
 --configfile $FGCMCAL_DIR/cookbook/fgcmBuildStarsHsc.py \
 --id ccd=13 filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y
 ```
@@ -181,7 +178,7 @@ run on `lsst-dev01`.
 
 ```bash
 fgcmFitCycle.py /datasets/hsc/repo --rerun \
-private/${USER}/${COOKBOOKRERUN}/wide+deep:private/${USER}/${COOKBOOKRERUN}/fit1 \
+private/${USER}/${COOKBOOKRERUN}/wide+deep+udeep:private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile $FGCMCAL_DIR/cookbook/fgcmFitCycleHscCookbook_cycle00_config.py \
 |& tee fgcmFitCycleHscCookbook_cycle00.log
 ```
@@ -335,7 +332,7 @@ be converged and should be output.  This should take around 5 minutes on `lsst-d
 
 ```bash
 fgcmOutputProducts.py /datasets/hsc/repo --rerun \
-private/${USER}/${COOKBOOKRERUN}/wide:private/${USER}/${COOKBOOKRERUN}/fit1 \
+private/${USER}/${COOKBOOKRERUN}/fit1 \
 --configfile $FGCMCAL_DIR/cookbook/fgcmOutputProductsHsc.py \
 --config cycleNumber=4 |& tee fgcmFitCycleHscCookbook_output.log
 ```
