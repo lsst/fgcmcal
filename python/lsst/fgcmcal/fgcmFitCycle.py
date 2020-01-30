@@ -35,6 +35,7 @@ cycle.  Please see the fgcmcal Cookbook for details.
 
 import sys
 import traceback
+import copy
 
 import numpy as np
 
@@ -45,6 +46,7 @@ import lsst.afw.table as afwTable
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
 from .utilities import computeCcdOffsets, makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat, makeStdSchema, makeStdCat
+from .sedterms import SedboundarytermDict, SedtermDict
 
 import fgcm
 
@@ -315,14 +317,16 @@ class FgcmFitCycleConfig(pexConfig.Config):
              "config.bands, and matched band-by-band."),
         dtype=float,
         default=(0,),
+        deprecated=("This field has been deprecated and will be removed after v20. "
+                    "Please use sedSlopeTermMap and sedSlopeMap."),
     )
-    sedExtrapolate = pexConfig.ListField(
-        doc=("Extrapolation direction for computing linear SED from colors.  0 sets to "
-             "interpolation.  +1 is extrapolate SED from redder bands (e.g. g, r, i -> g), "
-             "and -1 is extrapolate from bluer bands (e.g. i, z, y -> y). Must be same "
-             "length as config.bands."),
-        dtype=int,
-        default=(0,),
+    sedboundaryterms = pexConfig.ConfigField(
+        doc="Mapping from bands to SED boundary term names used is sedterms.",
+        dtype=SedboundarytermDict,
+    )
+    sedterms = pexConfig.ConfigField(
+        doc="Mapping from terms to bands for fgcm linear SED approximations.",
+        dtype=SedtermDict,
     )
     sigFgcmMaxErr = pexConfig.Field(
         doc="Maximum mag error for fitting sigma_FGCM",
@@ -778,14 +782,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # Output the config for the next cycle
         # We need to make a copy since the input one has been frozen
 
-        outConfig = FgcmFitCycleConfig()
-        outConfig.update(**self.config.toDict())
-
-        outConfig.cycleNumber += 1
-        outConfig.precomputeSuperStarInitialCycle = False
-        outConfig.freezeStdAtmosphere = False
-        outConfig.expGrayPhotometricCut[:] = fgcmFitCycle.updatedPhotometricCut
-        outConfig.expGrayHighCut[:] = fgcmFitCycle.updatedHighCut
+        outConfig = copy.copy(self.config)
+        outConfig.update(cycleNumber=(self.config.cycleNumber + 1),
+                         precomputeSuperStarInitialCycle=False,
+                         freezeStdAtmosphere=False,
+                         expGrayPhotometricCut=fgcmFitCycle.updatedPhotometricCut,
+                         expGrayHighCut=fgcmFitCycle.updatedHighCut)
         configFileName = '%s_cycle%02d_config.py' % (outConfig.outfileBase,
                                                      outConfig.cycleNumber)
         outConfig.save(configFileName)
