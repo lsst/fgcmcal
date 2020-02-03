@@ -141,7 +141,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.refObjLoader.ref_dataset_name = "sdss-dr9-fink-v5b"
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([-0.001386063173413, -0.0015368220629])
+        zpOffsets = np.array([-0.001374409999698, -0.0015618705656])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
@@ -176,7 +176,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self.config.fgcmOutputProducts.doRefcatOutput = True
 
-        rawRepeatability = np.array([0.00693819504807070, 0.00443888382172])
+        rawRepeatability = np.array([0.00691888829016613, 0.00443888382172])
         filterNCalibMap = {'HSC-R': 13,
                            'HSC-I': 14}
 

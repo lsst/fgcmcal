@@ -51,7 +51,7 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
         doc="Reference object loader for photometry",
     )
     refFilterMap = pexConfig.DictField(
-        doc="Mapping from camera 'filterName` to reference filter name.",
+        doc="Mapping from camera 'filterName' to reference filter name.",
         keytype=str,
         itemtype=str,
         default={},
@@ -313,12 +313,8 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         # via the refObjLoader task which requires a valid filterName
         foundReferenceFilter = False
         for filterName in filterList:
-            try:
-                refFilterName = self.config.refFilterMap[filterName]
-            except KeyError:
-                # It is okay to not have a match in the reference catalog, but warn
-                self.log.warn(f'Camera filter {filterName} not defined in refFilterMap')
-                # Go to the next filterName
+            refFilterName = self.config.refFilterMap.get(filterName)
+            if refFilterName is None:
                 continue
 
             try:
@@ -340,11 +336,9 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         # Retrieve all the fluxField names
         self._fluxFields = []
         for filterName in filterList:
-            try:
-                refFilterName = self.config.refFilterMap[filterName]
-            except KeyError:
-                refFilterName = None
-                fluxField = None
+            fluxField = None
+
+            refFilterName = self.config.refFilterMap.get(filterName)
 
             if refFilterName is not None:
                 try:
