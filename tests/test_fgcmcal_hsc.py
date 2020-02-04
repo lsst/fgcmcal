@@ -30,6 +30,7 @@ matplotlib.use("Agg")  # noqa E402
 
 import unittest
 import os
+import copy
 import tempfile
 import numpy as np
 
@@ -105,25 +106,23 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nGoodZp = 26
         nOkZp = 26
         nBadZp = 1206
-        nStdStars = 389
-        nPlots = 34
+        nStdStars = 382
+        nPlots = 42
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
 
         # Test the second fit cycle -- need to copy to unfreeze config
-        newConfig = fgcmcal.FgcmFitCycleConfig()
-        newConfig.update(**self.config.toDict())
-        newConfig.cycleNumber = 1
+        newConfig = copy.copy(self.config)
+        newConfig.update(cycleNumber=1)
         self.config = newConfig
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
 
         # Test the "final" fit cycle
-        newConfig = fgcmcal.FgcmFitCycleConfig()
-        newConfig.update(**self.config.toDict())
-        newConfig.cycleNumber = 2
-        newConfig.ccdGraySubCcd = True
-        newConfig.isFinalCycle = True
+        newConfig = copy.copy(self.config)
+        newConfig.update(cycleNumber=2,
+                         ccdGraySubCcd=True,
+                         isFinalCycle=True)
         self.config = newConfig
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots)
@@ -142,7 +141,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.config.refObjLoader.ref_dataset_name = "sdss-dr9-fink-v5b"
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([-0.001367187476717, -0.0020010727458])
+        zpOffsets = np.array([-0.001374409999698, -0.0015618705656])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
@@ -177,9 +176,9 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self.config.fgcmOutputProducts.doRefcatOutput = True
 
-        rawRepeatability = np.array([0.007167850226701, 0.00834175861044])
-        filterNCalibMap = {'HSC-R': 10,
-                           'HSC-I': 11}
+        rawRepeatability = np.array([0.00691888829016613, 0.00443888382172])
+        filterNCalibMap = {'HSC-R': 13,
+                           'HSC-I': 14}
 
         visits = [903334, 903336, 903338, 903342, 903344, 903346,
                   903986, 903988, 903990, 904010, 904014]
@@ -242,6 +241,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # The testdata catalogs have the old name
         config.psfCandidateName = 'calib_psfCandidate'
         config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'sdss-dr9-fink-v5b'
+        config.fgcmLoadReferenceCatalog.refFilterMap = {'r': 'r', 'i': 'i'}
         config.fgcmLoadReferenceCatalog.applyColorTerms = True
         config.fgcmLoadReferenceCatalog.colorterms = self.sdssColorterms()
         config.fgcmLoadReferenceCatalog.referenceSelector.doSignalToNoise = True
@@ -278,7 +278,14 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         config.autoHighCutNSig = 5.0
         config.aperCorrFitNBins = 0
         config.aperCorrInputSlopes = (-0.9694, -1.7229)
-        config.sedFudgeFactors = (1.0, 1.0)
+        config.sedboundaryterms = fgcmcal.SedboundarytermDict()
+        config.sedboundaryterms.data['ri'] = fgcmcal.Sedboundaryterm(primary='r',
+                                                                     secondary='i')
+        config.sedterms = fgcmcal.SedtermDict()
+        config.sedterms.data['r'] = fgcmcal.Sedterm(primaryTerm='ri', secondaryTerm=None,
+                                                    extrapolated=False, constant=1.0)
+        config.sedterms.data['i'] = fgcmcal.Sedterm(primaryTerm='ri', secondaryTerm=None,
+                                                    extrapolated=False, constant=0.75)
         config.starColorCuts = ('r,i,-0.50,2.25',)
         config.freezeStdAtmosphere = True
         config.precomputeSuperStarInitialCycle = False

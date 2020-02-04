@@ -14,9 +14,11 @@ config.doRefcatOutput = True
 config.doAtmosphereOutput = True
 # Do output the zeropoints in jointcal_photoCalib format (though uses a lot of space)
 config.doZeropointOutput = True
+# Compose Jacobian of WCS with fgcm calibration for output photoCalib?
+config.doComposeWcsJacobian = True
 
 # Last cycle number that was run, preferably with outputStandards == True
-config.cycleNumber = 3
+config.cycleNumber = 4
 # For quicker runs, we cut down the area used for cross-calibration
 config.referencePixelizationNPixels = 10
 

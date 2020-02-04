@@ -60,6 +60,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         config = fgcmcal.FgcmLoadReferenceCatalogConfig()
         config.applyColorTerms = True
         config.refObjLoader.ref_dataset_name = 'sdss-dr9-fink-v5b'
+        config.refFilterMap = {'r': 'r', 'i': 'i'}
         config.colorterms.data = {}
         config.colorterms.data['sdss*'] = lsst.pipe.tasks.colorterms.ColortermDict()
         config.colorterms.data['sdss*'].data = {}
@@ -98,6 +99,9 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         self.assertLess(np.max(refCat['refMag'][:, 1]), 99.1)
         self.assertLess(np.max(refCat['refMagErr'][:, 0]), 99.1)
         self.assertLess(np.max(refCat['refMagErr'][:, 1]), 99.1)
+        test, = np.where((refCat['refMag'][:, 0] < 30.0) &
+                         (refCat['refMag'][:, 1] < 30.0))
+        self.assertGreater(test.size, 0)
 
         # Check the separations from the center
         self.assertLess(np.max(esutil.coords.sphdist(ra, dec, refCat['ra'], refCat['dec'])), rad)
@@ -111,6 +115,48 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         ipring = hp.ang2pix(nside, np.radians(90.0 - refCat['dec']), np.radians(refCat['ra']))
         self.assertEqual(pixel, np.max(ipring))
         self.assertEqual(pixel, np.min(ipring))
+
+    def test_fgcmLoadReferenceOtherFilters(self):
+        """
+        Test loading of the fgcm reference catalogs using unmatched filter names.
+        """
+
+        filterList = ['r2', 'i2']
+
+        config = fgcmcal.FgcmLoadReferenceCatalogConfig()
+        config.applyColorTerms = True
+        config.refObjLoader.ref_dataset_name = 'sdss-dr9-fink-v5b'
+        config.refFilterMap = {'r2': 'r', 'i2': 'i'}
+        config.colorterms.data = {}
+        config.colorterms.data['sdss*'] = lsst.pipe.tasks.colorterms.ColortermDict()
+        config.colorterms.data['sdss*'].data = {}
+        config.colorterms.data['sdss*'].data['r2'] = lsst.pipe.tasks.colorterms.Colorterm()
+        config.colorterms.data['sdss*'].data['r2'].primary = 'r'
+        config.colorterms.data['sdss*'].data['r2'].secondary = 'i'
+        config.colorterms.data['sdss*'].data['r2'].c0 = 0.0013181
+        config.colorterms.data['sdss*'].data['r2'].c1 = 0.01284177
+        config.colorterms.data['sdss*'].data['r2'].c2 = -0.03068248
+        config.colorterms.data['sdss*'].data['i2'] = lsst.pipe.tasks.colorterms.Colorterm()
+        config.colorterms.data['sdss*'].data['i2'].primary = 'i'
+        config.colorterms.data['sdss*'].data['i2'].secondary = 'z'
+        config.colorterms.data['sdss*'].data['i2'].c0 = 0.00130204
+        config.colorterms.data['sdss*'].data['i2'].c1 = -0.16922042
+        config.colorterms.data['sdss*'].data['i2'].c2 = -0.01374245
+
+        butler = dafPersist.Butler(self.inputDir)
+        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler, config=config)
+
+        ra = 320.0
+        dec = 0.0
+        rad = 0.1
+
+        refCat = loadCat.getFgcmReferenceStarsSkyCircle(ra, dec, rad, filterList)
+
+        self.assertEqual(len(filterList), refCat['refMag'].shape[1])
+        self.assertEqual(len(filterList), refCat['refMagErr'].shape[1])
+        test, = np.where((refCat['refMag'][:, 0] < 30.0) &
+                         (refCat['refMag'][:, 1] < 30.0))
+        self.assertGreater(test.size, 0)
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):

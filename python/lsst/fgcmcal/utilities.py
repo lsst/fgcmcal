@@ -157,10 +157,11 @@ def makeConfigDict(config, log, camera, maxIter,
                   'starColorCuts': starColorCutList,
                   'aperCorrFitNBins': config.aperCorrFitNBins,
                   'aperCorrInputSlopes': np.array(config.aperCorrInputSlopes),
-                  'sedFudgeFactors': np.array(config.sedFudgeFactors),
+                  'sedBoundaryTermDict': config.sedboundaryterms.toDict()['data'],
+                  'sedTermDict': config.sedterms.toDict()['data'],
                   'colorSplitIndices': np.array(config.colorSplitIndices),
                   'sigFgcmMaxErr': config.sigFgcmMaxErr,
-                  'sigFgcmMaxEGray': config.sigFgcmMaxEGray,
+                  'sigFgcmMaxEGray': list(config.sigFgcmMaxEGray),
                   'ccdGrayMaxStarErr': config.ccdGrayMaxStarErr,
                   'approxThroughput': list(config.approxThroughput),
                   'sigmaCalRange': list(config.sigmaCalRange),
@@ -181,7 +182,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'instrumentParsPerBand': config.instrumentParsPerBand,
                   'instrumentSlopeMinDeltaT': config.instrumentSlopeMinDeltaT,
                   'fitMirrorChromaticity': config.fitMirrorChromaticity,
-                  'useRepeatabilityForExpGrayCuts': config.useRepeatabilityForExpGrayCuts,
+                  'useRepeatabilityForExpGrayCuts': list(config.useRepeatabilityForExpGrayCuts),
                   'autoPhotometricCutNSig': config.autoPhotometricCutNSig,
                   'autoHighCutNSig': config.autoHighCutNSig,
                   'printOnly': False,
@@ -358,7 +359,7 @@ def translateVisitCatalog(visitCat):
                                                  ('TELDEC', 'f8'),
                                                  ('TELROT', 'f8'),
                                                  ('PMB', 'f8'),
-                                                 ('FILTERNAME', 'a2')])
+                                                 ('FILTERNAME', 'a10')])
     fgcmExpInfo['VISIT'][:] = visitCat['visit']
     fgcmExpInfo['MJD'][:] = visitCat['mjd']
     fgcmExpInfo['EXPTIME'][:] = visitCat['exptime']
