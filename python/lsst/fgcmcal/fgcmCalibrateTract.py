@@ -37,7 +37,7 @@ from .fgcmBuildStars import FgcmBuildStarsTask
 from .fgcmFitCycle import FgcmFitCycleConfig
 from .fgcmOutputProducts import FgcmOutputProductsTask
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
-from .utilities import computeCcdOffsets
+from .utilities import computeCcdOffsets, computeApertureRadius
 from .utilities import makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat
 from .utilities import makeStdSchema, makeStdCat
@@ -219,7 +219,9 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         Raises
         ------
         RuntimeError: Raised if `config.fgcmBuildStars.doReferenceMatches` is
-           not True, or if fgcmLookUpTable is not available.
+           not True, or if fgcmLookUpTable is not available, or if
+           doSubtractLocalBackground is True and aperture radius cannot be
+           determined.
         """
 
         if not butler.datasetExists('fgcmLookUpTable'):
@@ -233,6 +235,19 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         self.makeSubtask("fgcmBuildStars", butler=butler)
         self.makeSubtask("fgcmOutputProducts", butler=butler)
 
+        # Compute the aperture radius if necessary.  This is useful to do now before
+        # any heavy lifting has happened (fail early).
+        calibFluxApertureRadius = None
+        if self.config.fgcmBuildStars.doSubtractLocalBackground:
+            sourceSchema = butler.get('src_schema').schema
+            try:
+                calibFluxApertureRadius = computeApertureRadius(sourceSchema,
+                                                                self.config.fgcmBuildStars.instFluxField)
+            except (RuntimeError, LookupError):
+                raise RuntimeError("Could not determine aperture radius from %s. "
+                                   "Cannot use doSubtractLocalBackground." %
+                                   (self.config.instFluxField))
+
         # Run the build stars tasks
         tract = dataRefs[0].dataId['tract']
         self.log.info("Running on tract %d" % (tract))
@@ -241,8 +256,10 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(butler, dataRefs)
         camera = butler.get('camera')
         visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(camera, groupedDataRefs)
+        rad = calibFluxApertureRadius
         fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedDataRefs,
-                                                                                 visitCat)
+                                                                                 visitCat,
+                                                                                 calibFluxApertureRadius=rad)
 
         fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = \
             self.fgcmBuildStars.fgcmMatchStars(butler,

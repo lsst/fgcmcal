@@ -369,11 +369,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 raise RuntimeError("Must have fgcmLookUpTable if using config.doReferenceMatches")
         # Compute aperture radius if necessary.  This is useful to do now before
         # any heavy lifting has happened (fail early).
+        calibFluxApertureRadius = None
         if self.config.doSubtractLocalBackground:
             sourceSchema = butler.get('src_schema').schema
             try:
-                self.calibFluxApertureRadius = computeApertureRadius(sourceSchema,
-                                                                     self.config.instFluxField)
+                calibFluxApertureRadius = computeApertureRadius(sourceSchema,
+                                                                self.config.instFluxField)
             except (RuntimeError, LookupError):
                 raise RuntimeError("Could not determine aperture radius from %s. "
                                    "Cannot use doSubtractLocalBackground." %
@@ -393,8 +394,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         # Compile all the stars
         if not butler.datasetExists('fgcmStarObservations'):
+            rad = calibFluxApertureRadius
             fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
-                                                                      visitCat)
+                                                                      visitCat,
+                                                                      calibFluxApertureRadius=rad)
         else:
             self.log.info("Found fgcmStarObservations")
             fgcmStarObservationCat = butler.get('fgcmStarObservations')
@@ -582,7 +585,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         return groupedDataRefs
 
-    def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat):
+    def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
+                                    calibFluxApertureRadius=None):
         """
         Compile all good star observations from visits in visitCat.
 
@@ -592,6 +596,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            Lists of `lsst.daf.persistence.ButlerDataRef`, grouped by visit.
         visitCat: `afw.table.BaseCatalog`
            Catalog with visit data for FGCM
+        calibFluxApertureRadius: `float`, optional
+           Aperture radius for calibration flux.  Default is None.
 
         Returns
         -------
@@ -600,10 +606,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         Raises
         ------
-        RuntimeError: Raised if computeApertureRadius() fails.
+        RuntimeError: Raised if doSubtractLocalBackground is True and
+           calibFluxApertureRadius is not set.
         """
-
         startTime = time.time()
+
+        if self.config.doSubtractLocalBackground and calibFluxApertureRadius is None:
+            raise RuntimeError("Must set calibFluxApertureRadius if doSubtractLocalBackground is True.")
 
         # create our source schema.  Use the first valid dataRef
         dataRef = groupedDataRefs[list(groupedDataRefs.keys())[0]][0]
@@ -637,7 +646,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # Prepare local background if desired
         if self.config.doSubtractLocalBackground:
             localBackgroundFluxKey = sourceSchema[self.config.localBackgroundFluxField].asKey()
-            localBackgroundArea = np.pi*self.calibFluxApertureRadius**2.
+            localBackgroundArea = np.pi*calibFluxApertureRadius**2.
         else:
             localBackground = 0.0
 
