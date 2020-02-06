@@ -179,9 +179,6 @@ class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
         """
         return [parsedCmd.butler]
 
-    def precall(self, parsedCmd):
-        return True
-
     def __call__(self, butler):
         """
         Parameters
