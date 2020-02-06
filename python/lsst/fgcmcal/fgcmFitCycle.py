@@ -705,9 +705,40 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         if self.config.doReferenceCalibration:
             refStars = butler.get('fgcmReferenceStars')
+
+            # After DM-23331 reference catalogs have FILTERNAMES to prevent
+            # against index errors and allow more flexibility in fitting after
+            # the build stars step.
+            md = refStars.getMetadata()
+            if 'FILTERNAMES' in md:
+                filternames = md.getArray('FILTERNAMES')
+
+                # The reference catalog that fgcm wants has one entry per band
+                # in the config file
+                refMag = np.zeros((len(refStars), len(self.config.bands)),
+                                  dtype=refStars['refMag'].dtype) + 99.0
+                refMagErr = np.zeros_like(refMag) + 99.0
+                for i, filtername in enumerate(filternames):
+                    # We are allowed to run the fit configured so that we do not
+                    # use every column in the reference catalog.
+                    try:
+                        band = self.config.filterMap[filtername]
+                    except KeyError:
+                        continue
+                    try:
+                        ind = self.config.bands.index(band)
+                    except ValueError:
+                        continue
+
+                    refMag[:, ind] = refStars['refMag'][:, i]
+                    refMagErr[:, ind] = refStars['refMagErr'][:, i]
+
+            else:
+                # Continue to use old catalogs as before.
+                refMag = refStars['refMag'][:, :]
+                refMagErr = refStars['refMagErr'][:, :]
+
             refId = refStars['fgcm_id'][:]
-            refMag = refStars['refMag'][:, :]
-            refMagErr = refStars['refMagErr'][:, :]
         else:
             refId = None
             refMag = None

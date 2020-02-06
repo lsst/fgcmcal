@@ -39,6 +39,7 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
 import lsst.geom as geom
+from lsst.daf.base import PropertyList
 from lsst.daf.base.dateTime import DateTime
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
@@ -46,6 +47,8 @@ from .fgcmLoadReferenceCatalog import FgcmLoadReferenceCatalogTask
 from .utilities import computeApproxPixelAreaFields, computeApertureRadius
 
 import fgcm
+
+REFSTARS_FORMAT_VERSION = 1
 
 __all__ = ['FgcmBuildStarsConfig', 'FgcmBuildStarsTask', 'FgcmBuildStarsRunner']
 
@@ -900,6 +903,11 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             fgcmRefCat['fgcm_id'][:] = fgcmMakeStars.referenceCat['fgcm_id']
             fgcmRefCat['refMag'][:, :] = fgcmMakeStars.referenceCat['refMag']
             fgcmRefCat['refMagErr'][:, :] = fgcmMakeStars.referenceCat['refMagErr']
+
+            md = PropertyList()
+            md.set("REFSTARS_FORMAT_VERSION", REFSTARS_FORMAT_VERSION)
+            md.set("FILTERNAMES", referenceFilterNames)
+            fgcmRefCat.setMetadata(md)
 
         else:
             fgcmRefCat = None
