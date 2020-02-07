@@ -29,6 +29,7 @@ and do not need to be part of a task.
 import numpy as np
 import re
 
+from lsst.daf.base import PropertyList
 import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
@@ -743,7 +744,7 @@ def makeStdSchema(nBands):
     return stdSchema
 
 
-def makeStdCat(stdSchema, stdStruct):
+def makeStdCat(stdSchema, stdStruct, goodBands):
     """
     Make the standard star catalog for persistence
 
@@ -753,6 +754,8 @@ def makeStdCat(stdSchema, stdStruct):
        Standard star catalog schema
     stdStruct: `numpy.ndarray`
        Standard star structure in FGCM format
+    goodBands: `list`
+       List of good band names used in stdStruct
 
     Returns
     -------
@@ -774,6 +777,10 @@ def makeStdCat(stdSchema, stdStruct):
     stdCat['mag_std_noabs'][:, :] = stdStruct['MAG_STD'][:, :]
     stdCat['magErr_std'][:, :] = stdStruct['MAGERR_STD'][:, :]
     stdCat['npsfcand'][:, :] = stdStruct['NPSFCAND'][:, :]
+
+    md = PropertyList()
+    md.set("BANDS", list(goodBands))
+    stdCat.setMetadata(md)
 
     return stdCat
 
@@ -810,3 +817,60 @@ def computeApertureRadius(schema, fluxField):
     apertureRadius = float(m.groups()[0]) + float(m.groups()[1])/10.
 
     return apertureRadius
+
+
+def extractReferenceMags(refStars, bands, filterMap):
+    """
+    Extract reference magnitudes from refStars for given bands and
+    associated filterMap.
+
+    Parameters
+    ----------
+    refStars : `lsst.afw.table.BaseCatalog`
+       FGCM reference star catalog
+    bands : `list`
+       List of bands for calibration
+    filterMap: `dict`
+       FGCM mapping of filter to band
+
+    Returns
+    -------
+    refMag : `np.ndarray`
+       nstar x nband array of reference magnitudes
+    refMagErr : `np.ndarray`
+       nstar x nband array of reference magnitude errors
+    """
+    # After DM-23331 fgcm reference catalogs have FILTERNAMES to prevent
+    # against index errors and allow more flexibility in fitting after
+    # the build stars step.
+
+    md = refStars.getMetadata()
+    if 'FILTERNAMES' in md:
+        filternames = md.getArray('FILTERNAMES')
+
+        # The reference catalog that fgcm wants has one entry per band
+        # in the config file
+        refMag = np.zeros((len(refStars), len(bands)),
+                          dtype=refStars['refMag'].dtype) + 99.0
+        refMagErr = np.zeros_like(refMag) + 99.0
+        for i, filtername in enumerate(filternames):
+            # We are allowed to run the fit configured so that we do not
+            # use every column in the reference catalog.
+            try:
+                band = filterMap[filtername]
+            except KeyError:
+                continue
+            try:
+                ind = bands.index(band)
+            except ValueError:
+                continue
+
+            refMag[:, ind] = refStars['refMag'][:, i]
+            refMagErr[:, ind] = refStars['refMagErr'][:, i]
+
+    else:
+        # Continue to use old catalogs as before.
+        refMag = refStars['refMag'][:, :]
+        refMagErr = refStars['refMagErr'][:, :]
+
+    return refMag, refMagErr

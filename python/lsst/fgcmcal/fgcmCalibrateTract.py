@@ -37,7 +37,7 @@ from .fgcmBuildStars import FgcmBuildStarsTask
 from .fgcmFitCycle import FgcmFitCycleConfig
 from .fgcmOutputProducts import FgcmOutputProductsTask
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
-from .utilities import computeCcdOffsets, computeApertureRadius
+from .utilities import computeCcdOffsets, computeApertureRadius, extractReferenceMags
 from .utilities import makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat
 from .utilities import makeStdSchema, makeStdCat
@@ -315,6 +315,11 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         visitIndex = np.searchsorted(fgcmExpInfo['VISIT'],
                                      fgcmStarObservationCat['visit'][obsIndex])
 
+        refMag, refMagErr = extractReferenceMags(fgcmRefCat,
+                                                 self.config.fgcmFitCycle.bands,
+                                                 self.config.fgcmFitCycle.filterMap)
+        refId = fgcmRefCat['fgcm_id'][:]
+
         fgcmStars = fgcm.FgcmStars(fgcmFitCycle.fgcmConfig)
         fgcmStars.loadStars(fgcmPars,
                             fgcmStarObservationCat['visit'][obsIndex],
@@ -332,9 +337,9 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
                             obsX=fgcmStarObservationCat['x'][obsIndex],
                             obsY=fgcmStarObservationCat['y'][obsIndex],
                             psfCandidate=fgcmStarObservationCat['psf_candidate'][obsIndex],
-                            refID=fgcmRefCat['fgcm_id'][:],
-                            refMag=fgcmRefCat['refMag'][:, :],
-                            refMagErr=fgcmRefCat['refMagErr'][:, :],
+                            refID=refId,
+                            refMag=refMag,
+                            refMagErr=refMagErr,
                             flagID=None,
                             flagFlag=None,
                             computeNobs=True)
@@ -384,6 +389,8 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
 
             self.log.info("Raw repeatability after cycle number %d is:" % (cycleNumber))
             for i, band in enumerate(fgcmFitCycle.fgcmPars.bands):
+                if not fgcmFitCycle.fgcmPars.hasExposuresInBand[i]:
+                    continue
                 rep = fgcmFitCycle.fgcmPars.compReservedRawRepeatability[i] * 1000.0
                 self.log.info("  Band %s, repeatability: %.2f mmag" % (band, rep))
 
@@ -401,6 +408,8 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
                 previousReservedRawRepeatability[:] = fgcmFitCycle.fgcmPars.compReservedRawRepeatability
                 self.log.info("Setting exposure gray photometricity cuts to:")
                 for i, band in enumerate(fgcmFitCycle.fgcmPars.bands):
+                    if not fgcmFitCycle.fgcmPars.hasExposuresInBand[i]:
+                        continue
                     cut = fgcmFitCycle.updatedPhotometricCut[i] * 1000.0
                     self.log.info("  Band %s, photometricity cut: %.2f mmag" % (band, cut))
 
@@ -435,6 +444,8 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
 
         self.log.info("Raw repeatability after clean-up cycle is:")
         for i, band in enumerate(fgcmFitCycle.fgcmPars.bands):
+            if not fgcmFitCycle.fgcmPars.hasExposuresInBand[i]:
+                continue
             rep = fgcmFitCycle.fgcmPars.compReservedRawRepeatability[i] * 1000.0
             self.log.info("  Band %s, repeatability: %.2f mmag" % (band, rep))
 
@@ -449,9 +460,9 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         atmSchema = makeAtmSchema()
         atmCat = makeAtmCat(atmSchema, fgcmFitCycle.fgcmZpts.atmStruct)
 
-        stdSchema = makeStdSchema(fgcmFitCycle.fgcmPars.nBands)
-        stdStruct = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
-        stdCat = makeStdCat(stdSchema, stdStruct)
+        stdStruct, goodBands = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
+        stdSchema = makeStdSchema(len(goodBands))
+        stdCat = makeStdCat(stdSchema, stdStruct, goodBands)
 
         outStruct = self.fgcmOutputProducts.generateTractOutputProducts(butler, tract,
                                                                         visitCat,

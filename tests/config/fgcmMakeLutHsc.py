@@ -1,3 +1,3 @@
-config.filterNames = ['r', 'i']
-config.stdFilterNames = ['r', 'i']
+config.filterNames = ['g', 'r', 'i']
+config.stdFilterNames = ['g', 'r', 'i']
 config.atmosphereTableName = 'fgcm_atm_subaru2_test'

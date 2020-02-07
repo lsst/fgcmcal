@@ -75,11 +75,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self.otherArgs = []
 
-        nBand = 2
-        i0Std = np.array([0.07877351, 0.06464688])
-        i10Std = np.array([-0.00061516, -0.00063434])
-        i0Recon = np.array([0.0689530429, 0.05600673])
-        i10Recon = np.array([-7.01847144, 3.62675740])
+        nBand = 3
+        i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
+        i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
+        i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
+        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
 
         self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
@@ -163,11 +163,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        nBand = 2
-        i0Std = np.array([0.07877351, 0.06464688])
-        i10Std = np.array([-0.00061516, -0.00063434])
-        i0Recon = np.array([0.0689530429, 0.05600673])
-        i10Recon = np.array([-7.01847144, 3.62675740])
+        nBand = 3
+        i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
+        i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
+        i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
+        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
 
         self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
@@ -176,7 +176,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        rawRepeatability = np.array([0.00691888829016613, 0.00443888382172])
+        rawRepeatability = np.array([0.0, 0.00691888829016613, 0.00443888382172])
         filterNCalibMap = {'HSC-R': 13,
                            'HSC-I': 14}
 

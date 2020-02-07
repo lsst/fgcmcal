@@ -44,6 +44,7 @@ import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
 
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
+from .utilities import extractReferenceMags
 from .utilities import computeCcdOffsets, makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat, makeStdSchema, makeStdCat
 from .sedterms import SedboundarytermDict, SedtermDict
@@ -706,38 +707,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         if self.config.doReferenceCalibration:
             refStars = butler.get('fgcmReferenceStars')
 
-            # After DM-23331 reference catalogs have FILTERNAMES to prevent
-            # against index errors and allow more flexibility in fitting after
-            # the build stars step.
-            md = refStars.getMetadata()
-            if 'FILTERNAMES' in md:
-                filternames = md.getArray('FILTERNAMES')
-
-                # The reference catalog that fgcm wants has one entry per band
-                # in the config file
-                refMag = np.zeros((len(refStars), len(self.config.bands)),
-                                  dtype=refStars['refMag'].dtype) + 99.0
-                refMagErr = np.zeros_like(refMag) + 99.0
-                for i, filtername in enumerate(filternames):
-                    # We are allowed to run the fit configured so that we do not
-                    # use every column in the reference catalog.
-                    try:
-                        band = self.config.filterMap[filtername]
-                    except KeyError:
-                        continue
-                    try:
-                        ind = self.config.bands.index(band)
-                    except ValueError:
-                        continue
-
-                    refMag[:, ind] = refStars['refMag'][:, i]
-                    refMagErr[:, ind] = refStars['refMagErr'][:, i]
-
-            else:
-                # Continue to use old catalogs as before.
-                refMag = refStars['refMag'][:, :]
-                refMagErr = refStars['refMagErr'][:, :]
-
+            refMag, refMagErr = extractReferenceMags(refStars,
+                                                     self.config.bands,
+                                                     self.config.filterMap)
             refId = refStars['fgcm_id'][:]
         else:
             refId = None
@@ -1099,9 +1071,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         # Save the standard stars (if configured)
         if self.outputStandards:
-            stdSchema = makeStdSchema(len(self.config.bands))
-            stdStruct = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
-            stdCat = makeStdCat(stdSchema, stdStruct)
+            stdStruct, goodBands = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
+            stdSchema = makeStdSchema(len(goodBands))
+            stdCat = makeStdCat(stdSchema, stdStruct, goodBands)
 
             butler.put(stdCat, 'fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
 

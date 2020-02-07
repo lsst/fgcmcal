@@ -316,7 +316,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                "which is required for fgcmOutputProducts.")
 
         fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
-        self.bands = fitCycleConfig.bands
+        self.configBands = fitCycleConfig.bands
 
         if self.config.doReferenceCalibration and fitCycleConfig.doReferenceCalibration:
             self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
@@ -346,8 +346,11 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         if self.config.doReferenceCalibration or self.config.doRefcatOutput:
             stdCat = butler.get('fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
+            md = stdCat.getMetadata()
+            self.bands = md.getArray('BANDS')
         else:
             stdCat = None
+            self.bands = self.configBands
 
         if self.config.doReferenceCalibration:
             offsets = self._computeReferenceOffsets(butler, stdCat)
@@ -403,10 +406,16 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
            Configuration object from `FgcmFitCycleTask`
         """
 
-        self.bands = fgcmFitCycleConfig.bands
+        self.configBands = fgcmFitCycleConfig.bands
         self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
         self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
         self.filterMap = fgcmBuildStarsConfig.filterMap
+
+        if stdCat is not None:
+            md = stdCat.getMetadata()
+            self.bands = md.getArray('BANDS')
+        else:
+            self.bands = self.configBands
 
         if self.config.doReferenceCalibration and fgcmFitCycleConfig.doReferenceCalibration:
             self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
@@ -461,7 +470,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
            Per band zeropoint offsets
         """
 
-        # Only use stars that are observed in all the bands
+        # Only use stars that are observed in all the bands that were actually used
         # This will ensure that we use the same healpix pixels for the absolute
         # calibration of each band.
         minObs = stdCat['ngood'].min(axis=1)
@@ -773,7 +782,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # Get a mapping from filtername to the offsets
         offsetMapping = {}
         for f in self.filterMap:
-            offsetMapping[f] = offsets[self.bands.index(self.filterMap[f])]
+            # Not every filter in the map will necesarily have a band.
+            if self.filterMap[f] in self.bands:
+                offsetMapping[f] = offsets[self.bands.index(self.filterMap[f])]
 
         # Get a mapping from "ccd" to the ccd index used for the scaling
         camera = butler.get('camera')
