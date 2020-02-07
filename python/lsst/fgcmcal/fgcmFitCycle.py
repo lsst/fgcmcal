@@ -44,6 +44,7 @@ import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
 
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
+from .utilities import extractReferenceMags
 from .utilities import computeCcdOffsets, makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat, makeStdSchema, makeStdCat
 from .sedterms import SedboundarytermDict, SedtermDict
@@ -705,9 +706,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         if self.config.doReferenceCalibration:
             refStars = butler.get('fgcmReferenceStars')
+
+            refMag, refMagErr = extractReferenceMags(refStars,
+                                                     self.config.bands,
+                                                     self.config.filterMap)
             refId = refStars['fgcm_id'][:]
-            refMag = refStars['refMag'][:, :]
-            refMagErr = refStars['refMagErr'][:, :]
         else:
             refId = None
             refMag = None
@@ -1068,9 +1071,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         # Save the standard stars (if configured)
         if self.outputStandards:
-            stdSchema = makeStdSchema(len(self.config.bands))
-            stdStruct = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
-            stdCat = makeStdCat(stdSchema, stdStruct)
+            stdStruct, goodBands = fgcmFitCycle.fgcmStars.retrieveStdStarCatalog(fgcmFitCycle.fgcmPars)
+            stdSchema = makeStdSchema(len(goodBands))
+            stdCat = makeStdCat(stdSchema, stdStruct, goodBands)
 
             butler.put(stdCat, 'fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
 

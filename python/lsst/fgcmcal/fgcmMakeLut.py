@@ -335,10 +335,7 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         butler:  `lsst.daf.persistence.Butler`
         """
 
-        if (not butler.datasetExists('fgcmLookUpTable')):
-            self._fgcmMakeLut(butler)
-        else:
-            self.log.info("Found existing fgcmLookUpTable.  Skipping creation.")
+        self._fgcmMakeLut(butler)
 
     def _fgcmMakeLut(self, butler):
         """

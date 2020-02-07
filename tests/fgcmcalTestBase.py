@@ -63,11 +63,13 @@ class FgcmcalTestBase(object):
            List of additional arguments to send to command-line tasks
         """
 
-        self.config = None
         self.inputDir = inputDir
         self.testDir = testDir
         self.logLevel = logLevel
         self.otherArgs = otherArgs
+
+        self.config = None
+        self.configfiles = []
 
         lsst.log.setLevel("daf.persistence.butler", lsst.log.FATAL)
         lsst.log.setLevel("CameraMapper", lsst.log.FATAL)
@@ -99,6 +101,8 @@ class FgcmcalTestBase(object):
 
         args = [self.inputDir, '--output', self.testDir,
                 '--doraise']
+        if len(self.configfiles) > 0:
+            args.extend(['--configfile', *self.configfiles])
         args.extend(self.otherArgs)
 
         result = fgcmcal.FgcmMakeLutTask.parseAndRun(args=args, config=self.config)
@@ -165,6 +169,8 @@ class FgcmcalTestBase(object):
         args = [self.inputDir, '--output', self.testDir,
                 '--id', 'visit='+'^'.join([str(visit) for visit in visits]),
                 '--doraise']
+        if len(self.configfiles) > 0:
+            args.extend(['--configfile', *self.configfiles])
         args.extend(self.otherArgs)
 
         result = fgcmcal.FgcmBuildStarsTask.parseAndRun(args=args, config=self.config)
@@ -206,6 +212,8 @@ class FgcmcalTestBase(object):
 
         args = [self.inputDir, '--output', self.testDir,
                 '--doraise']
+        if len(self.configfiles) > 0:
+            args.extend(['--configfile', *self.configfiles])
         args.extend(self.otherArgs)
 
         # Move into the test directory so the plots will get cleaned in tearDown
@@ -280,6 +288,8 @@ class FgcmcalTestBase(object):
 
         args = [self.inputDir, '--output', self.testDir,
                 '--doraise']
+        if len(self.configfiles) > 0:
+            args.extend(['--configfile', *self.configfiles])
         args.extend(self.otherArgs)
 
         result = fgcmcal.FgcmOutputProductsTask.parseAndRun(args=args, config=self.config,
@@ -441,6 +451,8 @@ class FgcmcalTestBase(object):
                 '--id', 'visit='+'^'.join([str(visit) for visit in visits]),
                 'tract=%d' % (tract),
                 '--doraise']
+        if len(self.configfiles) > 0:
+            args.extend(['--configfile', *self.configfiles])
         args.extend(self.otherArgs)
 
         # Move into the test directory so the plots will get cleaned in tearDown

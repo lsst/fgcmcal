@@ -36,7 +36,6 @@ import numpy as np
 
 import lsst.utils
 import lsst.pipe.tasks
-from lsst.pipe.tasks.colorterms import ColortermLibrary
 
 import fgcmcalTestBase
 
@@ -71,22 +70,23 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # First test making the LUT
         self.config = fgcmcal.FgcmMakeLutConfig()
-        self.config.filterNames = ['r', 'i']
-        self.config.stdFilterNames = ['r', 'i']
-        self.config.atmosphereTableName = 'fgcm_atm_subaru2_test'
+        testConfigFile = os.path.join(ROOT, 'config', 'fgcmMakeLutHsc.py')
+        self.configfiles = [testConfigFile]
+
         self.otherArgs = []
 
-        nBand = 2
-        i0Std = np.array([0.07877351, 0.06464688])
-        i10Std = np.array([-0.00061516, -0.00063434])
-        i0Recon = np.array([0.0689530429, 0.05600673])
-        i10Recon = np.array([-7.01847144, 3.62675740])
+        nBand = 3
+        i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
+        i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
+        i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
+        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
 
         self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         # Build the stars, adding in the reference stars
         self.config = fgcmcal.FgcmBuildStarsConfig()
-        self.fillDefaultBuildStarsConfig(self.config, visitDataRefName, ccdDataRefName)
+        testConfigFile = os.path.join(ROOT, 'config', 'fgcmBuildStarsHsc.py')
+        self.configfiles = [testConfigFile]
         self.otherArgs = []
 
         visits = [903334, 903336, 903338, 903342, 903344, 903346,
@@ -99,7 +99,9 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # Perform the fit cycle
         self.config = fgcmcal.FgcmFitCycleConfig()
-        self.fillDefaultFitCycleConfig(self.config)
+        testConfigFile = os.path.join(ROOT, 'config', 'fgcmFitCycleHsc.py')
+        self.config.load(testConfigFile)
+        self.configfiles = [testConfigFile]
         self.otherArgs = []
 
         nZp = 1232
@@ -116,6 +118,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         newConfig.update(cycleNumber=1)
         self.config = newConfig
 
+        newConfigFile = os.path.join(self.testDir,
+                                     f'fgcmFitCycle_cycle{newConfig.cycleNumber}.py')
+        newConfig.save(newConfigFile)
+        self.configfiles.append(newConfigFile)
+
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
 
         # Test the "final" fit cycle
@@ -125,20 +132,19 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                          isFinalCycle=True)
         self.config = newConfig
 
+        newConfigFile = os.path.join(self.testDir,
+                                     f'fgcmFitCycle_cycle{newConfig.cycleNumber}.py')
+        newConfig.save(newConfigFile)
+        self.configfiles.append(newConfigFile)
+
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots)
 
         # Output the products
 
         self.config = fgcmcal.FgcmOutputProductsConfig()
-        self.config.cycleNumber = 2
-        # Turning on "reference calibration" is redundant in practice if
-        # reference stars have been used in the fit, but this needs to
-        # be exercised in testing.
-        self.config.doReferenceCalibration = True
-        self.config.photoCal.applyColorTerms = True
-        self.config.photoCal.photoCatName = 'sdss-dr9-fink-v5b'
-        self.config.photoCal.colorterms = self.sdssColorterms()
-        self.config.refObjLoader.ref_dataset_name = "sdss-dr9-fink-v5b"
+        testConfigFile = os.path.join(ROOT, 'config', 'fgcmOutputProductsHsc.py')
+        self.configfiles = [testConfigFile]
+        self.otherArgs = []
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
         zpOffsets = np.array([-0.001374409999698, -0.0015618705656])
@@ -151,32 +157,26 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # Set numpy seed for stability
         np.random.seed(seed=1000)
 
-        visitDataRefName = 'visit'
-        ccdDataRefName = 'ccd'
-
         # First need to make the LUT
         self.config = fgcmcal.FgcmMakeLutConfig()
-        self.config.filterNames = ['r', 'i']
-        self.config.stdFilterNames = ['r', 'i']
-        self.config.atmosphereTableName = 'fgcm_atm_subaru2_test'
+        testConfigFile = os.path.join(ROOT, 'config', 'fgcmMakeLutHsc.py')
+        self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        nBand = 2
-        i0Std = np.array([0.07877351, 0.06464688])
-        i10Std = np.array([-0.00061516, -0.00063434])
-        i0Recon = np.array([0.0689530429, 0.05600673])
-        i10Recon = np.array([-7.01847144, 3.62675740])
+        nBand = 3
+        i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
+        i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
+        i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
+        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
 
         self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         self.config = fgcmcal.FgcmCalibrateTractConfig()
-        self.fillDefaultBuildStarsConfig(self.config.fgcmBuildStars, visitDataRefName, ccdDataRefName)
-        self.fillDefaultFitCycleConfig(self.config.fgcmFitCycle)
-        self.config.maxFitCycles = 3
+        testConfigFile = os.path.join(ROOT, 'config', 'fgcmCalibrateTractHsc.py')
+        self.configfiles = [testConfigFile]
+        self.otherArgs = []
 
-        self.config.fgcmOutputProducts.doRefcatOutput = True
-
-        rawRepeatability = np.array([0.00691888829016613, 0.00443888382172])
+        rawRepeatability = np.array([0.0, 0.00691888829016613, 0.00443888382172])
         filterNCalibMap = {'HSC-R': 13,
                            'HSC-I': 14}
 
@@ -186,123 +186,6 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self._testFgcmCalibrateTract(visits, tract,
                                      rawRepeatability, filterNCalibMap)
-
-    def sdssColorterms(self):
-        """
-        Return the SDSS to HSC color terms
-        """
-
-        colorterms = ColortermLibrary()
-        colorterms.data = {}
-        colorterms.data['sdss*'] = lsst.pipe.tasks.colorterms.ColortermDict()
-        colorterms.data['sdss*'].data = {}
-        colorterms.data['sdss*'].data['g'] = lsst.pipe.tasks.colorterms.Colorterm()
-        colorterms.data['sdss*'].data['g'].primary = 'g'
-        colorterms.data['sdss*'].data['g'].secondary = 'r'
-        colorterms.data['sdss*'].data['g'].c0 = -0.00816446
-        colorterms.data['sdss*'].data['g'].c1 = -0.08366937
-        colorterms.data['sdss*'].data['g'].c2 = -0.00726883
-        colorterms.data['sdss*'].data['r'] = lsst.pipe.tasks.colorterms.Colorterm()
-        colorterms.data['sdss*'].data['r'].primary = 'r'
-        colorterms.data['sdss*'].data['r'].secondary = 'i'
-        colorterms.data['sdss*'].data['r'].c0 = 0.0013181
-        colorterms.data['sdss*'].data['r'].c1 = 0.01284177
-        colorterms.data['sdss*'].data['r'].c2 = -0.03068248
-        colorterms.data['sdss*'].data['i'] = lsst.pipe.tasks.colorterms.Colorterm()
-        colorterms.data['sdss*'].data['i'].primary = 'i'
-        colorterms.data['sdss*'].data['i'].secondary = 'z'
-        colorterms.data['sdss*'].data['i'].c0 = 0.00130204
-        colorterms.data['sdss*'].data['i'].c1 = -0.16922042
-        colorterms.data['sdss*'].data['i'].c2 = -0.01374245
-
-        return colorterms
-
-    def fillDefaultBuildStarsConfig(self, config, visitDataRefName, ccdDataRefName):
-        """
-        Fill the config parameters for a build stars configuration
-
-        Parameters
-        ----------
-        config: `lsst.fgcmcal.FgcmBuildStarsConfig`
-        visitDataRefName: `str`
-           Name of the dataRef key for the visit
-        ccdDataRefName: `str`
-           Name of the dataRef key for the ccd
-        """
-
-        config.filterMap = {'r': 'r', 'i': 'i'}
-        config.requiredBands = ['r', 'i']
-        config.primaryBands = ['i']
-        config.checkAllCcds = False
-        config.coarseNside = 64
-        config.visitDataRefName = visitDataRefName
-        config.ccdDataRefName = ccdDataRefName
-        config.doReferenceMatches = True
-        # The testdata catalogs have the old name
-        config.psfCandidateName = 'calib_psfCandidate'
-        config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'sdss-dr9-fink-v5b'
-        config.fgcmLoadReferenceCatalog.refFilterMap = {'r': 'r', 'i': 'i'}
-        config.fgcmLoadReferenceCatalog.applyColorTerms = True
-        config.fgcmLoadReferenceCatalog.colorterms = self.sdssColorterms()
-        config.fgcmLoadReferenceCatalog.referenceSelector.doSignalToNoise = True
-        config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.fluxField = 'i_flux'
-        config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.errField = 'i_fluxErr'
-        config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.minimum = 50.0
-
-    def fillDefaultFitCycleConfig(self, config):
-        """
-        Fill the config parameters for a fit cycle configuration.
-
-        Parameters
-        ----------
-        config: `lsst.fgcmcal.FgcmFitCycleConfig`
-        """
-
-        config.outfileBase = 'TestFgcm'
-        config.bands = ['r', 'i']
-        config.fitFlag = (1, 1)
-        config.requiredFlag = (1, 1)
-        config.filterMap = {'r': 'r', 'i': 'i'}
-        config.doReferenceCalibration = True
-        config.maxIterBeforeFinalCycle = 5
-        config.nCore = 1
-        config.cycleNumber = 0
-        config.utBoundary = 0.0
-        config.washMjds = (0.0, )
-        config.epochMjds = (0.0, 100000.0)
-        config.latitude = 19.8256
-        config.expGrayPhotometricCut = (-0.1, -0.1)
-        config.expGrayHighCut = (0.1, 0.1)
-        config.expVarGrayPhotometricCut = 0.05**2.
-        config.autoPhotometricCutNSig = 5.0
-        config.autoHighCutNSig = 5.0
-        config.aperCorrFitNBins = 0
-        config.aperCorrInputSlopes = (-0.9694, -1.7229)
-        config.sedboundaryterms = fgcmcal.SedboundarytermDict()
-        config.sedboundaryterms.data['ri'] = fgcmcal.Sedboundaryterm(primary='r',
-                                                                     secondary='i')
-        config.sedterms = fgcmcal.SedtermDict()
-        config.sedterms.data['r'] = fgcmcal.Sedterm(primaryTerm='ri', secondaryTerm=None,
-                                                    extrapolated=False, constant=1.0)
-        config.sedterms.data['i'] = fgcmcal.Sedterm(primaryTerm='ri', secondaryTerm=None,
-                                                    extrapolated=False, constant=0.75)
-        config.starColorCuts = ('r,i,-0.50,2.25',)
-        config.freezeStdAtmosphere = True
-        config.precomputeSuperStarInitialCycle = False
-        config.minExpPerNight = 1
-        config.minStarPerExp = 50
-        config.nStarPerRun = 50
-        config.nExpPerRun = 2
-        config.colorSplitIndices = (0, 1)
-        config.superStarSubCcd = True
-        config.superStarSubCcdChebyshevOrder = 1
-        config.ccdGraySubCcd = False
-        config.ccdGraySubCcdChebyshevOrder = 1
-        config.ccdGraySubCcdTriangular = True
-        config.modelMagErrors = False
-        config.outputZeropointsBeforeFinalCycle = False
-        config.outputStandardsBeforeFinalCycle = False
-        config.sigmaCalRange = (0.003, 0.003)
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
