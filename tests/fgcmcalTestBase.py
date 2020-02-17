@@ -369,6 +369,7 @@ class FgcmcalTestBase(object):
         testZpInd, = np.where((zptCat['visit'] == testVisit) &
                               (zptCat['ccd'] == testCcd))
         fgcmZpt = zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex]
+        fgcmZptGrayErr = np.sqrt(zptCat['fgcmZptVar'][testZpInd])
 
         if self.config.doComposeWcsJacobian:
             # The raw zeropoint needs to be modified to know about the wcs jacobian
@@ -400,6 +401,11 @@ class FgcmcalTestBase(object):
         # wrong.
         self.assertFloatsAlmostEqual(photoCalMeanCalMags,
                                      photoCalMags, rtol=1e-2)
+
+        # And the photoCal error is just the zeropoint gray error
+        self.assertFloatsAlmostEqual(testCal.getCalibrationErr(),
+                                     (np.log(10.0) / 2.5) * testCal.getCalibrationMean() *
+                                     fgcmZptGrayErr)
 
         # Test the transmission output
 
