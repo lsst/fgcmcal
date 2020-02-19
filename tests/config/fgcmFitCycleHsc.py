@@ -14,7 +14,7 @@ config.expGrayHighCut = (0.1, 0.1, 0.1)
 config.expVarGrayPhotometricCut = 0.05**2.
 config.autoPhotometricCutNSig = 5.0
 config.autoHighCutNSig = 5.0
-config.aperCorrFitNBins = 0
+config.aperCorrFitNBins = 2
 config.aperCorrInputSlopes = (-1.0, -0.9694, -1.7229)
 config.sedboundaryterms = fgcmcal.SedboundarytermDict()
 config.sedboundaryterms.data['ri'] = fgcmcal.Sedboundaryterm(primary='r',
