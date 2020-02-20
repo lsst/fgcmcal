@@ -84,3 +84,6 @@ config.doReferenceCalibration = True
 config.refStarSnMin = 50.0
 # Number of sigma compared to average mag for reference star to be considered an outlier
 config.refStarOutlierNSig = 4.0
+
+config.useRepeatabilityForExpGrayCuts = (False, False, False, False, False)
+config.sigFgcmMaxEGray = (0.05, 0.05, 0.05, 0.05, 0.05)

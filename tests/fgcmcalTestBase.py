@@ -125,14 +125,14 @@ class FgcmcalTestBase(object):
                                      np.zeros(nBand) + lutStd[0]['O3STD'],
                                      np.zeros(nBand) + np.log(lutStd[0]['TAUSTD']),
                                      np.zeros(nBand) + lutStd[0]['ALPHASTD'],
-                                     np.zeros(nBand) + 1. / np.cos(np.radians(lutStd[0]['ZENITHSTD'])),
+                                     np.zeros(nBand) + 1./np.cos(np.radians(lutStd[0]['ZENITHSTD'])),
                                      np.zeros(nBand, dtype=np.int32),
                                      np.zeros(nBand) + lutStd[0]['PMBSTD'])
         i0 = fgcmLut.computeI0(np.zeros(nBand) + np.log(lutStd[0]['PWVSTD']),
                                np.zeros(nBand) + lutStd[0]['O3STD'],
                                np.zeros(nBand) + np.log(lutStd[0]['TAUSTD']),
                                np.zeros(nBand) + lutStd[0]['ALPHASTD'],
-                               np.zeros(nBand) + 1. / np.cos(np.radians(lutStd[0]['ZENITHSTD'])),
+                               np.zeros(nBand) + 1./np.cos(np.radians(lutStd[0]['ZENITHSTD'])),
                                np.zeros(nBand) + lutStd[0]['PMBSTD'],
                                indices)
 
@@ -142,11 +142,11 @@ class FgcmcalTestBase(object):
                                np.zeros(nBand) + lutStd[0]['O3STD'],
                                np.zeros(nBand) + np.log(lutStd[0]['TAUSTD']),
                                np.zeros(nBand) + lutStd[0]['ALPHASTD'],
-                               np.zeros(nBand) + 1. / np.cos(np.radians(lutStd[0]['ZENITHSTD'])),
+                               np.zeros(nBand) + 1./np.cos(np.radians(lutStd[0]['ZENITHSTD'])),
                                np.zeros(nBand) + lutStd[0]['PMBSTD'],
                                indices)
 
-        self.assertFloatsAlmostEqual(i10Recon, i1 / i0, msg='i10Recon', rtol=1e-5)
+        self.assertFloatsAlmostEqual(i10Recon, i1/i0, msg='i10Recon', rtol=1e-5)
 
     def _testFgcmBuildStars(self, visits, nStar, nObs):
         """
@@ -314,7 +314,7 @@ class FgcmcalTestBase(object):
         task = LoadIndexedReferenceObjectsTask(butler, config=config)
 
         # Read in a giant radius to get them all
-        refStruct = task.loadSkyCircle(rawStars[0].getCoord(), 5.0 * geom.degrees,
+        refStruct = task.loadSkyCircle(rawStars[0].getCoord(), 5.0*geom.degrees,
                                        filterName='r')
 
         # Make sure all the stars are there
@@ -326,7 +326,7 @@ class FgcmcalTestBase(object):
         # Perform math on numpy arrays to maintain datatypes
         mags = rawStars['mag_std_noabs'][:, 0].astype(np.float64) + offsets[0]
         fluxes = (mags*units.ABmag).to_value(units.nJy)
-        fluxErrs = (np.log(10.) / 2.5) * fluxes * rawStars['magErr_std'][:, 0].astype(np.float64)
+        fluxErrs = (np.log(10.)/2.5)*fluxes*rawStars['magErr_std'][:, 0].astype(np.float64)
         # Only check the first one
         self.assertFloatsAlmostEqual(fluxes[0], refStruct.refCat['r_flux'][test[0]])
         self.assertFloatsAlmostEqual(fluxErrs[0], refStruct.refCat['r_fluxErr'][test[0]])
@@ -369,6 +369,7 @@ class FgcmcalTestBase(object):
         testZpInd, = np.where((zptCat['visit'] == testVisit) &
                               (zptCat['ccd'] == testCcd))
         fgcmZpt = zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex]
+        fgcmZptGrayErr = np.sqrt(zptCat['fgcmZptVar'][testZpInd])
 
         if self.config.doComposeWcsJacobian:
             # The raw zeropoint needs to be modified to know about the wcs jacobian
@@ -400,6 +401,10 @@ class FgcmcalTestBase(object):
         # wrong.
         self.assertFloatsAlmostEqual(photoCalMeanCalMags,
                                      photoCalMags, rtol=1e-2)
+
+        # And the photoCal error is just the zeropoint gray error
+        self.assertFloatsAlmostEqual(testCal.getCalibrationErr(),
+                                     (np.log(10.0)/2.5)*testCal.getCalibrationMean()*fgcmZptGrayErr)
 
         # Test the transmission output
 
@@ -497,7 +502,7 @@ class FgcmcalTestBase(object):
 
         coord = geom.SpherePoint(320.0*geom.degrees, 0.0*geom.degrees)
 
-        refStruct = task.loadSkyCircle(coord, 5.0 * geom.degrees, filterName='r')
+        refStruct = task.loadSkyCircle(coord, 5.0*geom.degrees, filterName='r')
 
         # Test the psf candidate counting, ratio should be between 0.0 and 1.0
         candRatio = (refStruct.refCat['r_nPsfCandidate'].astype(np.float64) /

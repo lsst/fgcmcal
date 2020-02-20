@@ -502,7 +502,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # Note that there is an assumption here that the ra/dec coords stored
         # on-disk are in radians, and therefore that starObs['coord_ra'] /
         # starObs['coord_dec'] return radians when used as an array of numpy float64s.
-        theta = np.pi / 2. - stdCat['coord_dec']
+        theta = np.pi/2. - stdCat['coord_dec']
         phi = stdCat['coord_ra']
 
         ipring = hp.ang2pix(self.config.referencePixelizationNside, theta, phi)
@@ -532,7 +532,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # We need a boolean index to deal with catalogs...
         selected = np.zeros(len(stdCat), dtype=np.bool)
 
-        refFluxFields = [None] * len(self.bands)
+        refFluxFields = [None]*len(self.bands)
 
         for p, pix in enumerate(gdpix):
             i1a = rev[rev[pix]: rev[pix + 1]]
@@ -561,7 +561,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             offsets[b] = np.median(results['zp'][ok, b])
             # use median absolute deviation to estimate Normal sigma
             # see https://en.wikipedia.org/wiki/Median_absolute_deviation
-            madSigma = 1.4826 * np.median(np.abs(results['zp'][ok, b] - offsets[b]))
+            madSigma = 1.4826*np.median(np.abs(results['zp'][ok, b] - offsets[b]))
             self.log.info("Reference catalog offset for %s band: %.12f +/- %.12f" %
                           (band, offsets[b], madSigma))
 
@@ -594,9 +594,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         sourceCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
         sourceCat.reserve(selected.sum())
         sourceCat.extend(stdCat[selected], mapper=sourceMapper)
-        sourceCat['instFlux'] = 10.**(stdCat['mag_std_noabs'][selected, b] / (-2.5))
-        sourceCat['instFluxErr'] = (np.log(10.) / 2.5) * (stdCat['magErr_std'][selected, b] *
-                                                          sourceCat['instFlux'])
+        sourceCat['instFlux'] = 10.**(stdCat['mag_std_noabs'][selected, b]/(-2.5))
+        sourceCat['instFluxErr'] = (np.log(10.)/2.5)*(stdCat['magErr_std'][selected, b] *
+                                                      sourceCat['instFlux'])
         # Make sure we only use stars that have valid measurements
         # (This is perhaps redundant with requirements above that the
         # stars be observed in all bands, but it can't hurt)
@@ -611,7 +611,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             # Need to find the flux field in the reference catalog
             # to work around limitations of DirectMatch in PhotoCal
             ctr = stdCat[0].getCoord()
-            rad = 0.05 * lsst.geom.degrees
+            rad = 0.05*lsst.geom.degrees
             refDataTest = self.refObjLoader.loadSkyCircle(ctr, rad, band)
             refFluxFields[b] = refDataTest.fluxField
 
@@ -649,9 +649,9 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # numpy arrays rather than Angles, which would we approximately 600x slower.
         # TODO: Fix this after DM-16524 (HtmIndexer.indexPoints should take coords
         # (as Angles) for input
-        conv = stdCat[0]['coord_ra'].asDegrees() / float(stdCat[0]['coord_ra'])
-        indices = np.array(self.indexer.indexPoints(stdCat['coord_ra'] * conv,
-                                                    stdCat['coord_dec'] * conv))
+        conv = stdCat[0]['coord_ra'].asDegrees()/float(stdCat[0]['coord_ra'])
+        indices = np.array(self.indexer.indexPoints(stdCat['coord_ra']*conv,
+                                                    stdCat['coord_dec']*conv))
 
         formattedCat = self._formatCatalog(stdCat, offsets)
 
@@ -725,7 +725,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             # We want fluxes in nJy from calibrated AB magnitudes
             # (after applying offset).  Updated after RFC-549 and RFC-575.
             flux = (mag*units.ABmag).to_value(units.nJy)
-            fluxErr = (np.log(10.) / 2.5) * flux * fgcmStarCat['magErr_std'][:, b].astype(np.float64)
+            fluxErr = (np.log(10.)/2.5)*flux*fgcmStarCat['magErr_std'][:, b].astype(np.float64)
 
             formattedCat['%s_flux' % (band)][:] = flux
             formattedCat['%s_fluxErr' % (band)][:] = fluxErr
@@ -825,7 +825,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
             # The "mean" calibration will be set to the center of the ccd for reference
             calibCenter = fgcmField.evaluate(fgcmField.getBBox().getCenter())
-            calibErr = (np.log(10.0) / 2.5) * calibCenter * rec['fgcmZptErr']
+            calibErr = (np.log(10.0)/2.5)*calibCenter*np.sqrt(rec['fgcmZptVar'])
             photoCalib = afwImage.PhotoCalib(calibrationMean=calibCenter,
                                              calibrationErr=calibErr,
                                              calibration=fgcmField,
@@ -873,7 +873,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                lsst.geom.Point2I(*xyMax))
 
         pars[:, :] = (coefficients.reshape(orderPlus1, orderPlus1) *
-                      (10.**(offset / -2.5)) * scaling)
+                      (10.**(offset/-2.5))*scaling)
 
         boundedField = afwMath.ChebyshevBoundedField(bbox, pars)
 
@@ -913,13 +913,13 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             # Try to use MODTRAN instead
             try:
                 modGen = fgcm.ModtranGenerator(elevation)
-                lambdaRange = np.array([atmLambda[0], atmLambda[-1]]) / 10.
-                lambdaStep = (atmLambda[1] - atmLambda[0]) / 10.
+                lambdaRange = np.array([atmLambda[0], atmLambda[-1]])/10.
+                lambdaStep = (atmLambda[1] - atmLambda[0])/10.
             except (ValueError, IOError) as e:
                 raise RuntimeError("FGCM look-up-table generated with modtran, "
                                    "but modtran not configured to run.") from e
 
-        zenith = np.degrees(np.arccos(1. / atmCat['secZenith']))
+        zenith = np.degrees(np.arccos(1./atmCat['secZenith']))
 
         for i, visit in enumerate(atmCat['visit']):
             if atmTable is not None:
