@@ -548,8 +548,8 @@ def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
                                                        '8: Non-photometric, on non-photometric night; '
                                                        '16: No zeropoint could be determined; '
                                                        '32: Too few stars for reliable gray computation'))
-    zptSchema.addField('fgcmZpt', type=np.float32, doc='FGCM zeropoint (center of CCD)')
-    zptSchema.addField('fgcmZptErr', type=np.float32,
+    zptSchema.addField('fgcmZpt', type=np.float64, doc='FGCM zeropoint (center of CCD)')
+    zptSchema.addField('fgcmZptErr', type=np.float64,
                        doc='Error on zeropoint, estimated from repeatability + number of obs')
     zptSchema.addField('fgcmfZptChebXyMax', type='ArrayD', size=2,
                        doc='maximum x/maximum y to scale to apply chebyshev parameters')
@@ -559,41 +559,41 @@ def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
     zptSchema.addField('fgcmfZptSstarCheb', type='ArrayD',
                        size=superStarChebyshevSize,
                        doc='Chebyshev parameters (flattened) for superStarFlat')
-    zptSchema.addField('fgcmI0', type=np.float32, doc='Integral of the passband')
-    zptSchema.addField('fgcmI10', type=np.float32, doc='Normalized chromatic integral')
-    zptSchema.addField('fgcmR0', type=np.float32,
+    zptSchema.addField('fgcmI0', type=np.float64, doc='Integral of the passband')
+    zptSchema.addField('fgcmI10', type=np.float64, doc='Normalized chromatic integral')
+    zptSchema.addField('fgcmR0', type=np.float64,
                        doc='Retrieved i0 integral, estimated from stars (only for flag 1)')
-    zptSchema.addField('fgcmR10', type=np.float32,
+    zptSchema.addField('fgcmR10', type=np.float64,
                        doc='Retrieved i10 integral, estimated from stars (only for flag 1)')
-    zptSchema.addField('fgcmGry', type=np.float32,
+    zptSchema.addField('fgcmGry', type=np.float64,
                        doc='Estimated gray extinction relative to atmospheric solution; '
                        'only for flag <= 4')
-    zptSchema.addField('fgcmZptVar', type=np.float32, doc='Variance of zeropoint over ccd')
-    zptSchema.addField('fgcmTilings', type=np.float32,
+    zptSchema.addField('fgcmZptVar', type=np.float64, doc='Variance of zeropoint over ccd')
+    zptSchema.addField('fgcmTilings', type=np.float64,
                        doc='Number of photometric tilings used for solution for ccd')
-    zptSchema.addField('fgcmFpGry', type=np.float32,
+    zptSchema.addField('fgcmFpGry', type=np.float64,
                        doc='Average gray extinction over the full focal plane '
                        '(same for all ccds in a visit)')
-    zptSchema.addField('fgcmFpGryBlue', type=np.float32,
+    zptSchema.addField('fgcmFpGryBlue', type=np.float64,
                        doc='Average gray extinction over the full focal plane '
                        'for 25% bluest stars')
-    zptSchema.addField('fgcmFpGryBlueErr', type=np.float32,
+    zptSchema.addField('fgcmFpGryBlueErr', type=np.float64,
                        doc='Error on Average gray extinction over the full focal plane '
                        'for 25% bluest stars')
-    zptSchema.addField('fgcmFpGryRed', type=np.float32,
+    zptSchema.addField('fgcmFpGryRed', type=np.float64,
                        doc='Average gray extinction over the full focal plane '
                        'for 25% reddest stars')
-    zptSchema.addField('fgcmFpGryRedErr', type=np.float32,
+    zptSchema.addField('fgcmFpGryRedErr', type=np.float64,
                        doc='Error on Average gray extinction over the full focal plane '
                        'for 25% reddest stars')
-    zptSchema.addField('fgcmFpVar', type=np.float32,
+    zptSchema.addField('fgcmFpVar', type=np.float64,
                        doc='Variance of gray extinction over the full focal plane '
                        '(same for all ccds in a visit)')
-    zptSchema.addField('fgcmDust', type=np.float32,
+    zptSchema.addField('fgcmDust', type=np.float64,
                        doc='Gray dust extinction from the primary/corrector'
                        'at the time of the exposure')
-    zptSchema.addField('fgcmFlat', type=np.float32, doc='Superstarflat illumination correction')
-    zptSchema.addField('fgcmAperCorr', type=np.float32, doc='Aperture correction estimated by fgcm')
+    zptSchema.addField('fgcmFlat', type=np.float64, doc='Superstarflat illumination correction')
+    zptSchema.addField('fgcmAperCorr', type=np.float64, doc='Aperture correction estimated by fgcm')
     zptSchema.addField('exptime', type=np.float32, doc='Exposure time')
     zptSchema.addField('filtername', type=str, size=10, doc='Filter name')
 
