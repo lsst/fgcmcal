@@ -69,6 +69,15 @@ class FgcmFitCycleConfig(pexConfig.Config):
              "and matched band-by-band."),
         dtype=int,
         default=(0,),
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use fitBands instead."),
+    )
+    fitBands = pexConfig.ListField(
+        doc=("Bands to use in atmospheric fit.  Other bands will have atmosphere constrained "
+             "from observations in the other bands on the same night."),
+        dtype=str,
+        default=[],
     )
     requiredFlag = pexConfig.ListField(
         doc=("Flag for which bands are required for a star to be considered a calibration "
@@ -76,6 +85,14 @@ class FgcmFitCycleConfig(pexConfig.Config):
              "be same length as config.bands, and matched band-by-band."),
         dtype=int,
         default=(0,),
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use requiredBands instead."),
+    )
+    requiredBands = pexConfig.ListField(
+        doc="Bands that are required for a star to be considered a calibration star.",
+        dtype=str,
+        default=[],
     )
     filterMap = pexConfig.DictField(
         doc="Mapping from 'filterName' to band.",
@@ -138,6 +155,15 @@ class FgcmFitCycleConfig(pexConfig.Config):
         doc="Compute superstar flat on sub-ccd scale",
         dtype=bool,
         default=True,
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use superStarSubCcdDict instead."),
+    )
+    superStarSubCcdDict = pexConfig.DictField(
+        doc="Per-band specification on whether to compute superstar flat on sub-ccd scale.",
+        keytype=str,
+        itemtype=bool,
+        default={},
     )
     superStarSubCcdChebyshevOrder = pexConfig.Field(
         doc=("Order of the 2D chebyshev polynomials for sub-ccd superstar fit. "
@@ -161,6 +187,15 @@ class FgcmFitCycleConfig(pexConfig.Config):
         doc="Compute CCD gray terms on sub-ccd scale",
         dtype=bool,
         default=False,
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use ccdGraySubCcdDict instead."),
+    )
+    ccdGraySubCcdDict = pexConfig.DictField(
+        doc="Per-band specification on whether to compute ccd gray on sub-ccd scale.",
+        keytype=str,
+        itemtype=bool,
+        default={},
     )
     ccdGraySubCcdChebyshevOrder = pexConfig.Field(
         doc="Order of the 2D chebyshev polynomials for sub-ccd gray fit.",
@@ -271,12 +306,32 @@ class FgcmFitCycleConfig(pexConfig.Config):
              "Must be same length as config.bands, and matched band-by-band."),
         dtype=float,
         default=(0.0,),
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use expGrayPhotometricCutDict instead."),
+    )
+    expGrayPhotometricCutDict = pexConfig.DictField(
+        doc=("Per-band specification on maximum (negative) exposure gray for a visit to be "
+             "considered photometric.  Must have one entry per band."),
+        keytype=str,
+        itemtype=float,
+        default={},
     )
     expGrayHighCut = pexConfig.ListField(
         doc=("Maximum (positive) exposure gray for a visit to be considered photometric. "
              "Must be same length as config.bands, and matched band-by-band."),
         dtype=float,
         default=(0.0,),
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use expGrayHighCutDict instead."),
+    )
+    expGrayHighCutDict = pexConfig.DictField(
+        doc=("Per-band specification on maximum (positive) exposure gray for a visit to be "
+             "considered photometric.  Must have one entry per band."),
+        keytype=str,
+        itemtype=float,
+        default={},
     )
     expGrayRecoverCut = pexConfig.Field(
         doc=("Maximum (negative) exposure gray to be able to recover bad ccds via interpolation. "
@@ -289,6 +344,16 @@ class FgcmFitCycleConfig(pexConfig.Config):
         doc="Maximum exposure variance to be considered possibly photometric",
         dtype=float,
         default=0.0005,
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use expVarGrayPhotometricCutDict instead."),
+    )
+    expVarGrayPhotometricCutDict = pexConfig.DictField(
+        doc=("Per-band specification on maximum exposure variance to be considered possibly "
+             "photometric."),
+        keytype=str,
+        itemtype=float,
+        default={},
     )
     expGrayErrRecoverCut = pexConfig.Field(
         doc=("Maximum exposure gray error to be able to recover bad ccds via interpolation. "
@@ -312,12 +377,26 @@ class FgcmFitCycleConfig(pexConfig.Config):
              "If set, must be same length as config.bands, and matched band-by-band."),
         dtype=float,
         default=[],
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use aperCorrInputSlopeDict instead."),
+    )
+    aperCorrInputSlopeDict = pexConfig.DictField(
+        doc=("Per-band specification of aperture correction input slope parameters.  These "
+             "are used on the first fit iteration, and aperture correction parameters will "
+             "be updated from the data if config.aperCorrFitNBins > 0.  It is recommended "
+             "to set this when there is insufficient data to fit the parameters (e.g. "
+             "tract mode)."),
+        keytype=str,
+        itemtype=float,
+        default={},
     )
     sedFudgeFactors = pexConfig.ListField(
         doc=("Fudge factors for computing linear SED from colors.  Must be same length as "
              "config.bands, and matched band-by-band."),
         dtype=float,
         default=(0,),
+        optional=True,
         deprecated=("This field has been deprecated and will be removed after v20. "
                     "Please use sedSlopeTermMap and sedSlopeMap."),
     )
@@ -339,6 +418,16 @@ class FgcmFitCycleConfig(pexConfig.Config):
              "May be 1 element (same for all bands) or the same length as config.bands."),
         dtype=float,
         default=(0.05,),
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use sigFgcmMaxEGrayDict instead."),
+    )
+    sigFgcmMaxEGrayDict = pexConfig.DictField(
+        doc=("Per-band specification for maximum (absolute) gray value for observations in "
+             "sigma_fgcm."),
+        keytype=str,
+        itemtype=float,
+        default={},
     )
     ccdGrayMaxStarErr = pexConfig.Field(
         doc="Maximum error on a star observation to use in ccd gray computation",
@@ -350,6 +439,16 @@ class FgcmFitCycleConfig(pexConfig.Config):
              "May be 1 element (same for all bands) or the same length as config.bands."),
         dtype=float,
         default=(1.0, ),
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use approxThroughputDict instead."),
+    )
+    approxThroughputDict = pexConfig.DictField(
+        doc=("Per-band specification of the approximate overall throughput at the start of "
+             "calibration observations."),
+        keytype=str,
+        itemtype=float,
+        default={},
     )
     sigmaCalRange = pexConfig.ListField(
         doc="Allowed range for systematic error floor estimation",
@@ -394,6 +493,14 @@ class FgcmFitCycleConfig(pexConfig.Config):
     colorSplitIndices = pexConfig.ListField(
         doc="Band indices to use to split stars by color",
         dtype=int,
+        default=None,
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use colorSplitBands instead."),
+    )
+    colorSplitBands = pexConfig.ListField(
+        doc="Band names to use to split stars by color.  Must have 2 entries.",
+        dtype=str,
         default=None,
     )
     modelMagErrors = pexConfig.Field(
@@ -445,6 +552,16 @@ class FgcmFitCycleConfig(pexConfig.Config):
              "May be 1 element (same for all bands) or the same length as config.bands."),
         dtype=bool,
         default=(False,),
+        optional=True,
+        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
+                    "It will be removed after v20.  Use useRepeatabilityForExpGrayCutsDict instead."),
+    )
+    useRepeatabilityForExpGrayCutsDict = pexConfig.DictField(
+        doc=("Per-band specification on whether to use star repeatability (instead of exposures) "
+             "for computing photometric cuts. Recommended for tract mode or bands with few visits."),
+        keytype=str,
+        itemtype=bool,
+        default={},
     )
     autoPhotometricCutNSig = pexConfig.Field(
         doc=("Number of sigma for automatic computation of (low) photometric cut. "
@@ -785,12 +902,17 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # Output the config for the next cycle
         # We need to make a copy since the input one has been frozen
 
+        updatedPhotometricCutDict = {b: float(fgcmFitCycle.updatedPhotometricCut[i]) for
+                                     i, b in enumerate(self.config.bands)}
+        updatedHighCutDict = {b: float(fgcmFitCycle.updatedHighCut[i]) for
+                              i, b in enumerate(self.config.bands)}
+
         outConfig = copy.copy(self.config)
         outConfig.update(cycleNumber=(self.config.cycleNumber + 1),
                          precomputeSuperStarInitialCycle=False,
                          freezeStdAtmosphere=False,
-                         expGrayPhotometricCut=fgcmFitCycle.updatedPhotometricCut,
-                         expGrayHighCut=fgcmFitCycle.updatedHighCut)
+                         expGrayPhotometricCutDict=updatedPhotometricCutDict,
+                         expGrayHighCutDict=updatedHighCutDict)
         configFileName = '%s_cycle%02d_config.py' % (outConfig.outfileBase,
                                                      outConfig.cycleNumber)
         outConfig.save(configFileName)
@@ -878,9 +1000,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         inParInfo = np.zeros(1, dtype=[('NCCD', 'i4'),
                                        ('LUTFILTERNAMES', parLutFilterNames.dtype.str,
-                                        parLutFilterNames.size),
-                                       ('FITBANDS', parFitBands.dtype.str, parFitBands.size),
-                                       ('NOTFITBANDS', parNotFitBands.dtype.str, parNotFitBands.size),
+                                        (parLutFilterNames.size, )),
+                                       ('FITBANDS', parFitBands.dtype.str, (parFitBands.size, )),
+                                       ('NOTFITBANDS', parNotFitBands.dtype.str, (parNotFitBands.size, )),
                                        ('LNTAUUNIT', 'f8'),
                                        ('LNTAUSLOPEUNIT', 'f8'),
                                        ('ALPHAUNIT', 'f8'),
@@ -900,74 +1022,74 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParInfo['HASEXTERNALPWV'] = parCat['hasExternalPwv']
         inParInfo['HASEXTERNALTAU'] = parCat['hasExternalTau']
 
-        inParams = np.zeros(1, dtype=[('PARALPHA', 'f8', parCat['parAlpha'].size),
-                                      ('PARO3', 'f8', parCat['parO3'].size),
+        inParams = np.zeros(1, dtype=[('PARALPHA', 'f8', (parCat['parAlpha'].size, )),
+                                      ('PARO3', 'f8', (parCat['parO3'].size, )),
                                       ('PARLNTAUINTERCEPT', 'f8',
-                                       parCat['parLnTauIntercept'].size),
+                                       (parCat['parLnTauIntercept'].size, )),
                                       ('PARLNTAUSLOPE', 'f8',
-                                       parCat['parLnTauSlope'].size),
+                                       (parCat['parLnTauSlope'].size, )),
                                       ('PARLNPWVINTERCEPT', 'f8',
-                                       parCat['parLnPwvIntercept'].size),
+                                       (parCat['parLnPwvIntercept'].size, )),
                                       ('PARLNPWVSLOPE', 'f8',
-                                       parCat['parLnPwvSlope'].size),
+                                       (parCat['parLnPwvSlope'].size, )),
                                       ('PARLNPWVQUADRATIC', 'f8',
-                                       parCat['parLnPwvQuadratic'].size),
+                                       (parCat['parLnPwvQuadratic'].size, )),
                                       ('PARQESYSINTERCEPT', 'f8',
-                                       parCat['parQeSysIntercept'].size),
+                                       (parCat['parQeSysIntercept'].size, )),
                                       ('COMPQESYSSLOPE', 'f8',
-                                       parCat['compQeSysSlope'].size),
+                                       (parCat['compQeSysSlope'].size, )),
                                       ('PARFILTEROFFSET', 'f8',
-                                       parCat['parFilterOffset'].size),
+                                       (parCat['parFilterOffset'].size, )),
                                       ('PARFILTEROFFSETFITFLAG', 'i2',
-                                       parCat['parFilterOffsetFitFlag'].size),
+                                       (parCat['parFilterOffsetFitFlag'].size, )),
                                       ('PARRETRIEVEDLNPWVSCALE', 'f8'),
                                       ('PARRETRIEVEDLNPWVOFFSET', 'f8'),
                                       ('PARRETRIEVEDLNPWVNIGHTLYOFFSET', 'f8',
-                                       parCat['parRetrievedLnPwvNightlyOffset'].size),
+                                       (parCat['parRetrievedLnPwvNightlyOffset'].size, )),
                                       ('COMPABSTHROUGHPUT', 'f8',
-                                       parCat['compAbsThroughput'].size),
+                                       (parCat['compAbsThroughput'].size, )),
                                       ('COMPREFOFFSET', 'f8',
-                                       parCat['compRefOffset'].size),
+                                       (parCat['compRefOffset'].size, )),
                                       ('COMPREFSIGMA', 'f8',
-                                       parCat['compRefSigma'].size),
+                                       (parCat['compRefSigma'].size, )),
                                       ('COMPMIRRORCHROMATICITY', 'f8',
-                                       parCat['compMirrorChromaticity'].size),
+                                       (parCat['compMirrorChromaticity'].size, )),
                                       ('MIRRORCHROMATICITYPIVOT', 'f8',
-                                       parCat['mirrorChromaticityPivot'].size),
+                                       (parCat['mirrorChromaticityPivot'].size, )),
                                       ('COMPAPERCORRPIVOT', 'f8',
-                                       parCat['compAperCorrPivot'].size),
+                                       (parCat['compAperCorrPivot'].size, )),
                                       ('COMPAPERCORRSLOPE', 'f8',
-                                       parCat['compAperCorrSlope'].size),
+                                       (parCat['compAperCorrSlope'].size, )),
                                       ('COMPAPERCORRSLOPEERR', 'f8',
-                                       parCat['compAperCorrSlopeErr'].size),
+                                       (parCat['compAperCorrSlopeErr'].size, )),
                                       ('COMPAPERCORRRANGE', 'f8',
-                                       parCat['compAperCorrRange'].size),
+                                       (parCat['compAperCorrRange'].size, )),
                                       ('COMPMODELERREXPTIMEPIVOT', 'f8',
-                                       parCat['compModelErrExptimePivot'].size),
+                                       (parCat['compModelErrExptimePivot'].size, )),
                                       ('COMPMODELERRFWHMPIVOT', 'f8',
-                                       parCat['compModelErrFwhmPivot'].size),
+                                       (parCat['compModelErrFwhmPivot'].size, )),
                                       ('COMPMODELERRSKYPIVOT', 'f8',
-                                       parCat['compModelErrSkyPivot'].size),
+                                       (parCat['compModelErrSkyPivot'].size, )),
                                       ('COMPMODELERRPARS', 'f8',
-                                       parCat['compModelErrPars'].size),
+                                       (parCat['compModelErrPars'].size, )),
                                       ('COMPEXPGRAY', 'f8',
-                                       parCat['compExpGray'].size),
+                                       (parCat['compExpGray'].size, )),
                                       ('COMPVARGRAY', 'f8',
-                                       parCat['compVarGray'].size),
+                                       (parCat['compVarGray'].size, )),
                                       ('COMPNGOODSTARPEREXP', 'i4',
-                                       parCat['compNGoodStarPerExp'].size),
+                                       (parCat['compNGoodStarPerExp'].size, )),
                                       ('COMPSIGFGCM', 'f8',
-                                       parCat['compSigFgcm'].size),
+                                       (parCat['compSigFgcm'].size, )),
                                       ('COMPSIGMACAL', 'f8',
-                                       parCat['compSigmaCal'].size),
+                                       (parCat['compSigmaCal'].size, )),
                                       ('COMPRETRIEVEDLNPWV', 'f8',
-                                       parCat['compRetrievedLnPwv'].size),
+                                       (parCat['compRetrievedLnPwv'].size, )),
                                       ('COMPRETRIEVEDLNPWVRAW', 'f8',
-                                       parCat['compRetrievedLnPwvRaw'].size),
+                                       (parCat['compRetrievedLnPwvRaw'].size, )),
                                       ('COMPRETRIEVEDLNPWVFLAG', 'i2',
-                                       parCat['compRetrievedLnPwvFlag'].size),
+                                       (parCat['compRetrievedLnPwvFlag'].size, )),
                                       ('COMPRETRIEVEDTAUNIGHT', 'f8',
-                                       parCat['compRetrievedTauNight'].size)])
+                                       (parCat['compRetrievedTauNight'].size, ))])
 
         inParams['PARALPHA'][:] = parCat['parAlpha'][0, :]
         inParams['PARO3'][:] = parCat['parO3'][0, :]

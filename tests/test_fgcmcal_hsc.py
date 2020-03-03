@@ -128,7 +128,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # Test the "final" fit cycle
         newConfig = copy.copy(self.config)
         newConfig.update(cycleNumber=2,
-                         ccdGraySubCcd=True,
+                         ccdGraySubCcdDict={'g': True, 'r': True, 'i': True},
                          isFinalCycle=True)
         self.config = newConfig
 

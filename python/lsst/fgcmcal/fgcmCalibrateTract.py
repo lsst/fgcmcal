@@ -83,7 +83,8 @@ class FgcmCalibrateTractConfig(pexConfig.Config):
 
         self.fgcmBuildStars.checkAllCcds = False
         self.fgcmBuildStars.densityCutMaxPerPixel = 10000
-        self.fgcmFitCycle.useRepeatabilityForExpGrayCuts = [True]
+        self.fgcmFitCycle.useRepeatabilityForExpGrayCutsDict = {b: True for
+                                                                b in self.fgcmFitCycle.bands}
         self.fgcmFitCycle.quietMode = True
         self.fgcmOutputProducts.doReferenceCalibration = False
         self.fgcmOutputProducts.doRefcatOutput = False
