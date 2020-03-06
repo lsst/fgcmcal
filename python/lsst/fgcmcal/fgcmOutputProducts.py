@@ -761,14 +761,30 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         self.log.info("Outputting %s objects" % (datasetType))
 
-        # Only output those that we have a calibration
-        # See fgcmFitCycle._makeZptSchema for flag definitions
-        selected = (zptCat['fgcmFlag'] < 16)
+        # Select visit/ccds where we have a calibration
+        # This includes ccds where we were able to interpolate from neighboring
+        # ccds.
+        cannot_compute = fgcm.fgcmUtilities.zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
+        too_few_stars = fgcm.fgcmUtilities.zpFlagDict['TOO_FEW_STARS_ON_CCD']
+        selected = (((zptCat['fgcmFlag'] & cannot_compute) == 0) &
+                    (zptCat['fgcmZptVar'] > 0.0))
 
-        # Get the mapping from filtername to dataId filter name
+        # We also select the "best" calibrations, avoiding interpolation.  These
+        # are only used for mapping filternames
+        selected_best = (((zptCat['fgcmFlag'] & (cannot_compute | too_few_stars)) == 0) &
+                         (zptCat['fgcmZptVar'] > 0.0))
+
+        # Log warnings for any visit which has no valid zeropoints
+        badVisits = np.unique(zptCat['visit'][~selected])
+        goodVisits = np.unique(zptCat['visit'][selected])
+        allBadVisits = badVisits[~np.isin(badVisits, goodVisits)]
+        for allBadVisit in allBadVisits:
+            self.log.warn(f'No suitable photoCalib for {self.visitDataRefName} {allBadVisit}')
+
+        # Get the mapping from filtername to dataId filter name, empirically
         filterMapping = {}
         nFound = 0
-        for rec in zptCat[selected]:
+        for rec in zptCat[selected_best]:
             if rec['filtername'] in filterMapping:
                 continue
             dataId = {self.visitDataRefName: int(rec['visit']),
