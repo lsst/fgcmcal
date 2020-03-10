@@ -83,12 +83,20 @@ class FgcmCalibrateTractConfig(pexConfig.Config):
 
         self.fgcmBuildStars.checkAllCcds = False
         self.fgcmBuildStars.densityCutMaxPerPixel = 10000
-        self.fgcmFitCycle.useRepeatabilityForExpGrayCuts = [True]
         self.fgcmFitCycle.quietMode = True
         self.fgcmOutputProducts.doReferenceCalibration = False
         self.fgcmOutputProducts.doRefcatOutput = False
         self.fgcmOutputProducts.cycleNumber = 0
         self.fgcmOutputProducts.photoCal.applyColorTerms = False
+
+    def validate(self):
+        super().validate()
+
+        for band in self.fgcmFitCycle.bands:
+            if not self.fgcmFitCycle.useRepeatabilityForExpGrayCutsDict[band]:
+                msg = 'Must set useRepeatabilityForExpGrayCutsDict[band]=True for all bands'
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.useRepeatabilityForExpGrayCutsDict,
+                                                     self, msg)
 
 
 class FgcmCalibrateTractRunner(pipeBase.ButlerInitializedTaskRunner):

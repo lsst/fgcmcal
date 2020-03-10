@@ -128,7 +128,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # Test the "final" fit cycle
         newConfig = copy.copy(self.config)
         newConfig.update(cycleNumber=2,
-                         ccdGraySubCcd=True,
+                         ccdGraySubCcdDict={'g': True, 'r': True, 'i': True},
                          isFinalCycle=True)
         self.config = newConfig
 
@@ -177,8 +177,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.otherArgs = []
 
         rawRepeatability = np.array([0.0, 0.00691888829016613, 0.00443888382172])
-        filterNCalibMap = {'HSC-R': 13,
-                           'HSC-I': 14}
+        filterNCalibMap = {'HSC-R': 17,
+                           'HSC-I': 16}
 
         visits = [903334, 903336, 903338, 903342, 903344, 903346,
                   903986, 903988, 903990, 904010, 904014]

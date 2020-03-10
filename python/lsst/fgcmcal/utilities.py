@@ -68,13 +68,8 @@ def makeConfigDict(config, log, camera, maxIter,
     configDict: `dict`
         Configuration dictionary for fgcm
     """
-
-    fitFlag = np.array(config.fitFlag, dtype=np.bool)
-    requiredFlag = np.array(config.requiredFlag, dtype=np.bool)
-
-    fitBands = [b for i, b in enumerate(config.bands) if fitFlag[i]]
-    notFitBands = [b for i, b in enumerate(config.bands) if not fitFlag[i]]
-    requiredBands = [b for i, b in enumerate(config.bands) if requiredFlag[i]]
+    # Extract the bands that are _not_ being fit for fgcm configuration
+    notFitBands = [b for b in config.bands if b not in config.fitBands]
 
     # process the starColorCuts
     starColorCutList = []
@@ -113,9 +108,9 @@ def makeConfigDict(config, log, camera, maxIter,
                   'skyBrightnessField': 'SKYBACKGROUND',
                   'deepFlag': 'DEEPFLAG',  # unused
                   'bands': list(config.bands),
-                  'fitBands': list(fitBands),
-                  'notFitBands': list(notFitBands),
-                  'requiredBands': list(requiredBands),
+                  'fitBands': list(config.fitBands),
+                  'notFitBands': notFitBands,
+                  'requiredBands': list(config.requiredBands),
                   'filterToBand': dict(config.filterMap),
                   'logLevel': 'INFO',  # FIXME
                   'nCore': config.nCore,
@@ -124,11 +119,11 @@ def makeConfigDict(config, log, camera, maxIter,
                   'reserveFraction': config.reserveFraction,
                   'freezeStdAtmosphere': config.freezeStdAtmosphere,
                   'precomputeSuperStarInitialCycle': config.precomputeSuperStarInitialCycle,
-                  'superStarSubCCD': config.superStarSubCcd,
+                  'superStarSubCCDDict': dict(config.superStarSubCcdDict),
                   'superStarSubCCDChebyshevOrder': config.superStarSubCcdChebyshevOrder,
                   'superStarSubCCDTriangular': config.superStarSubCcdTriangular,
                   'superStarSigmaClip': config.superStarSigmaClip,
-                  'ccdGraySubCCD': config.ccdGraySubCcd,
+                  'ccdGraySubCCDDict': dict(config.ccdGraySubCcdDict),
                   'ccdGraySubCCDChebyshevOrder': config.ccdGraySubCcdChebyshevOrder,
                   'ccdGraySubCCDTriangular': config.ccdGraySubCcdTriangular,
                   'cycleNumber': config.cycleNumber,
@@ -146,10 +141,10 @@ def makeConfigDict(config, log, camera, maxIter,
                   'minStarPerExp': config.minStarPerExp,
                   'minExpPerNight': config.minExpPerNight,
                   'expGrayInitialCut': config.expGrayInitialCut,
-                  'expGrayPhotometricCut': np.array(config.expGrayPhotometricCut),
-                  'expGrayHighCut': np.array(config.expGrayHighCut),
+                  'expGrayPhotometricCutDict': dict(config.expGrayPhotometricCutDict),
+                  'expGrayHighCutDict': dict(config.expGrayHighCutDict),
                   'expGrayRecoverCut': config.expGrayRecoverCut,
-                  'expVarGrayPhotometricCut': config.expVarGrayPhotometricCut,
+                  'expVarGrayPhotometricCutDict': dict(config.expVarGrayPhotometricCutDict),
                   'expGrayErrRecoverCut': config.expGrayErrRecoverCut,
                   'refStarSnMin': config.refStarSnMin,
                   'refStarOutlierNSig': config.refStarOutlierNSig,
@@ -157,14 +152,14 @@ def makeConfigDict(config, log, camera, maxIter,
                   'illegalValue': -9999.0,  # internally used by fgcm.
                   'starColorCuts': starColorCutList,
                   'aperCorrFitNBins': config.aperCorrFitNBins,
-                  'aperCorrInputSlopes': np.array(config.aperCorrInputSlopes),
+                  'aperCorrInputSlopeDict': dict(config.aperCorrInputSlopeDict),
                   'sedBoundaryTermDict': config.sedboundaryterms.toDict()['data'],
                   'sedTermDict': config.sedterms.toDict()['data'],
-                  'colorSplitIndices': np.array(config.colorSplitIndices),
+                  'colorSplitBands': list(config.colorSplitBands),
                   'sigFgcmMaxErr': config.sigFgcmMaxErr,
-                  'sigFgcmMaxEGray': list(config.sigFgcmMaxEGray),
+                  'sigFgcmMaxEGrayDict': dict(config.sigFgcmMaxEGrayDict),
                   'ccdGrayMaxStarErr': config.ccdGrayMaxStarErr,
-                  'approxThroughput': list(config.approxThroughput),
+                  'approxThroughputDict': dict(config.approxThroughputDict),
                   'sigmaCalRange': list(config.sigmaCalRange),
                   'sigmaCalFitPercentile': list(config.sigmaCalFitPercentile),
                   'sigmaCalPlotPercentile': list(config.sigmaCalPlotPercentile),
@@ -183,7 +178,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'instrumentParsPerBand': config.instrumentParsPerBand,
                   'instrumentSlopeMinDeltaT': config.instrumentSlopeMinDeltaT,
                   'fitMirrorChromaticity': config.fitMirrorChromaticity,
-                  'useRepeatabilityForExpGrayCuts': list(config.useRepeatabilityForExpGrayCuts),
+                  'useRepeatabilityForExpGrayCutsDict': dict(config.useRepeatabilityForExpGrayCutsDict),
                   'autoPhotometricCutNSig': config.autoPhotometricCutNSig,
                   'autoHighCutNSig': config.autoHighCutNSig,
                   'printOnly': False,
