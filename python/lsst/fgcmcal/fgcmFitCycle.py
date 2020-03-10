@@ -58,9 +58,9 @@ class FgcmFitCycleConfig(pexConfig.Config):
     """Config for FgcmFitCycle"""
 
     bands = pexConfig.ListField(
-        doc="Bands to run calibration (in wavelength order)",
+        doc="Bands to run calibration",
         dtype=str,
-        default=("NO_DATA",),
+        default=[],
     )
     fitFlag = pexConfig.ListField(
         doc=("Flag for which bands are directly constrained in the FGCM fit. "
@@ -74,8 +74,9 @@ class FgcmFitCycleConfig(pexConfig.Config):
                     "It will be removed after v20.  Use fitBands instead."),
     )
     fitBands = pexConfig.ListField(
-        doc=("Bands to use in atmospheric fit.  Other bands will have atmosphere constrained "
-             "from observations in the other bands on the same night."),
+        doc=("Bands to use in atmospheric fit. The bands not listed here will have "
+             "the atmosphere constrained from the 'fitBands' on the same night. "
+             "Must be a subset of `config.bands`"),
         dtype=str,
         default=[],
     )
@@ -90,7 +91,8 @@ class FgcmFitCycleConfig(pexConfig.Config):
                     "It will be removed after v20.  Use requiredBands instead."),
     )
     requiredBands = pexConfig.ListField(
-        doc="Bands that are required for a star to be considered a calibration star.",
+        doc=("Bands that are required for a star to be considered a calibration star. "
+             "Must be a subset of `config.bands`"),
         dtype=str,
         default=[],
     )
@@ -160,7 +162,8 @@ class FgcmFitCycleConfig(pexConfig.Config):
                     "It will be removed after v20.  Use superStarSubCcdDict instead."),
     )
     superStarSubCcdDict = pexConfig.DictField(
-        doc="Per-band specification on whether to compute superstar flat on sub-ccd scale.",
+        doc=("Per-band specification on whether to compute superstar flat on sub-ccd scale. "
+             "Must have one entry per band."),
         keytype=str,
         itemtype=bool,
         default={},
@@ -192,7 +195,8 @@ class FgcmFitCycleConfig(pexConfig.Config):
                     "It will be removed after v20.  Use ccdGraySubCcdDict instead."),
     )
     ccdGraySubCcdDict = pexConfig.DictField(
-        doc="Per-band specification on whether to compute ccd gray on sub-ccd scale.",
+        doc=("Per-band specification on whether to compute achromatic per-ccd residual "
+             "('ccd gray') on a sub-ccd scale."),
         keytype=str,
         itemtype=bool,
         default={},
@@ -311,8 +315,9 @@ class FgcmFitCycleConfig(pexConfig.Config):
                     "It will be removed after v20.  Use expGrayPhotometricCutDict instead."),
     )
     expGrayPhotometricCutDict = pexConfig.DictField(
-        doc=("Per-band specification on maximum (negative) exposure gray for a visit to be "
-             "considered photometric.  Must have one entry per band."),
+        doc=("Per-band specification on maximum (negative) achromatic exposure residual "
+             "('gray term') for a visit to be considered photometric.  Must have one "
+             "entry per band. Broad-band filters should be -0.05."),
         keytype=str,
         itemtype=float,
         default={},
@@ -327,8 +332,9 @@ class FgcmFitCycleConfig(pexConfig.Config):
                     "It will be removed after v20.  Use expGrayHighCutDict instead."),
     )
     expGrayHighCutDict = pexConfig.DictField(
-        doc=("Per-band specification on maximum (positive) exposure gray for a visit to be "
-             "considered photometric.  Must have one entry per band."),
+        doc=("Per-band specification on maximum (positive) achromatic exposure residual "
+             "('gray term') for a visit to be considered photometric.  Must have one "
+             "entry per band.  Broad-band filters should be 0.2."),
         keytype=str,
         itemtype=float,
         default={},
@@ -350,7 +356,8 @@ class FgcmFitCycleConfig(pexConfig.Config):
     )
     expVarGrayPhotometricCutDict = pexConfig.DictField(
         doc=("Per-band specification on maximum exposure variance to be considered possibly "
-             "photometric."),
+             "photometric.  Must have one entry per band.  Broad-band filters should be "
+             "0.0005."),
         keytype=str,
         itemtype=float,
         default={},
@@ -423,14 +430,16 @@ class FgcmFitCycleConfig(pexConfig.Config):
                     "It will be removed after v20.  Use sigFgcmMaxEGrayDict instead."),
     )
     sigFgcmMaxEGrayDict = pexConfig.DictField(
-        doc=("Per-band specification for maximum (absolute) gray value for observations in "
-             "sigma_fgcm."),
+        doc=("Per-band specification for maximum (absolute) achromatic residual (gray value) "
+             "for observations in sigma_fgcm (raw repeatability).  Broad-band filters "
+             "should be 0.05."),
         keytype=str,
         itemtype=float,
         default={},
     )
     ccdGrayMaxStarErr = pexConfig.Field(
-        doc="Maximum error on a star observation to use in ccd gray computation",
+        doc=("Maximum error on a star observation to use in ccd gray (achromatic residual) "
+             "computation"),
         dtype=float,
         default=0.10,
     )
@@ -445,7 +454,8 @@ class FgcmFitCycleConfig(pexConfig.Config):
     )
     approxThroughputDict = pexConfig.DictField(
         doc=("Per-band specification of the approximate overall throughput at the start of "
-             "calibration observations."),
+             "calibration observations.  Must have one entry per band.  Typically should "
+             "be 1.0."),
         keytype=str,
         itemtype=float,
         default={},
@@ -501,7 +511,8 @@ class FgcmFitCycleConfig(pexConfig.Config):
     colorSplitBands = pexConfig.ListField(
         doc="Band names to use to split stars by color.  Must have 2 entries.",
         dtype=str,
-        default=None,
+        length=2,
+        default=('g', 'i'),
     )
     modelMagErrors = pexConfig.Field(
         doc="Should FGCM model the magnitude errors from sky/fwhm? (False means trust inputs)",
@@ -587,6 +598,55 @@ class FgcmFitCycleConfig(pexConfig.Config):
 
     def setDefaults(self):
         pass
+
+    def validate(self):
+        super().validate()
+
+        for band in self.fitBands:
+            if band not in self.bands:
+                msg = 'fitBand %s not in bands' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.fitBands, self, msg)
+        for band in self.requiredBands:
+            if band not in self.bands:
+                msg = 'requiredBand %s not in bands' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.requiredBands, self, msg)
+        for band in self.colorSplitBands:
+            if band not in self.bands:
+                msg = 'colorSplitBand %s not in bands' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.colorSplitBands, self, msg)
+        for band in self.bands:
+            if band not in self.superStarSubCcdDict:
+                msg = 'band %s not in superStarSubCcdDict' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.superStarSubCcdDict,
+                                                     self, msg)
+            if band not in self.ccdGraySubCcdDict:
+                msg = 'band %s not in ccdGraySubCcdDict' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.ccdGraySubCcdDict,
+                                                     self, msg)
+            if band not in self.expGrayPhotometricCutDict:
+                msg = 'band %s not in expGrayPhotometricCutDict' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.expGrayPhotometricCutDict,
+                                                     self, msg)
+            if band not in self.expGrayHighCutDict:
+                msg = 'band %s not in expGrayHighCutDict' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.expGrayHighCutDict,
+                                                     self, msg)
+            if band not in self.expVarGrayPhotometricCutDict:
+                msg = 'band %s not in expVarGrayPhotometricCutDict' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.expVarGrayPhotometricCutDict,
+                                                     self, msg)
+            if band not in self.sigFgcmMaxEGrayDict:
+                msg = 'band %s not in sigFgcmMaxEGrayDict' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.sigFgcmMaxEGrayDict,
+                                                     self, msg)
+            if band not in self.approxThroughputDict:
+                msg = 'band %s not in approxThroughputDict' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.approxThroughputDict,
+                                                     self, msg)
+            if band not in self.useRepeatabilityForExpGrayCutsDict:
+                msg = 'band %s not in useRepeatabilityForExpGrayCutsDict' % (band)
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.useRepeatabilityForExpGrayCutsDict,
+                                                     self, msg)
 
 
 class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
@@ -904,8 +964,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         updatedPhotometricCutDict = {b: float(fgcmFitCycle.updatedPhotometricCut[i]) for
                                      i, b in enumerate(self.config.bands)}
-        updatedHighCutDict = {b: float(fgcmFitCycle.updatedHighCut[i]) for
-                              i, b in enumerate(self.config.bands)}
+        updatedHighCutDict = {band: float(fgcmFitCycle.updatedHighCut[i]) for
+                              i, band in enumerate(self.config.bands)}
 
         outConfig = copy.copy(self.config)
         outConfig.update(cycleNumber=(self.config.cycleNumber + 1),
