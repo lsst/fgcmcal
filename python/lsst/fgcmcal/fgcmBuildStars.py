@@ -363,6 +363,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            fails if the calibFlux is not a CircularAperture flux.
         """
 
+        self.log.info("Running with %d dataRefs" % (len(dataRefs)))
+
         if self.config.doReferenceMatches:
             # Ensure that we have a LUT
             if not butler.datasetExists('fgcmLookUpTable'):
@@ -434,6 +436,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         visitCat: `afw.table.BaseCatalog`
         """
 
+        self.log.info("Assembling visitCatalog from %d %ss" %
+                      (len(groupedDataRefs), self.config.visitDataRefName))
+
         nCcd = len(camera)
 
         schema = self._makeFgcmVisitSchema(nCcd)
@@ -465,6 +470,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # not have a bypass
             # TODO: When DM-15500 is implemented in the Gen3 Butler, this
             # can be fixed
+
+            if (i % 500) == 0:
+                self.log.info("Retrieving metadata for %s %d (%d/%d)" %
+                              (self.config.visitDataRefName, visit, i, len(groupedDataRefs)))
 
             # Note that the reference ccd is first in the list (if available).
 
@@ -530,6 +539,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            Dictionary with visit keys, and `list`s of `lsst.daf.persistence.ButlerDataRef`
         """
 
+        self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
+
         camera = butler.get('camera')
 
         ccdIds = []
@@ -540,6 +551,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # will be unnecessary with Gen3 Butler.  This should be part of
         # DM-13730.
 
+        nVisits = 0
+
         groupedDataRefs = {}
         for dataRef in dataRefs:
             visit = dataRef.dataId[self.config.visitDataRefName]
@@ -548,6 +561,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 continue
             # If we need to check all ccds, do it here
             if self.config.checkAllCcds:
+                if visit in groupedDataRefs:
+                    # We already have found this visit
+                    continue
                 dataId = dataRef.dataId.copy()
                 # For each ccd we must check that a valid source catalog exists.
                 for ccdId in ccdIds:
@@ -558,6 +574,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                             if (goodDataRef.dataId[self.config.ccdDataRefName] not in
                                [d.dataId[self.config.ccdDataRefName] for d in groupedDataRefs[visit]]):
                                 groupedDataRefs[visit].append(goodDataRef)
+                                nVisits += 1
                         else:
                             groupedDataRefs[visit] = [goodDataRef]
             else:
@@ -567,8 +584,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     if (dataRef.dataId[self.config.ccdDataRefName] not in
                        [d.dataId[self.config.ccdDataRefName] for d in groupedDataRefs[visit]]):
                         groupedDataRefs[visit].append(dataRef)
+                        nVisits += 1
                 else:
                     groupedDataRefs[visit] = [dataRef]
+
+            if (nVisits % 100) == 0 and nVisits > 0:
+                self.log.info("Found %d unique %ss..." % (nVisits,
+                                                          self.config.visitDataRefName))
+
+        self.log.info("Found %d unique %ss total." % (nVisits,
+                                                      self.config.visitDataRefName))
 
         # Put them in ccd order, with the reference ccd first (if available)
         def ccdSorter(dataRef):
