@@ -574,8 +574,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                             if (goodDataRef.dataId[self.config.ccdDataRefName] not in
                                [d.dataId[self.config.ccdDataRefName] for d in groupedDataRefs[visit]]):
                                 groupedDataRefs[visit].append(goodDataRef)
-                                nVisits += 1
                         else:
+                            # This is a new visit
+                            nVisits += 1
                             groupedDataRefs[visit] = [goodDataRef]
             else:
                 # We have already confirmed that the dataset exists, so no need
@@ -584,8 +585,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     if (dataRef.dataId[self.config.ccdDataRefName] not in
                        [d.dataId[self.config.ccdDataRefName] for d in groupedDataRefs[visit]]):
                         groupedDataRefs[visit].append(dataRef)
-                        nVisits += 1
                 else:
+                    # This is a new visit
+                    nVisits += 1
                     groupedDataRefs[visit] = [dataRef]
 
             if (nVisits % 100) == 0 and nVisits > 0:
