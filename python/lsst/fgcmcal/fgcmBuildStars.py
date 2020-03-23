@@ -416,7 +416,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             self.log.info("Found fgcmStarIds and fgcmStarIndices")
 
         # Persist catalogs via the butler
-        # butler.put(visitCat, 'fgcmVisitCatalog')
+        butler.put(visitCat, 'fgcmVisitCatalog')
         # butler.put(fgcmStarObservationCat, 'fgcmStarObservations')
         butler.put(fgcmStarIdCat, 'fgcmStarIds')
         butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
