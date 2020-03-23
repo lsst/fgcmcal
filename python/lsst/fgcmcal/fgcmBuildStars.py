@@ -394,6 +394,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             self.log.info("Found fgcmVisitCatalog.")
             visitCat = butler.get('fgcmVisitCatalog')
 
+        butler.put(visitCat, 'fgcmVisitCatalog')
+
         # Compile all the stars
         if not butler.datasetExists('fgcmStarObservations'):
             rad = calibFluxApertureRadius
@@ -404,6 +406,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             self.log.info("Found fgcmStarObservations")
             fgcmStarObservationCat = butler.get('fgcmStarObservations')
 
+        butler.put(fgcmStarObservationCat, 'fgcmStarObservations')
+
         if not butler.datasetExists('fgcmStarIds') or not butler.datasetExists('fgcmStarIndices'):
             fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = self.fgcmMatchStars(butler,
                                                                                 visitCat,
@@ -412,8 +416,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             self.log.info("Found fgcmStarIds and fgcmStarIndices")
 
         # Persist catalogs via the butler
-        butler.put(visitCat, 'fgcmVisitCatalog')
-        butler.put(fgcmStarObservationCat, 'fgcmStarObservations')
+        # butler.put(visitCat, 'fgcmVisitCatalog')
+        # butler.put(fgcmStarObservationCat, 'fgcmStarObservations')
         butler.put(fgcmStarIdCat, 'fgcmStarIds')
         butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
         if fgcmRefCat is not None:
