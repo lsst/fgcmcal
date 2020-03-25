@@ -196,6 +196,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         target=FgcmLoadReferenceCatalogTask,
         doc="FGCM reference object loader",
     )
+    # reuseExistingFiles = pexConfig.Field(
+    #     doc="Reuse existing files if found",
+    #     dtype=bool,
+    #     default=False,
+    # )
 
     def setDefaults(self):
         sourceSelector = self.sourceSelector["science"]
@@ -387,24 +392,30 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         camera = butler.get('camera')
 
         # Make the visit catalog if necessary
-        if not butler.datasetExists('fgcmVisitCatalog'):
+        visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs, butler)
+
+        # if not butler.datasetExists('fgcmVisitCatalog'):
             # we need to build visitCat
-            visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs)
-        else:
-            self.log.info("Found fgcmVisitCatalog.")
-            visitCat = butler.get('fgcmVisitCatalog')
+        #     visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs)
+        # else:
+        #     self.log.info("Found fgcmVisitCatalog.")
+        #     visitCat = butler.get('fgcmVisitCatalog')
 
         butler.put(visitCat, 'fgcmVisitCatalog')
 
         # Compile all the stars
-        if not butler.datasetExists('fgcmStarObservations'):
-            rad = calibFluxApertureRadius
-            fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
-                                                                      visitCat,
-                                                                      calibFluxApertureRadius=rad)
-        else:
-            self.log.info("Found fgcmStarObservations")
-            fgcmStarObservationCat = butler.get('fgcmStarObservations')
+        # if not butler.datasetExists('fgcmStarObservations'):
+        #    rad = calibFluxApertureRadius
+        #    fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
+        #                                                              visitCat,
+        #                                                              calibFluxApertureRadius=rad)
+        #else:
+        #    self.log.info("Found fgcmStarObservations")
+        #    fgcmStarObservationCat = butler.get('fgcmStarObservations')
+        rad = calibFluxApertureRadius
+        fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
+                                                                  visitCat, butler,
+                                                                  calibFluxApertureRadius=rad)
 
         butler.put(fgcmStarObservationCat, 'fgcmStarObservations')
 
@@ -423,7 +434,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         if fgcmRefCat is not None:
             butler.put(fgcmRefCat, 'fgcmReferenceStars')
 
-    def fgcmMakeVisitCatalog(self, camera, groupedDataRefs):
+    def fgcmMakeVisitCatalog(self, camera, groupedDataRefs, butler):
         """
         Make a visit catalog with all the keys from each visit
 
@@ -445,16 +456,31 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         nCcd = len(camera)
 
-        schema = self._makeFgcmVisitSchema(nCcd)
+        rebuildCatalog = False
+        if butler.datasetExists('fgcmVisitCatalog'):
+            visitCat = butler.get('fgcmVisitCatalog')
 
-        visitCat = afwTable.BaseCatalog(schema)
-        visitCat.reserve(len(groupedDataRefs))
+            if len(visitCat) != len(groupedDataRefs):
+                self.log.info("Existing visitCatalog found, but has inconsistent number of visits.  Rebuilding...")
+                rebuildCatalog = True
+        else:
+            rebuildCatalog = True
 
-        self._fillVisitCatalog(visitCat, groupedDataRefs)
+        if rebuildCatalog:
+            schema = self._makeFgcmVisitSchema(nCcd)
+
+            visitCat = afwTable.BaseCatalog(schema)
+            visitCat.reserve(len(groupedDataRefs))
+
+            for i, visit in enumerate(sorted(groupedDataRefs)):
+                rec = visitCat.addNew()
+                rec['visit'] = visit
+
+        self._fillVisitCatalog(visitCat, groupedDataRefs, butler)
 
         return visitCat
 
-    def _fillVisitCatalog(self, visitCat, groupedDataRefs):
+    def _fillVisitCatalog(self, visitCat, groupedDataRefs, butler):
         """
         Fill the visit catalog with visit metadata
 
@@ -475,9 +501,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             # TODO: When DM-15500 is implemented in the Gen3 Butler, this
             # can be fixed
 
+            # Do not read those that have already been read
+            if visitCat['used'][i]:
+                continue
+
             if (i % 500) == 0:
                 self.log.info("Retrieving metadata for %s %d (%d/%d)" %
                               (self.config.visitDataRefName, visit, i, len(groupedDataRefs)))
+                # Save checkpoint
+                butler.put(visitCat, 'fgcmVisitCatalog')
 
             # Note that the reference ccd is first in the list (if available).
 
@@ -491,7 +523,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             f = exp.getFilter()
             psf = exp.getPsf()
 
-            rec = visitCat.addNew()
+            # rec = visitCat.addNew()
+            rec = visitCat[i]
             rec['visit'] = visit
             rec['filtername'] = f.getName()
             radec = visitInfo.getBoresightRaDec()
@@ -523,6 +556,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 self.log.warn('Sky background not found for visit %d / ccd %d' %
                               (visit, dataRef.dataId[self.config.ccdDataRefName]))
                 rec['skyBackground'] = -1.0
+
+            rec['used'] = True
+            rec['sources_read'] = False
 
     def findAndGroupDataRefs(self, butler, dataRefs):
         """
@@ -616,7 +652,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         return groupedDataRefs
 
-    def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
+    def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat, butler,
                                     calibFluxApertureRadius=None):
         """
         Compile all good star observations from visits in visitCat.
@@ -663,7 +699,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         aperMapper = self._makeAperMapper(sourceSchema)
 
         outputSchema = sourceMapper.getOutputSchema()
-        fullCatalog = afwTable.BaseCatalog(outputSchema)
+
+        if butler.datasetExists('fgcmStarObservations'):
+            fullCatalog = butler.get('fgcmStarObservations')
+            if (not fullCatalog.schema.compare(outputSchema, outputSchema.EQUAL_KEYS) or
+                not fullCatalog.schema.compare(outputSchema, outputSchema.EQUAL_NAMES)):
+                raise RuntimeError("Existing fgcmStarObservations file found with mismatched schema.")
+        else:
+            fullCatalog = afwTable.BaseCatalog(outputSchema)
 
         # FGCM will provide relative calibration for the flux in config.instFluxField
 
@@ -695,7 +738,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         k = 2.5 / np.log(10.)
 
         # loop over visits
-        for visit in visitCat:
+        for ctr, visit in enumerate(visitCat):
+            if visit['sources_read']:
+                continue
+
             expTime = visit['exptime']
 
             nStarInVisit = 0
@@ -796,9 +842,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                   np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
             visit['deltaAper'] = np.median(instMagIn[ok] - instMagOut[ok])
+            visit['sources_read'] = True
 
             self.log.info("  Found %d good stars in visit %d (deltaAper = %.3f)" %
                           (nStarInVisit, visit['visit'], visit['deltaAper']))
+
+            if (ctr % 500) == 0:
+                butler.put(fullCatalog, 'fgcmStarObservations')
+                butler.put(visitCat, 'fgcmVisitCatalog')
 
         self.log.info("Found all good star observations in %.2f s" %
                       (time.time() - startTime))
@@ -986,6 +1037,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         schema.addField('deepFlag', type=np.int32, doc="Deep observation")
         schema.addField('scaling', type='ArrayD', doc="Scaling applied due to flat adjustment",
                         size=nCcd)
+        schema.addField('used', type=np.bool, doc="This visit has been ingested.")
+        schema.addField('sources_read', type=np.bool, doc="This visit had sources read.")
 
         return schema
 
