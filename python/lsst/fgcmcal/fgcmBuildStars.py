@@ -395,7 +395,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs, butler)
 
         # if not butler.datasetExists('fgcmVisitCatalog'):
-            # we need to build visitCat
+        # we need to build visitCat
         #     visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs)
         # else:
         #     self.log.info("Found fgcmVisitCatalog.")
@@ -409,7 +409,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         #    fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
         #                                                              visitCat,
         #                                                              calibFluxApertureRadius=rad)
-        #else:
+        # else:
         #    self.log.info("Found fgcmStarObservations")
         #    fgcmStarObservationCat = butler.get('fgcmStarObservations')
         rad = calibFluxApertureRadius
@@ -461,7 +461,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             visitCat = butler.get('fgcmVisitCatalog')
 
             if len(visitCat) != len(groupedDataRefs):
-                self.log.info("Existing visitCatalog found, but has inconsistent number of visits.  Rebuilding...")
+                self.log.info("Existing visitCatalog found, but has inconsistent number of visits. "
+                              "Rebuilding...")
                 rebuildCatalog = True
         else:
             rebuildCatalog = True
@@ -702,8 +703,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         if butler.datasetExists('fgcmStarObservations'):
             fullCatalog = butler.get('fgcmStarObservations')
-            if (not fullCatalog.schema.compare(outputSchema, outputSchema.EQUAL_KEYS) or
-                not fullCatalog.schema.compare(outputSchema, outputSchema.EQUAL_NAMES)):
+            comp1 = fullCatalog.schema.compare(outputSchema, outputSchema.EQUAL_KEYS)
+            comp2 = fullCatalog.schema.compare(outputSchema, outputSchema.EQUAL_NAMES)
+            if not comp1 or not comp2:
                 raise RuntimeError("Existing fgcmStarObservations file found with mismatched schema.")
         else:
             fullCatalog = afwTable.BaseCatalog(outputSchema)
