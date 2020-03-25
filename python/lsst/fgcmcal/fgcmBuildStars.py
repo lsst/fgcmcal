@@ -476,6 +476,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             for i, visit in enumerate(sorted(groupedDataRefs)):
                 rec = visitCat.addNew()
                 rec['visit'] = visit
+                rec['used'] = 0
+                rec['sources_read'] = 0
 
         self._fillVisitCatalog(visitCat, groupedDataRefs, butler)
 
@@ -558,8 +560,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                               (visit, dataRef.dataId[self.config.ccdDataRefName]))
                 rec['skyBackground'] = -1.0
 
-            rec['used'] = True
-            rec['sources_read'] = False
+            rec['used'] = 1
 
     def findAndGroupDataRefs(self, butler, dataRefs):
         """
@@ -844,7 +845,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                   np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
             visit['deltaAper'] = np.median(instMagIn[ok] - instMagOut[ok])
-            visit['sources_read'] = True
+            visit['sources_read'] = 1
 
             self.log.info("  Found %d good stars in visit %d (deltaAper = %.3f)" %
                           (nStarInVisit, visit['visit'], visit['deltaAper']))
@@ -1039,8 +1040,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         schema.addField('deepFlag', type=np.int32, doc="Deep observation")
         schema.addField('scaling', type='ArrayD', doc="Scaling applied due to flat adjustment",
                         size=nCcd)
-        schema.addField('used', type=np.bool, doc="This visit has been ingested.")
-        schema.addField('sources_read', type=np.bool, doc="This visit had sources read.")
+        schema.addField('used', type=np.int32, doc="This visit has been ingested.")
+        schema.addField('sources_read', type=np.int32, doc="This visit had sources read.")
 
         return schema
 
