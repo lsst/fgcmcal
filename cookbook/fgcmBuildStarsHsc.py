@@ -33,6 +33,8 @@ config.primaryBands = ['i']
 config.doReferenceMatches = True
 # Subtract the local background before performing calibration?
 config.doSubtractLocalBackground = True
+# Number of visits read between checkpoints
+config.nVisitsPerCheckpoint = 100
 
 # Reference object loader configuration parameters
 config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'

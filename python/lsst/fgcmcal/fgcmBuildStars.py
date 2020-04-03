@@ -435,8 +435,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                                                             fgcmStarObservationCat)
 
         # Persist catalogs via the butler
-        # butler.put(visitCat, 'fgcmVisitCatalog')
-        # butler.put(fgcmStarObservationCat, 'fgcmStarObservations')
         butler.put(fgcmStarIdCat, 'fgcmStarIds')
         butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
         if fgcmRefCat is not None:
@@ -537,7 +535,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             f = exp.getFilter()
             psf = exp.getPsf()
 
-            # rec = visitCat.addNew()
             rec = visitCat[i]
             rec['visit'] = visit
             rec['filtername'] = f.getName()
