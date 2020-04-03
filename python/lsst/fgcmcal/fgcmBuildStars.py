@@ -29,6 +29,7 @@ star observations into unique stars, and performs as much cleaning of
 the input catalog as possible.
 """
 
+import os
 import sys
 import time
 import traceback
@@ -196,11 +197,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         target=FgcmLoadReferenceCatalogTask,
         doc="FGCM reference object loader",
     )
-    # reuseExistingFiles = pexConfig.Field(
-    #     doc="Reuse existing files if found",
-    #     dtype=bool,
-    #     default=False,
-    # )
+    nVisitsPerCheckpoint = pexConfig.Field(
+        doc="Number of visits read between checkpoints",
+        dtype=int,
+        default=500,
+    )
 
     def setDefaults(self):
         sourceSelector = self.sourceSelector["science"]
@@ -392,49 +393,57 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         camera = butler.get('camera')
 
         # Make the visit catalog if necessary
-        visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs, butler)
+        # First check if the visit catalog is in the current path
+        visitCatDataRef = butler.dataRef('fgcmVisitCatalog')
+        filename = visitCatDataRef.get('fgcmVisitCatalog_filename')[0]
+        if os.path.exists(filename):
+            # This file exists and we should continue processing
+            inVisitCat = visitCatDataRef.get()
+            if len(inVisitCat) != len(groupedDataRefs):
+                raise RuntimeError("Existing visitCatalog found, but has an inconsistent "
+                                   "number of visits.  Cannot continue.")
+        else:
+            inVisitCat = None
 
-        # if not butler.datasetExists('fgcmVisitCatalog'):
-        # we need to build visitCat
-        #     visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs)
-        # else:
-        #     self.log.info("Found fgcmVisitCatalog.")
-        #     visitCat = butler.get('fgcmVisitCatalog')
+        visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs,
+                                             visitCatDataRef=visitCatDataRef,
+                                             inVisitCat=inVisitCat)
 
-        butler.put(visitCat, 'fgcmVisitCatalog')
+        # Persist the visitCat as a checkpoint file.
+        visitCatDataRef.put(visitCat)
 
-        # Compile all the stars
-        # if not butler.datasetExists('fgcmStarObservations'):
-        #    rad = calibFluxApertureRadius
-        #    fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
-        #                                                              visitCat,
-        #                                                              calibFluxApertureRadius=rad)
-        # else:
-        #    self.log.info("Found fgcmStarObservations")
-        #    fgcmStarObservationCat = butler.get('fgcmStarObservations')
+        starObsDataRef = butler.dataRef('fgcmStarObservations')
+        filename = starObsDataRef.get('fgcmStarObservations_filename')[0]
+        if os.path.exists(filename):
+            inStarObsCat = starObsDataRef.get()
+        else:
+            inStarObsCat = None
+
         rad = calibFluxApertureRadius
         fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
-                                                                  visitCat, butler,
-                                                                  calibFluxApertureRadius=rad)
+                                                                  visitCat,
+                                                                  calibFluxApertureRadius=rad,
+                                                                  starObsDataRef=starObsDataRef,
+                                                                  visitCatDataRef=visitCatDataRef,
+                                                                  inStarObsCat=inStarObsCat)
+        visitCatDataRef.put(visitCat)
+        starObsDataRef.put(fgcmStarObservationCat)
 
-        butler.put(fgcmStarObservationCat, 'fgcmStarObservations')
-
-        if not butler.datasetExists('fgcmStarIds') or not butler.datasetExists('fgcmStarIndices'):
-            fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = self.fgcmMatchStars(butler,
-                                                                                visitCat,
-                                                                                fgcmStarObservationCat)
-        else:
-            self.log.info("Found fgcmStarIds and fgcmStarIndices")
+        # Always do the matching.
+        fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = self.fgcmMatchStars(butler,
+                                                                            visitCat,
+                                                                            fgcmStarObservationCat)
 
         # Persist catalogs via the butler
-        butler.put(visitCat, 'fgcmVisitCatalog')
+        # butler.put(visitCat, 'fgcmVisitCatalog')
         # butler.put(fgcmStarObservationCat, 'fgcmStarObservations')
         butler.put(fgcmStarIdCat, 'fgcmStarIds')
         butler.put(fgcmStarIndicesCat, 'fgcmStarIndices')
         if fgcmRefCat is not None:
             butler.put(fgcmRefCat, 'fgcmReferenceStars')
 
-    def fgcmMakeVisitCatalog(self, camera, groupedDataRefs, butler):
+    def fgcmMakeVisitCatalog(self, camera, groupedDataRefs,
+                             visitCatDataRef=None, inVisitCat=None):
         """
         Make a visit catalog with all the keys from each visit
 
@@ -445,6 +454,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         groupedDataRefs: `dict`
            Dictionary with visit keys, and `list`s of
            `lsst.daf.persistence.ButlerDataRef`
+        visitCatDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
+           Dataref to write visitCat for checkpoints
+        inVisitCat: `afw.table.BaseCatalog`
+           Input (possibly incomplete) visit catalog
 
         Returns
         -------
@@ -456,18 +469,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         nCcd = len(camera)
 
-        rebuildCatalog = False
-        if butler.datasetExists('fgcmVisitCatalog'):
-            visitCat = butler.get('fgcmVisitCatalog')
-
-            if len(visitCat) != len(groupedDataRefs):
-                self.log.info("Existing visitCatalog found, but has inconsistent number of visits. "
-                              "Rebuilding...")
-                rebuildCatalog = True
-        else:
-            rebuildCatalog = True
-
-        if rebuildCatalog:
+        if inVisitCat is None:
             schema = self._makeFgcmVisitSchema(nCcd)
 
             visitCat = afwTable.BaseCatalog(schema)
@@ -478,12 +480,18 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 rec['visit'] = visit
                 rec['used'] = 0
                 rec['sources_read'] = 0
+        else:
+            visitCat = inVisitCat
 
-        self._fillVisitCatalog(visitCat, groupedDataRefs, butler)
+        # No matter what, fill the catalog. This will check if it was
+        # already read.
+        self._fillVisitCatalog(visitCat, groupedDataRefs,
+                               visitCatDataRef=visitCatDataRef)
 
         return visitCat
 
-    def _fillVisitCatalog(self, visitCat, groupedDataRefs, butler):
+    def _fillVisitCatalog(self, visitCat, groupedDataRefs,
+                          visitCatDataRef=None):
         """
         Fill the visit catalog with visit metadata
 
@@ -493,7 +501,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            Catalog with schema from _makeFgcmVisitSchema()
         groupedDataRefs: `dict`
            Dictionary with visit keys, and `list`s of
-           `lsst.daf.persistence.ButlerDataRef`
+           `lsst.daf.persistence.ButlerDataRef
+        visitCatDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
+           Dataref to write visitCat for checkpoints
         """
 
         bbox = geom.BoxI(geom.PointI(0, 0), geom.PointI(1, 1))
@@ -508,11 +518,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             if visitCat['used'][i]:
                 continue
 
-            if (i % 500) == 0:
+            if (i % self.config.nVisitsPerCheckpoint) == 0:
                 self.log.info("Retrieving metadata for %s %d (%d/%d)" %
                               (self.config.visitDataRefName, visit, i, len(groupedDataRefs)))
-                # Save checkpoint
-                butler.put(visitCat, 'fgcmVisitCatalog')
+                # Save checkpoint if desired
+                if visitCatDataRef is not None:
+                    visitCatDataRef.put(visitCat)
 
             # Note that the reference ccd is first in the list (if available).
 
@@ -654,10 +665,14 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         return groupedDataRefs
 
-    def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat, butler,
-                                    calibFluxApertureRadius=None):
+    def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
+                                    calibFluxApertureRadius=None,
+                                    visitCatDataRef=None,
+                                    starObsDataRef=None,
+                                    inStarObsCat=None):
         """
-        Compile all good star observations from visits in visitCat.
+        Compile all good star observations from visits in visitCat.  Checkpoint files
+        will be stored if both visitCatDataRef and starObsDataRef are not None.
 
         Parameters
         ----------
@@ -667,6 +682,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            Catalog with visit data for FGCM
         calibFluxApertureRadius: `float`, optional
            Aperture radius for calibration flux.  Default is None.
+        visitCatDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
+           Dataref to write visitCat for checkpoints
+        starObsDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
+           Dataref to write the star observation catalog for checkpoints.
+        inStarObsCat: `afw.table.BaseCatalog`
+           Input (possibly incomplete) observation catalog
 
         Returns
         -------
@@ -679,6 +700,11 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
            calibFluxApertureRadius is not set.
         """
         startTime = time.time()
+
+        if (visitCatDataRef is not None and starObsDataRef is None or
+           visitCatDataRef is None and starObsDataRef is not None):
+            self.log.warn("Only one of visitCatDataRef and starObsDataRef are set, so "
+                          "no checkpoint files will be persisted.")
 
         if self.config.doSubtractLocalBackground and calibFluxApertureRadius is None:
             raise RuntimeError("Must set calibFluxApertureRadius if doSubtractLocalBackground is True.")
@@ -702,8 +728,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         outputSchema = sourceMapper.getOutputSchema()
 
-        if butler.datasetExists('fgcmStarObservations'):
-            fullCatalog = butler.get('fgcmStarObservations')
+        if inStarObsCat is not None:
+            fullCatalog = inStarObsCat
             comp1 = fullCatalog.schema.compare(outputSchema, outputSchema.EQUAL_KEYS)
             comp2 = fullCatalog.schema.compare(outputSchema, outputSchema.EQUAL_NAMES)
             if not comp1 or not comp2:
@@ -850,9 +876,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             self.log.info("  Found %d good stars in visit %d (deltaAper = %.3f)" %
                           (nStarInVisit, visit['visit'], visit['deltaAper']))
 
-            if (ctr % 500) == 0:
-                butler.put(fullCatalog, 'fgcmStarObservations')
-                butler.put(visitCat, 'fgcmVisitCatalog')
+            if ((ctr % self.config.nVisitsPerCheckpoint) == 0 and
+               starObsDataRef is not None and visitCatDataRef is not None):
+                # We need to persist both the stars and the visit catalog which gets
+                # additional metadata from each visit.
+                starObsDataRef.put(fullCatalog)
+                visitCatDataRef.put(visitCat)
 
         self.log.info("Found all good star observations in %.2f s" %
                       (time.time() - startTime))
