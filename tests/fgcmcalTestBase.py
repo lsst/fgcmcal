@@ -510,6 +510,12 @@ class FgcmcalTestBase(object):
         self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
         self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
 
+        # Test that temporary files aren't stored
+        self.assertFalse(butler.datasetExists('fgcmVisitCatalog'))
+        self.assertFalse(butler.datasetExists('fgcmStarObservations'))
+        self.assertFalse(butler.datasetExists('fgcmStarIndices'))
+        self.assertFalse(butler.datasetExists('fgcmReferenceStars'))
+
     def _checkResult(self, result):
         """
         Check the result output from the task

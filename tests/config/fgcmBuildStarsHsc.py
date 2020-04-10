@@ -15,6 +15,7 @@ config.doReferenceMatches = True
 config.doSubtractLocalBackground = False
 # The testdata catalogs have the old name
 config.psfCandidateName = 'calib_psfCandidate'
+config.nVisitsPerCheckpoint = 5
 config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'sdss-dr9-fink-v5b'
 config.fgcmLoadReferenceCatalog.refFilterMap = {'g': 'g', 'r': 'r', 'i': 'i'}
 config.fgcmLoadReferenceCatalog.applyColorTerms = True
