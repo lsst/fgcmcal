@@ -903,6 +903,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # numpy arrays rather than Angles, which would we approximately 600x slower.
         conv = starObs[0]['ra'].asDegrees() / float(starObs[0]['ra'])
 
+        if 'deltaAper' in starObs.schema.getNames():
+            obsDeltaAper = starObs['deltaAper'][starIndices['obsIndex']]
+        else:
+            obsDeltaAper = None
+
         fgcmStars.loadStars(fgcmPars,
                             starObs['visit'][starIndices['obsIndex']],
                             starObs['ccd'][starIndices['obsIndex']],
@@ -918,6 +923,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                             starIds['nObs'][:],
                             obsX=starObs['x'][starIndices['obsIndex']],
                             obsY=starObs['y'][starIndices['obsIndex']],
+                            obsDeltaAper=obsDeltaAper,
                             psfCandidate=starObs['psf_candidate'][starIndices['obsIndex']],
                             refID=refId,
                             refMag=refMag,
@@ -934,6 +940,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         flagFlag = None
         flaggedStars = None
         refStars = None
+        obsDeltaAper = None
 
         # and set the bits in the cycle object
         fgcmFitCycle.setLUT(fgcmLut)
@@ -1075,7 +1082,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParInfo['HASEXTERNALPWV'] = parCat['hasExternalPwv']
         inParInfo['HASEXTERNALTAU'] = parCat['hasExternalTau']
 
-        inParams = np.zeros(1, dtype=[('PARALPHA', 'f8', (parCat['parAlpha'].size, )),
+        inParams = np.zeros(1, dtype=[('VISIT', 'i4', (parCat['visit'].size, )),
+                                      ('PARALPHA', 'f8', (parCat['parAlpha'].size, )),
                                       ('PARO3', 'f8', (parCat['parO3'].size, )),
                                       ('PARLNTAUINTERCEPT', 'f8',
                                        (parCat['parLnTauIntercept'].size, )),
@@ -1129,6 +1137,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        (parCat['compExpGray'].size, )),
                                       ('COMPVARGRAY', 'f8',
                                        (parCat['compVarGray'].size, )),
+                                      ('COMPMEDDELTAAPER', 'f8',
+                                       (parCat['compMedDeltaAper'].size, )),
+                                      ('COMPEPSILON', 'f8',
+                                       (parCat['compEpsilon'].size, )),
                                       ('COMPNGOODSTARPEREXP', 'i4',
                                        (parCat['compNGoodStarPerExp'].size, )),
                                       ('COMPSIGFGCM', 'f8',
@@ -1144,6 +1156,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                       ('COMPRETRIEVEDTAUNIGHT', 'f8',
                                        (parCat['compRetrievedTauNight'].size, ))])
 
+        inParams['VISIT'][:] = parCat['visit'][0, :]
         inParams['PARALPHA'][:] = parCat['parAlpha'][0, :]
         inParams['PARO3'][:] = parCat['parO3'][0, :]
         inParams['PARLNTAUINTERCEPT'][:] = parCat['parLnTauIntercept'][0, :]
@@ -1173,6 +1186,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParams['COMPMODELERRPARS'][:] = parCat['compModelErrPars'][0, :]
         inParams['COMPEXPGRAY'][:] = parCat['compExpGray'][0, :]
         inParams['COMPVARGRAY'][:] = parCat['compVarGray'][0, :]
+        inParams['COMPMEDDELTAAPER'][:] = parCat['compMedDeltaAper'][0, :]
+        inParams['COMPEPSILON'][:] = parCat['compEpsilon'][0, :]
         inParams['COMPNGOODSTARPEREXP'][:] = parCat['compNGoodStarPerExp'][0, :]
         inParams['COMPSIGFGCM'][:] = parCat['compSigFgcm'][0, :]
         inParams['COMPSIGMACAL'][:] = parCat['compSigmaCal'][0, :]
@@ -1304,6 +1319,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('hasExternalPwv', type=np.int32, doc='Parameters fit using external pwv')
         parSchema.addField('hasExternalTau', type=np.int32, doc='Parameters fit using external tau')
 
+        parSchema.addField('visit', type='ArrayI', doc='Exposure/visit vector',
+                           size=pars['VISIT'].size)
+
         # parameter section
         parSchema.addField('parAlpha', type='ArrayD', doc='Alpha parameter vector',
                            size=pars['PARALPHA'].size)
@@ -1371,6 +1389,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['COMPEXPGRAY'].size)
         parSchema.addField('compVarGray', type='ArrayD', doc='Computed exposure variance',
                            size=pars['COMPVARGRAY'].size)
+        parSchema.addField('compMedDeltaAper', type='ArrayD', doc='Computed median delta-aper',
+                           size=pars['COMPMEDDELTAAPER'].size)
+        parSchema.addField('compEpsilon', type='ArrayD', doc='Computed background offset epsilon',
+                           size=pars['COMPEPSILON'].size)
         parSchema.addField('compNGoodStarPerExp', type='ArrayI',
                            doc='Computed number of good stars per exposure',
                            size=pars['COMPNGOODSTARPEREXP'].size)
@@ -1451,6 +1473,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                     'compModelErrExptimePivot', 'compModelErrFwhmPivot',
                     'compModelErrSkyPivot', 'compModelErrPars',
                     'compExpGray', 'compVarGray', 'compNGoodStarPerExp', 'compSigFgcm',
+                    'compMedDeltaAper', 'compEpsilon', 'visit',
                     'compSigmaCal',
                     'compRetrievedLnPwv', 'compRetrievedLnPwvRaw', 'compRetrievedLnPwvFlag',
                     'compRetrievedTauNight']

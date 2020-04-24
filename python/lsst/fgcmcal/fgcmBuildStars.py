@@ -742,6 +742,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         ccdKey = outputSchema['ccd'].asKey()
         instMagKey = outputSchema['instMag'].asKey()
         instMagErrKey = outputSchema['instMagErr'].asKey()
+        deltaAperKey = outputSchema['deltaAper'].asKey()
 
         # Prepare local background if desired
         if self.config.doSubtractLocalBackground:
@@ -826,6 +827,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 # Apply the jacobian if configured
                 if self.config.doApplyWcsJacobian:
                     tempCat[instMagKey][:] -= 2.5*np.log10(tempCat['jacobian'][:])
+
+                with np.warnings.catch_warnings():
+                    np.warnings.simplefilter("ignore")
+                    tempCat[deltaAperKey] = -2.5*np.log10(
+                        sources[instFluxAperInKey][goodSrc.selected]) + 2.5*np.log10(
+                        sources[instFluxAperOutKey][goodSrc.selected])
+
+                baddelta, = np.where(~np.isfinite(tempCat[deltaAperKey]))
+                tempCat[deltaAperKey][baddelta] = -9999.0
 
                 fullCatalog.extend(tempCat)
 
@@ -1096,6 +1106,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         sourceMapper.addMapping(sourceSchema['slot_Centroid_y'].asKey(), 'y')
         sourceMapper.addMapping(sourceSchema[self.config.psfCandidateName].asKey(),
                                 'psf_candidate')
+        if self.config.localBackgroundFluxField in sourceSchema.getNames():
+            sourceMapper.addMapping(sourceSchema[self.config.localBackgroundFluxField].asKey(),
+                                    'localBackground')
 
         # and add the fields we want
         sourceMapper.editOutputSchema().addField(
@@ -1106,6 +1119,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             "instMag", type=np.float32, doc="Instrumental magnitude")
         sourceMapper.editOutputSchema().addField(
             "instMagErr", type=np.float32, doc="Instrumental magnitude error")
+        sourceMapper.editOutputSchema().addField(
+            "deltaAper", type=np.float32, doc="Difference in large aperture magnitudes")
         sourceMapper.editOutputSchema().addField(
             "jacobian", type=np.float32, doc="Relative pixel scale from wcs jacobian")
 

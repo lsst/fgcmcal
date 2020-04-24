@@ -732,6 +732,9 @@ def makeStdSchema(nBands):
     stdSchema.addField('magErr_std', type='ArrayF',
                        doc='Standard magnitude error',
                        size=nBands)
+    stdSchema.addField('deltaAper', type='ArrayF',
+                       doc='Mean delta-aper',
+                       size=nBands)
     stdSchema.addField('npsfcand', type='ArrayI',
                        doc='Number of observations flagged as psf candidates',
                        size=nBands)
@@ -771,6 +774,9 @@ def makeStdCat(stdSchema, stdStruct, goodBands):
     stdCat['ntotal'][:, :] = stdStruct['NTOTAL'][:, :]
     stdCat['mag_std_noabs'][:, :] = stdStruct['MAG_STD'][:, :]
     stdCat['magErr_std'][:, :] = stdStruct['MAGERR_STD'][:, :]
+    # And here we need to check
+    if 'DELTA_APER' in stdStruct.dtype.names:
+        stdCat['deltaAper'][:, :] = stdStruct['DELTA_APER'][:, :]
     stdCat['npsfcand'][:, :] = stdStruct['NPSFCAND'][:, :]
 
     md = PropertyList()
