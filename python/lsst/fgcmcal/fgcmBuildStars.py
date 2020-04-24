@@ -174,6 +174,11 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=str,
         default='base_LocalBackground_instFlux'
     )
+    doSubtractLocalBackgroundDelta = pexConfig.Field(
+        doc=("Subtract local background from delta-aper measurements"),
+        dtype=bool,
+        default=False
+    )
     sourceSelector = sourceSelectorRegistry.makeField(
         doc="How to select sources",
         default="science"
@@ -378,11 +383,17 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         # Compute aperture radius if necessary.  This is useful to do now before
         # any heavy lifting has happened (fail early).
         calibFluxApertureRadius = None
+        innerFluxApertureRadius = None
+        outerFluxApertureRadius = None
         if self.config.doSubtractLocalBackground:
             sourceSchema = butler.get('src_schema').schema
             try:
                 calibFluxApertureRadius = computeApertureRadius(sourceSchema,
                                                                 self.config.instFluxField)
+                innerFluxApertureRadius = computeApertureRadius(sourceSchema,
+                                                                self.config.apertureInnerInstFluxField)
+                outerFluxApertureRadius = computeApertureRadius(sourceSchema,
+                                                                self.config.aperterOuterInstFluxField)
             except (RuntimeError, LookupError):
                 raise RuntimeError("Could not determine aperture radius from %s. "
                                    "Cannot use doSubtractLocalBackground." %
@@ -420,9 +431,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             inStarObsCat = None
 
         rad = calibFluxApertureRadius
+        inRad = innerFluxApertureRadius
+        outRad = outerFluxApertureRadius
         fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                   visitCat,
                                                                   calibFluxApertureRadius=rad,
+                                                                  innerFluxApertureRadius=inRad,
+                                                                  outerFluxApertureRadius=outRad,
                                                                   starObsDataRef=starObsDataRef,
                                                                   visitCatDataRef=visitCatDataRef,
                                                                   inStarObsCat=inStarObsCat)
@@ -664,6 +679,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
                                     calibFluxApertureRadius=None,
+                                    innerFluxApertureRadius=None,
+                                    outerFluxApertureRadius=None,
                                     visitCatDataRef=None,
                                     starObsDataRef=None,
                                     inStarObsCat=None):
@@ -748,8 +765,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         if self.config.doSubtractLocalBackground:
             localBackgroundFluxKey = sourceSchema[self.config.localBackgroundFluxField].asKey()
             localBackgroundArea = np.pi*calibFluxApertureRadius**2.
+            innerBackgroundArea = np.pi*innerFluxApertureRadius**2.
+            outerBackgroundArea = np.pi*outerFluxApertureRadius**2.
         else:
             localBackground = 0.0
+            innerLocalBackground = 0.0
+            outerLocalBackground = 0.0
 
         aperOutputSchema = aperMapper.getOutputSchema()
 
@@ -800,6 +821,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                     localBackground = localBackgroundArea*sources[localBackgroundFluxKey]
                     sources[instFluxKey] -= localBackground
+
+                if self.config.doSubtractLocalBackgroundDelta:
+                    innerLocalBackground = innerBackgroundArea*sources[localBackgroundFluxKey]
+                    outerLocalBackground = outerBackgroundArea*sources[localBackgroundFluxKey]
+                    sources[instFluxAperInKey] -= innerLocalBackground
+                    sources[instFluxAperOutKey] -= outerLocalBackground
 
                 goodSrc = self.sourceSelector.selectSources(sources)
 
