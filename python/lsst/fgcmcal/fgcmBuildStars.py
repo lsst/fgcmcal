@@ -393,7 +393,7 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 innerFluxApertureRadius = computeApertureRadius(sourceSchema,
                                                                 self.config.apertureInnerInstFluxField)
                 outerFluxApertureRadius = computeApertureRadius(sourceSchema,
-                                                                self.config.aperterOuterInstFluxField)
+                                                                self.config.apertureOuterInstFluxField)
             except (RuntimeError, LookupError):
                 raise RuntimeError("Could not determine aperture radius from %s. "
                                    "Cannot use doSubtractLocalBackground." %
