@@ -179,6 +179,16 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         dtype=bool,
         default=False
     )
+    doSubtractSkyCorr = pexConfig.Field(
+        doc=("Subtract skyCorr background before performing calibration? "),
+        dtype=bool,
+        default=False
+    )
+    doSubtractSkyCorrDelta = pexConfig.Field(
+        doc=("Subtract skyCorr background from delta-aper measurements"),
+        dtype=bool,
+        default=False
+    )
     sourceSelector = sourceSelectorRegistry.makeField(
         doc="How to select sources",
         default="science"
@@ -224,7 +234,7 @@ class FgcmBuildStarsConfig(pexConfig.Config):
                                     'slot_Centroid_flag',
                                     fluxFlagName]
 
-        if self.doSubtractLocalBackground:
+        if self.doSubtractLocalBackground or self.doSubtractLocalBackgroundDelta:
             localBackgroundFlagName = self.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
             sourceSelector.flags.bad.append(localBackgroundFlagName)
 
@@ -385,7 +395,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         calibFluxApertureRadius = None
         innerFluxApertureRadius = None
         outerFluxApertureRadius = None
-        if self.config.doSubtractLocalBackground:
+        if ((self.config.doSubtractLocalBackground or
+             self.config.doSubtractLocalBackgroundDelta or
+             self.config.doSubtractSkyCorr or
+             self.config.doSubtractSkyCorrDelta)):
             sourceSchema = butler.get('src_schema').schema
             try:
                 calibFluxApertureRadius = computeApertureRadius(sourceSchema,
@@ -720,8 +733,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             self.log.warn("Only one of visitCatDataRef and starObsDataRef are set, so "
                           "no checkpoint files will be persisted.")
 
-        if self.config.doSubtractLocalBackground and calibFluxApertureRadius is None:
-            raise RuntimeError("Must set calibFluxApertureRadius if doSubtractLocalBackground is True.")
+        if ((self.config.doSubtractLocalBackground or
+             self.config.doSubtractSkyCorr) and calibFluxApertureRadius is None):
+            raise RuntimeError("Must set calibFluxApertureRadius if "
+                               "doSubtractLocalBackground or doSubtractSkyCorr is True.")
+
+        if ((self.config.doSubtractLocalBackgroundDelta or
+             self.config.doSubtractSkyCorrDelta) and (innerFluxApertureRadius is None or
+                                                      outerFluxApertureRadius is None)):
+            raise RuntimeError("Must set innerFluxApertureRadius and outerFluxApertureRadius "
+                               "if doSubtractLocalBackgroundDelta or doSubtractSkyCorrDelta is True.")
 
         # create our source schema.  Use the first valid dataRef
         dataRef = groupedDataRefs[list(groupedDataRefs.keys())[0]][0]
@@ -755,6 +776,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
         instFluxKey = sourceSchema[self.config.instFluxField].asKey()
         instFluxErrKey = sourceSchema[self.config.instFluxField + 'Err'].asKey()
+        raKey = sourceSchema['coord_ra'].asKey()
+        decKey = sourceSchema['coord_dec'].asKey()
         visitKey = outputSchema['visit'].asKey()
         ccdKey = outputSchema['ccd'].asKey()
         instMagKey = outputSchema['instMag'].asKey()
@@ -762,13 +785,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         deltaAperKey = outputSchema['deltaAper'].asKey()
 
         # Prepare local background if desired
-        if self.config.doSubtractLocalBackground:
+        if self.config.doSubtractLocalBackground or self.config.doSubtractSkyCorr:
             localBackgroundFluxKey = sourceSchema[self.config.localBackgroundFluxField].asKey()
             localBackgroundArea = np.pi*calibFluxApertureRadius**2.
+        else:
+            localBackground = 0.0
+
+        if self.config.doSubtractLocalBackgroundDelta or self.config.doSubtractSkyCorrDelta:
             innerBackgroundArea = np.pi*innerFluxApertureRadius**2.
             outerBackgroundArea = np.pi*outerFluxApertureRadius**2.
         else:
-            localBackground = 0.0
             innerLocalBackground = 0.0
             outerLocalBackground = 0.0
 
@@ -803,6 +829,16 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                 sources = dataRef.get(datasetType='src', flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
 
+                skyCorr = None
+                if self.config.doSubtractSkyCorr or self.config.doSubtractSkyCorrDelta:
+                    try:
+                        skyCorr = dataRef.get(datasetType='skyCorr')
+                        skyWcs = dataRef.get(datasetType='calexp_wcs')
+                    except Exception as e:
+                        self.log.info(e)
+                        self.log.info("Could not get skyCorr for %d/%d" % (visit, ccdId))
+                        skyCorr = None
+
                 # If we are subtracting the local background, then correct here
                 # before we do the s/n selection.  This ensures we do not have
                 # bad stars after local background subtraction.
@@ -827,6 +863,23 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     outerLocalBackground = outerBackgroundArea*sources[localBackgroundFluxKey]
                     sources[instFluxAperInKey] -= innerLocalBackground
                     sources[instFluxAperOutKey] -= outerLocalBackground
+
+                if skyCorr is not None:
+                    # Compute local skyCorr value
+                    radec = np.vstack((sources[raKey], sources[decKey]))
+                    xy = skyWcs.getTransform().getMapping().applyInverse(radec).T
+                    skyCorrValues = skyCorr.getImage().getArray()[xy[:, 1].astype(np.int32),
+                                                                  xy[:, 0].astype(np.int32)]
+
+                    if self.config.doSubtractSkyCorr:
+                        skyCorrBackground = localBackgroundArea*skyCorrValues
+                        sources[instFluxKey] -= skyCorrBackground
+
+                    if self.config.doSubtractSkyCorrDelta:
+                        innerSkyCorrBackground = innerBackgroundArea*skyCorrValues
+                        outerSkyCorrBackground = outerBackgroundArea*skyCorrValues
+                        sources[instFluxAperInKey] -= innerSkyCorrBackground
+                        sources[instFluxAperOutKey] -= outerSkyCorrBackground
 
                 goodSrc = self.sourceSelector.selectSources(sources)
 
