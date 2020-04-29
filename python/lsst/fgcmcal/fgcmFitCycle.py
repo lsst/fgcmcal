@@ -583,6 +583,36 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=4.0,
     )
+    deltaAperFitMinNgoodObs = pexConfig.Field(
+        doc=("Number of good observations for a star to be used to estimate background "
+             "errors from delta_aper statistic."),
+        dtype=int,
+        default=2,
+    )
+    deltaAperFitSpatialNside = pexConfig.Field(
+        doc=("Healpix nside to test spatial variation of background errors from "
+             "delta_aper statistic."),
+        dtype=int,
+        default=64,
+    )
+    deltaAperFitSpatialMinStar = pexConfig.Field(
+        doc=("Minumum number of good stars in a pixel to include in background error "
+             "map from delta_aper statistic."),
+        dtype=int,
+        default=500,
+    )
+    deltaAperFitPerCcdNx = pexConfig.Field(
+        doc=("Number of bins in x-direction to test background errors per ccd from "
+             "delta_aper statistic."),
+        dtype=int,
+        default=2,
+    )
+    deltaAperFitPerCcdNy = pexConfig.Field(
+        doc=("Number of bins in y-direction to test background errors per ccd from "
+             "delta_aper statistic."),
+        dtype=int,
+        default=2,
+    )
     quietMode = pexConfig.Field(
         doc="Be less verbose with logging.",
         dtype=bool,
@@ -1055,14 +1085,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parCat = butler.get('fgcmFitParameters', fgcmcycle=self.config.cycleNumber-1)
 
         parLutFilterNames = np.array(parCat[0]['lutFilterNames'].split(','))
-        parFitBands = np.array(parCat[0]['fitBands'].split(','))
-        parNotFitBands = np.array(parCat[0]['notFitBands'].split(','))
 
         inParInfo = np.zeros(1, dtype=[('NCCD', 'i4'),
                                        ('LUTFILTERNAMES', parLutFilterNames.dtype.str,
                                         (parLutFilterNames.size, )),
-                                       ('FITBANDS', parFitBands.dtype.str, (parFitBands.size, )),
-                                       ('NOTFITBANDS', parNotFitBands.dtype.str, (parNotFitBands.size, )),
                                        ('LNTAUUNIT', 'f8'),
                                        ('LNTAUSLOPEUNIT', 'f8'),
                                        ('ALPHAUNIT', 'f8'),
@@ -1077,8 +1103,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        ('HASEXTERNALTAU', 'i2')])
         inParInfo['NCCD'] = parCat['nCcd']
         inParInfo['LUTFILTERNAMES'][:] = parLutFilterNames
-        inParInfo['FITBANDS'][:] = parFitBands
-        inParInfo['NOTFITBANDS'][:] = parNotFitBands
         inParInfo['HASEXTERNALPWV'] = parCat['hasExternalPwv']
         inParInfo['HASEXTERNALTAU'] = parCat['hasExternalTau']
 
@@ -1141,6 +1165,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        (parCat['compMedDeltaAper'].size, )),
                                       ('COMPEPSILON', 'f8',
                                        (parCat['compEpsilon'].size, )),
+                                      ('COMPGLOBALEPSILON', 'f8',
+                                       (parCat['compGlobalEpsilon'].size, )),
+                                      ('COMPEPSILONMAP', 'f4',
+                                       (parCat['compEpsilonMap'].size, )),
+                                      ('COMPEPSILONNSTARMAP', 'i4',
+                                       (parCat['compEpsilonNStarMap'].size, )),
+                                      ('COMPEPSILONCCDMAP', 'f4',
+                                       (parCat['compEpsilonCcdMap'].size, )),
                                       ('COMPNGOODSTARPEREXP', 'i4',
                                        (parCat['compNGoodStarPerExp'].size, )),
                                       ('COMPSIGFGCM', 'f8',
@@ -1188,6 +1220,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParams['COMPVARGRAY'][:] = parCat['compVarGray'][0, :]
         inParams['COMPMEDDELTAAPER'][:] = parCat['compMedDeltaAper'][0, :]
         inParams['COMPEPSILON'][:] = parCat['compEpsilon'][0, :]
+        inParams['COMPGLOBALEPSILON'][:] = parCat['compGlobalEpsilon'][0, :]
+        inParams['COMPEPSILONMAP'][:] = parCat['compEpsilonMap'][0, :]
+        inParams['COMPEPSILONNSTARMAP'][:] = parCat['compEpsilonNStarMap'][0, :]
+        inParams['COMPEPSILONCCDMAP'][:] = parCat['compEpsilonCcdMap'][0, :]
         inParams['COMPNGOODSTARPEREXP'][:] = parCat['compNGoodStarPerExp'][0, :]
         inParams['COMPSIGFGCM'][:] = parCat['compSigFgcm'][0, :]
         inParams['COMPSIGMACAL'][:] = parCat['compSigmaCal'][0, :]
@@ -1220,16 +1256,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         comma = ','
         lutFilterNameString = comma.join([n.decode('utf-8')
                                           for n in parInfo['LUTFILTERNAMES'][0]])
-        fitBandString = comma.join([n.decode('utf-8')
-                                    for n in parInfo['FITBANDS'][0]])
-        notFitBandString = comma.join([n.decode('utf-8')
-                                       for n in parInfo['NOTFITBANDS'][0]])
-
         parSchema = self._makeParSchema(parInfo, pars, fgcmFitCycle.fgcmPars.parSuperStarFlat,
-                                        lutFilterNameString, fitBandString, notFitBandString)
+                                        lutFilterNameString)
         parCat = self._makeParCatalog(parSchema, parInfo, pars,
                                       fgcmFitCycle.fgcmPars.parSuperStarFlat,
-                                      lutFilterNameString, fitBandString, notFitBandString)
+                                      lutFilterNameString)
 
         butler.put(parCat, 'fgcmFitParameters', fgcmcycle=self.config.cycleNumber)
 
@@ -1268,7 +1299,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             butler.put(stdCat, 'fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
 
     def _makeParSchema(self, parInfo, pars, parSuperStarFlat,
-                       lutFilterNameString, fitBandString, notFitBandString):
+                       lutFilterNameString):
         """
         Make the parameter persistence schema
 
@@ -1282,10 +1313,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
            Superstar flat values returned by fgcm
         lutFilterNameString: `str`
            Combined string of all the lutFilterNames
-        fitBandString: `str`
-           Combined string of all the fitBands
-        notFitBandString: `str`
-           Combined string of all the bands not used in the fit
 
         Returns
         -------
@@ -1298,10 +1325,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('nCcd', type=np.int32, doc='Number of CCDs')
         parSchema.addField('lutFilterNames', type=str, doc='LUT Filter names in parameter file',
                            size=len(lutFilterNameString))
-        parSchema.addField('fitBands', type=str, doc='Bands that were fit',
-                           size=len(fitBandString))
-        parSchema.addField('notFitBands', type=str, doc='Bands that were not fit',
-                           size=len(notFitBandString))
         parSchema.addField('lnTauUnit', type=np.float64, doc='Step units for ln(AOD)')
         parSchema.addField('lnTauSlopeUnit', type=np.float64,
                            doc='Step units for ln(AOD) slope')
@@ -1393,6 +1416,18 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['COMPMEDDELTAAPER'].size)
         parSchema.addField('compEpsilon', type='ArrayD', doc='Computed background offset epsilon',
                            size=pars['COMPEPSILON'].size)
+        parSchema.addField('compGlobalEpsilon', type='ArrayD',
+                           doc='Computed global background offset epsilon per-band',
+                           size=pars['COMPGLOBALEPSILON'].size)
+        parSchema.addField('compEpsilonMap', type='ArrayF',
+                           doc='Computed epsilon spatial map',
+                           size=pars['COMPEPSILONMAP'].size)
+        parSchema.addField('compEpsilonNStarMap', type='ArrayI',
+                           doc='Computed epsilon spatial map, number of stars per pixel',
+                           size=pars['COMPEPSILONNSTARMAP'].size)
+        parSchema.addField('compEpsilonCcdMap', type='ArrayF',
+                           doc='Computed epsilon per-ccd map',
+                           size=pars['COMPEPSILONCCDMAP'].size)
         parSchema.addField('compNGoodStarPerExp', type='ArrayI',
                            doc='Computed number of good stars per exposure',
                            size=pars['COMPNGOODSTARPEREXP'].size)
@@ -1417,7 +1452,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         return parSchema
 
     def _makeParCatalog(self, parSchema, parInfo, pars, parSuperStarFlat,
-                        lutFilterNameString, fitBandString, notFitBandString):
+                        lutFilterNameString):
         """
         Make the FGCM parameter catalog for persistence
 
@@ -1431,10 +1466,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
            FGCM superstar flat array to put into parCat
         lutFilterNameString: `str`
            Combined string of all the lutFilterNames
-        fitBandString: `str`
-           Combined string of all the fitBands
-        notFitBandString: `str`
-           Combined string of all the bands not used in the fit
 
         Returns
         -------
@@ -1452,8 +1483,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # info section
         rec['nCcd'] = parInfo['NCCD']
         rec['lutFilterNames'] = lutFilterNameString
-        rec['fitBands'] = fitBandString
-        rec['notFitBands'] = notFitBandString
         # note these are not currently supported here.
         rec['hasExternalPwv'] = 0
         rec['hasExternalTau'] = 0
@@ -1474,7 +1503,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                     'compModelErrSkyPivot', 'compModelErrPars',
                     'compExpGray', 'compVarGray', 'compNGoodStarPerExp', 'compSigFgcm',
                     'compMedDeltaAper', 'compEpsilon', 'visit',
-                    'compSigmaCal',
+                    'compGlobalEpsilon', 'compEpsilonMap', 'compEpsilonNStarMap',
+                    'compEpsilonCcdMap', 'compSigmaCal',
                     'compRetrievedLnPwv', 'compRetrievedLnPwvRaw', 'compRetrievedLnPwvFlag',
                     'compRetrievedTauNight']
 
