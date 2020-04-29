@@ -237,6 +237,14 @@ class FgcmBuildStarsConfig(pexConfig.Config):
         if self.doSubtractLocalBackground or self.doSubtractLocalBackgroundDelta:
             localBackgroundFlagName = self.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
             sourceSelector.flags.bad.append(localBackgroundFlagName)
+        if self.doSubtractLocalBackground and self.doSubtractSkyCorr:
+            msg = 'Cannot set both doSubtractLocalBackground and doSubtractSkyCorr'
+            raise pexConfig.FieldValidationError(self.doSubtractLocalBackground,
+                                                 self, msg)
+        if self.doSubtractLocalBackgroundDelta and self.doSubtractSkyCorrDelta:
+            msg = 'Cannot set both doSubtractLocalBackgroundDelta and doSubtractSkyCorrDelta'
+            raise pexConfig.FieldValidationError(self.doSubtractLocalBackgroundDelta,
+                                                 self, msg)
 
         sourceSelector.doFlags = True
         sourceSelector.doUnresolved = True
@@ -795,8 +803,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             innerBackgroundArea = np.pi*innerFluxApertureRadius**2.
             outerBackgroundArea = np.pi*outerFluxApertureRadius**2.
         else:
-            innerLocalBackground = 0.0
-            outerLocalBackground = 0.0
+            innerBackground = 0.0
+            outerBackground = 0.0
+
+        skyCorrKey = None
+        if self.config.doSubtractSkyCorr or self.config.doSubtractSkyCorrDelta:
+            skyCorrKey = outputSchema['skyCorr'].asKey()
 
         aperOutputSchema = aperMapper.getOutputSchema()
 
@@ -856,13 +868,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     # than a mmag in quadrature).
 
                     localBackground = localBackgroundArea*sources[localBackgroundFluxKey]
-                    sources[instFluxKey] -= localBackground
 
+                innerBackground = 0.0
+                outerBackground = 0.0
                 if self.config.doSubtractLocalBackgroundDelta:
-                    innerLocalBackground = innerBackgroundArea*sources[localBackgroundFluxKey]
-                    outerLocalBackground = outerBackgroundArea*sources[localBackgroundFluxKey]
-                    sources[instFluxAperInKey] -= innerLocalBackground
-                    sources[instFluxAperOutKey] -= outerLocalBackground
+                    innerBackground = innerBackgroundArea*sources[localBackgroundFluxKey]
+                    outerBackground = outerBackgroundArea*sources[localBackgroundFluxKey]
 
                 if skyCorr is not None:
                     # Compute local skyCorr value
@@ -872,14 +883,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                                                                   xy[:, 0].astype(np.int32)]
 
                     if self.config.doSubtractSkyCorr:
-                        skyCorrBackground = localBackgroundArea*skyCorrValues
-                        sources[instFluxKey] -= skyCorrBackground
+                        localBackground = localBackgroundArea*skyCorrValues
 
                     if self.config.doSubtractSkyCorrDelta:
-                        innerSkyCorrBackground = innerBackgroundArea*skyCorrValues
-                        outerSkyCorrBackground = outerBackgroundArea*skyCorrValues
-                        sources[instFluxAperInKey] -= innerSkyCorrBackground
-                        sources[instFluxAperOutKey] -= outerSkyCorrBackground
+                        innerBackground = innerBackgroundArea*skyCorrValues
+                        outerBackground = outerBackgroundArea*skyCorrValues
+
+                sources[instFluxKey] -= localBackground
+                sources[instFluxAperInKey] -= innerBackground
+                sources[instFluxAperOutKey] -= outerBackground
 
                 goodSrc = self.sourceSelector.selectSources(sources)
 
@@ -917,6 +929,9 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 baddelta, = np.where(~np.isfinite(tempCat[deltaAperKey]))
                 tempCat[deltaAperKey][baddelta] = -9999.0
 
+                if skyCorrKey is not None:
+                    tempCat[skyCorrKey] = skyCorrValues[goodSrc.selected]
+
                 fullCatalog.extend(tempCat)
 
                 # And the aperture information
@@ -924,6 +939,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempAperCat = afwTable.BaseCatalog(aperVisitCatalog.schema)
                 tempAperCat.reserve(goodSrc.selected.sum())
                 tempAperCat.extend(sources[goodSrc.selected], mapper=aperMapper)
+
+                # Re-add the aperture backgrounds (for now)
+                sources[instFluxAperInKey] += innerBackground
+                sources[instFluxAperOutKey] += outerBackground
 
                 with np.warnings.catch_warnings():
                     # Ignore warnings, we will filter infinities and
@@ -1189,6 +1208,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
         if self.config.localBackgroundFluxField in sourceSchema.getNames():
             sourceMapper.addMapping(sourceSchema[self.config.localBackgroundFluxField].asKey(),
                                     'localBackground')
+        if self.config.doSubtractSkyCorr or self.config.doSubtractSkyCorrDelta:
+            sourceMapper.editOutputSchema().addField(
+                "skyCorr", type=np.float32,
+                doc="Local sky correction value (instFlux units)")
 
         # and add the fields we want
         sourceMapper.editOutputSchema().addField(
