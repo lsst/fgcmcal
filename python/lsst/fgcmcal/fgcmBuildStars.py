@@ -891,8 +891,10 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 instFluxAperIn = sources[instFluxAperInKey] - innerBackground
                 instFluxAperOut = sources[instFluxAperOutKey] - outerBackground
 
-                # The s/n cut will be based on the "raw"
-                # non-local-background-subtracted fluxes for consistency
+                # We need to subtract the local background before selection.
+                # We have copied out instFluxAperIn, instFluxAperOut so we
+                # will ensure there won't be double-subtraction
+                sources[instFluxKey] = instFlux
                 goodSrc = self.sourceSelector.selectSources(sources)
 
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
