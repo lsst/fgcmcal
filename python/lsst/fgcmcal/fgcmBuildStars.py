@@ -869,8 +869,6 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
 
                     localBackground = localBackgroundArea*sources[localBackgroundFluxKey]
 
-                innerBackground = 0.0
-                outerBackground = 0.0
                 if self.config.doSubtractLocalBackgroundDelta:
                     innerBackground = innerBackgroundArea*sources[localBackgroundFluxKey]
                     outerBackground = outerBackgroundArea*sources[localBackgroundFluxKey]
@@ -889,10 +887,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                         innerBackground = innerBackgroundArea*skyCorrValues
                         outerBackground = outerBackgroundArea*skyCorrValues
 
-                sources[instFluxKey] -= localBackground
-                sources[instFluxAperInKey] -= innerBackground
-                sources[instFluxAperOutKey] -= outerBackground
+                instFlux = sources[instFluxKey] - localBackground
+                instFluxAperIn = sources[instFluxAperInKey] - innerBackground
+                instFluxAperOut = sources[instFluxAperOutKey] - outerBackground
 
+                # The s/n cut will be based on the "raw"
+                # non-local-background-subtracted fluxes for consistency
                 goodSrc = self.sourceSelector.selectSources(sources)
 
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
@@ -902,12 +902,13 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempCat[ccdKey][:] = ccdId
 
                 # Compute "instrumental magnitude" by scaling flux with exposure time.
-                scaledInstFlux = (sources[instFluxKey][goodSrc.selected] *
+                scaledInstFlux = (instFlux[goodSrc.selected] *
                                   visit['scaling'][ccdMapping[ccdId]])
                 tempCat[instMagKey][:] = (-2.5*np.log10(scaledInstFlux) + 2.5*np.log10(expTime))
 
                 # Compute instMagErr from instFluxErr / instFlux, any scaling
-                # will cancel out.
+                # will cancel out.  This error is also computed from the "raw"
+                # non-background-subtracted fluxes.
 
                 tempCat[instMagErrKey][:] = k*(sources[instFluxErrKey][goodSrc.selected] /
                                                sources[instFluxKey][goodSrc.selected])
@@ -923,8 +924,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 with np.warnings.catch_warnings():
                     np.warnings.simplefilter("ignore")
                     tempCat[deltaAperKey] = -2.5*np.log10(
-                        sources[instFluxAperInKey][goodSrc.selected]) + 2.5*np.log10(
-                        sources[instFluxAperOutKey][goodSrc.selected])
+                        instFluxAperIn[goodSrc.selected]) + 2.5*np.log10(
+                        instFluxAperOut[goodSrc.selected])
 
                 baddelta, = np.where(~np.isfinite(tempCat[deltaAperKey]))
                 tempCat[deltaAperKey][baddelta] = -9999.0
@@ -940,14 +941,12 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                 tempAperCat.reserve(goodSrc.selected.sum())
                 tempAperCat.extend(sources[goodSrc.selected], mapper=aperMapper)
 
-                # Re-add the aperture backgrounds (for now)
-                sources[instFluxAperInKey] += innerBackground
-                sources[instFluxAperOutKey] += outerBackground
-
                 with np.warnings.catch_warnings():
                     # Ignore warnings, we will filter infinities and
                     # nans below.
                     np.warnings.simplefilter("ignore")
+
+                    # These are computed without the background tweak for now.
 
                     tempAperCat[instMagInKey][:] = -2.5*np.log10(
                         sources[instFluxAperInKey][goodSrc.selected])
@@ -973,10 +972,15 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
             instMagOut = aperVisitCatalog[instMagOutKey]
             instMagErrOut = aperVisitCatalog[instMagErrOutKey]
 
-            ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn) &
-                  np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
+            ok, = np.where(np.isfinite(instMagIn) & np.isfinite(instMagErrIn) &
+                           np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
-            visit['deltaAper'] = np.median(instMagIn[ok] - instMagOut[ok])
+            # Take the median of the brightest 25%
+            st = np.argsort(instMagIn[ok])
+            brightCut = instMagIn[ok[st[int(0.25*st.size)]]]
+            ok2, = np.where(instMagIn[ok] < brightCut)
+
+            visit['deltaAper'] = np.median(instMagIn[ok[ok2]] - instMagOut[ok[ok2]])
             visit['sources_read'] = 1
 
             self.log.info("  Found %d good stars in visit %d (deltaAper = %.3f)" %

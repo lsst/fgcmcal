@@ -147,7 +147,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.otherArgs = []
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([-0.001374409999698, -0.0015618705656])
+        zpOffsets = np.array([-0.00136853230651468, -0.0015405276790])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
@@ -176,7 +176,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        rawRepeatability = np.array([0.0, 0.00691888829016613, 0.00443888382172])
+        rawRepeatability = np.array([0.0, 0.005437727804837539, 0.00443888382172])
         filterNCalibMap = {'HSC-R': 17,
                            'HSC-I': 16}
 
