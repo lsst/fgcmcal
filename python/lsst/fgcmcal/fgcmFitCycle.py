@@ -1173,6 +1173,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        (parCat['compEpsilonNStarMap'].size, )),
                                       ('COMPEPSILONCCDMAP', 'f4',
                                        (parCat['compEpsilonCcdMap'].size, )),
+                                      ('COMPEPSILONCCDNSTARMAP', 'i4',
+                                       (parCat['compEpsilonCcdNStarMap'].size, )),
                                       ('COMPNGOODSTARPEREXP', 'i4',
                                        (parCat['compNGoodStarPerExp'].size, )),
                                       ('COMPSIGFGCM', 'f8',
@@ -1224,6 +1226,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParams['COMPEPSILONMAP'][:] = parCat['compEpsilonMap'][0, :]
         inParams['COMPEPSILONNSTARMAP'][:] = parCat['compEpsilonNStarMap'][0, :]
         inParams['COMPEPSILONCCDMAP'][:] = parCat['compEpsilonCcdMap'][0, :]
+        inParams['COMPEPSILONCCDNSTARMAP'][:] = parCat['compEpsilonCcdNStarMap'][0, :]
         inParams['COMPNGOODSTARPEREXP'][:] = parCat['compNGoodStarPerExp'][0, :]
         inParams['COMPSIGFGCM'][:] = parCat['compSigFgcm'][0, :]
         inParams['COMPSIGMACAL'][:] = parCat['compSigmaCal'][0, :]
@@ -1428,6 +1431,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('compEpsilonCcdMap', type='ArrayF',
                            doc='Computed epsilon per-ccd map',
                            size=pars['COMPEPSILONCCDMAP'].size)
+        parSchema.addField('compEpsilonCcdNStarMap', type='ArrayI',
+                           doc='Computed epsilon per-ccd map, number of stars per pixel',
+                           size=pars['COMPEPSILONCCDNSTARMAP'].size)
         parSchema.addField('compNGoodStarPerExp', type='ArrayI',
                            doc='Computed number of good stars per exposure',
                            size=pars['COMPNGOODSTARPEREXP'].size)
@@ -1504,7 +1510,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                     'compExpGray', 'compVarGray', 'compNGoodStarPerExp', 'compSigFgcm',
                     'compMedDeltaAper', 'compEpsilon', 'visit',
                     'compGlobalEpsilon', 'compEpsilonMap', 'compEpsilonNStarMap',
-                    'compEpsilonCcdMap', 'compSigmaCal',
+                    'compEpsilonCcdMap', 'compEpsilonCcdNStarMap', 'compSigmaCal',
                     'compRetrievedLnPwv', 'compRetrievedLnPwvRaw', 'compRetrievedLnPwvFlag',
                     'compRetrievedTauNight']
 
