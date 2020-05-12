@@ -879,8 +879,8 @@ class FgcmBuildStarsTask(pipeBase.CmdLineTask):
                     xy = skyWcs.getTransform().getMapping().applyInverse(radec).T
                     skyArray = skyCorr.getImage().getArray()
                     # Watch for x/y switch
-                    xclip = np.clip(xy[:, 0].astype(np.int32), 0, skyArray[:, 1].size - 1)
-                    yclip = np.clip(xy[:, 1].astype(np.int32), 0, skyArray[:, 0].size - 1)
+                    xclip = np.clip(xy[:, 0].astype(np.int32), 0, skyArray.shape[1] - 1)
+                    yclip = np.clip(xy[:, 1].astype(np.int32), 0, skyArray.shape[0] - 1)
                     skyCorrValues = skyArray[yclip, xclip]
 
                     if self.config.doSubtractSkyCorr:
