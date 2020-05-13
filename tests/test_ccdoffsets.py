@@ -49,8 +49,8 @@ class FgcmCcdOffsetsTest(lsst.utils.tests.TestCase):
 
         butler = dafPersist.Butler(os.path.join(self.dataDir, 'hsc'))
 
-        visit = 903986
-        ccd = 16
+        visit = 36236
+        ccd = 87
 
         visitInfo = butler.get('calexp_visitInfo', visit=visit, ccd=ccd)
         rotAngle = visitInfo.getBoresightRotAngle().asDegrees()

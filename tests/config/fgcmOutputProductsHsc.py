@@ -7,9 +7,10 @@ config.cycleNumber = 2
 config.doReferenceCalibration = True
 
 config.photoCal.applyColorTerms = True
-config.photoCal.photoCatName = 'sdss-dr9-fink-v5b'
-config.photoCal.colorterms.load(os.path.join(getPackageDir('fgcmcal'),
-                                             'tests',
+
+config.photoCal.photoCatName = 'ps1_pv3_3pi_20170110'
+config.photoCal.colorterms.load(os.path.join(getPackageDir('obs_subaru'),
                                              'config',
-                                             'sdssColortermsHsc.py'))
-config.refObjLoader.ref_dataset_name = "sdss-dr9-fink-v5b"
+                                             'hsc',
+                                             'colorterms.py'))
+config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'

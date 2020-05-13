@@ -93,11 +93,10 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        visits = [903334, 903336, 903338, 903342, 903344, 903346,
-                  903986, 903988, 903990, 904010, 904014]
+        visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
 
-        nStar = 472
-        nObs = 5431
+        nStar = 304
+        nObs = 3799
 
         self._testFgcmBuildStars(visits, nStar, nObs)
 
@@ -108,12 +107,12 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        nZp = 1232
-        nGoodZp = 26
-        nOkZp = 26
-        nBadZp = 1206
-        nStdStars = 382
-        nPlots = 42
+        nZp = 1120
+        nGoodZp = 27
+        nOkZp = 27
+        nBadZp = 1093
+        nStdStars = 256
+        nPlots = 40
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
 
@@ -151,11 +150,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.otherArgs = []
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([-0.001374409999698, -0.0015618705656])
+        zpOffsets = np.array([0.0012975315330550075, 0.006424360908567905])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
-                                     904014, 12, 'i', 1)
+                                     36236, 87, 'i', 1)
 
     def test_fgcmcalTract(self):
         # Set numpy seed for stability
@@ -180,12 +179,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        rawRepeatability = np.array([0.0, 0.00691888829016613, 0.00443888382172])
-        filterNCalibMap = {'HSC-R': 17,
-                           'HSC-I': 16}
+        rawRepeatability = np.array([0.0, 0.012838834334716097, 0.008774119602231331])
+        filterNCalibMap = {'HSC-R': 14,
+                           'HSC-I': 15}
 
-        visits = [903334, 903336, 903338, 903342, 903344, 903346,
-                  903986, 903988, 903990, 904010, 904014]
+        visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
         tract = 0
 
         self._testFgcmCalibrateTract(visits, tract,
