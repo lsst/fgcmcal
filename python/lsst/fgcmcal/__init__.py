@@ -6,6 +6,7 @@ import pkgutil
 import lsstimport
 
 from .fgcmFitCycle import *
+from .fgcmBuildStarsBase import *
 from .fgcmBuildStars import *
 from .fgcmMakeLut import *
 from .fgcmOutputProducts import *
