@@ -13,10 +13,12 @@ setupRequired(obs_base)
 setupRequired(pex_config)
 setupRequired(pipe_tasks)
 setupRequired(fgcm)
+# uses jointcal's PerTractCcdDataIdContainer to bundle visits in a tract in gen2
 setupRequired(jointcal)
 
-# data files for the unittests
+# data files for the unittests, and the obs package for that data
 setupOptional(testdata_jointcal)
+setupOptional(obs_subaru)
 
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envPrepend(PATH, ${PRODUCT_DIR}/bin)

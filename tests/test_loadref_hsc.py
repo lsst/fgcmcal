@@ -44,6 +44,10 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
             cls.dataDir = lsst.utils.getPackageDir('testdata_jointcal')
         except LookupError:
             raise unittest.SkipTest("testdata_jointcal not setup")
+        try:
+            lsst.utils.getPackageDir('obs_subaru')
+        except LookupError:
+            raise unittest.SkipTest("obs_subaru not setup")
 
     def setUp(self):
         self.inputDir = os.path.join(self.dataDir, 'hsc')
