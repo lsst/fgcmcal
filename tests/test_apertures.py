@@ -27,7 +27,7 @@ import os
 import lsst.utils
 import lsst.daf.persistence as dafPersist
 
-from lsst.fgcmcal.utilities import computeApertureRadius
+from lsst.fgcmcal.utilities import computeApertureRadiusFromSchema, computeApertureRadiusFromName
 
 
 class FgcmApertureTest(lsst.utils.tests.TestCase):
@@ -48,11 +48,14 @@ class FgcmApertureTest(lsst.utils.tests.TestCase):
 
         schema = butler.get('src_schema').schema
 
-        self.assertRaises(RuntimeError, computeApertureRadius, schema, 'base_PsfFlux_instFlux')
-        self.assertRaises(LookupError, computeApertureRadius, schema, 'not_a_field')
-        self.assertEqual(computeApertureRadius(schema, 'slot_CalibFlux_instFlux'), 12.0)
-        self.assertEqual(computeApertureRadius(schema, 'base_CircularApertureFlux_12_0_instFlux'), 12.0)
-        self.assertEqual(computeApertureRadius(schema, 'base_CircularApertureFlux_4_5_instFlux'), 4.5)
+        self.assertRaises(RuntimeError, computeApertureRadiusFromSchema, schema, 'base_PsfFlux_instFlux')
+        self.assertRaises(LookupError, computeApertureRadiusFromSchema, schema, 'not_a_field')
+        self.assertEqual(computeApertureRadiusFromSchema(schema, 'slot_CalibFlux_instFlux'), 12.0)
+        self.assertEqual(computeApertureRadiusFromSchema(schema,
+                                                         'base_CircularApertureFlux_12_0_instFlux'), 12.0)
+        self.assertEqual(computeApertureRadiusFromSchema(schema,
+                                                         'base_CircularApertureFlux_4_5_instFlux'), 4.5)
+        self.assertEqual(computeApertureRadiusFromName('ApFlux_12_0_instFlux'), 12.0)
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):

@@ -37,7 +37,7 @@ from .fgcmBuildStars import FgcmBuildStarsTask
 from .fgcmFitCycle import FgcmFitCycleConfig
 from .fgcmOutputProducts import FgcmOutputProductsTask
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
-from .utilities import computeCcdOffsets, computeApertureRadius, extractReferenceMags
+from .utilities import computeCcdOffsets, computeApertureRadiusFromSchema, extractReferenceMags
 from .utilities import makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat
 from .utilities import makeStdSchema, makeStdCat
@@ -249,8 +249,9 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
         if self.config.fgcmBuildStars.doSubtractLocalBackground:
             sourceSchema = butler.get('src_schema').schema
             try:
-                calibFluxApertureRadius = computeApertureRadius(sourceSchema,
-                                                                self.config.fgcmBuildStars.instFluxField)
+                field = self.config.fgcmBuildStars.instFluxField
+                calibFluxApertureRadius = computeApertureRadiusFromSchema(sourceSchema,
+                                                                          field)
             except (RuntimeError, LookupError):
                 raise RuntimeError("Could not determine aperture radius from %s. "
                                    "Cannot use doSubtractLocalBackground." %

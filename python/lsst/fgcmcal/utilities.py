@@ -780,7 +780,7 @@ def makeStdCat(stdSchema, stdStruct, goodBands):
     return stdCat
 
 
-def computeApertureRadius(schema, fluxField):
+def computeApertureRadiusFromSchema(schema, fluxField):
     """
     Compute the radius associated with a CircularApertureFlux field or
     associated slot.
@@ -789,11 +789,11 @@ def computeApertureRadius(schema, fluxField):
     ----------
     schema : `lsst.afw.table.schema`
     fluxField : `str`
-       CircularApertureFlux field or associated slot.
+       CircularApertureFlux or associated slot.
 
     Returns
     -------
-    apertureRadius: `float`
+    apertureRadius : `float`
        Radius of the aperture field, in pixels.
 
     Raises
@@ -803,13 +803,34 @@ def computeApertureRadius(schema, fluxField):
     """
     fluxFieldName = schema[fluxField].asField().getName()
 
-    m = re.search(r'CircularApertureFlux_(\d+)_(\d+)_', fluxFieldName)
+    return computeApertureRadiusFromName(fluxFieldName)
+
+
+def computeApertureRadiusFromName(fluxField):
+    """
+    Compute the radius associated with a CircularApertureFlux or ApFlux field.
+
+    Parameters
+    ----------
+    fluxField : `str`
+       CircularApertureFlux or ApFlux
+
+    Returns
+    -------
+    apertureRadius : `float`
+        Radius of the aperture field, in pixels.
+
+    Raises
+    ------
+     RuntimeError: Raised if flux field is not a CircularApertureFlux
+       or ApFlux.
+    """
+    m = re.search(r'(CircularApertureFlux|ApFlux)_(\d+)_(\d+)_', fluxField)
 
     if m is None:
-        raise RuntimeError("Flux field %s does not correspond to a circular aperture"
-                           % (fluxField))
+        raise RuntimeError(f"Flux field {fluxField} does not correspond to a CircularApertureFlux or ApFlux")
 
-    apertureRadius = float(m.groups()[0]) + float(m.groups()[1])/10.
+    apertureRadius = float(m.groups()[1]) + float(m.groups()[2])/10.
 
     return apertureRadius
 

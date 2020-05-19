@@ -8,6 +8,7 @@ import lsstimport
 from .fgcmFitCycle import *
 from .fgcmBuildStarsBase import *
 from .fgcmBuildStars import *
+from .fgcmBuildStarsTable import *
 from .fgcmMakeLut import *
 from .fgcmOutputProducts import *
 from .fgcmLoadReferenceCatalog import *

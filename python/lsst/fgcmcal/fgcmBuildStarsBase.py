@@ -37,7 +37,7 @@ from lsst.daf.base import PropertyList
 from lsst.daf.base.dateTime import DateTime
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
-from .utilities import computeApertureRadius
+from .utilities import computeApertureRadiusFromSchema, computeApertureRadiusFromName
 from .fgcmLoadReferenceCatalog import FgcmLoadReferenceCatalogTask
 
 import fgcm
@@ -284,7 +284,8 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask):
            an fgcmLookUpTable is not available, or if computeFluxApertureRadius()
            fails if the calibFlux is not a CircularAperture flux.
         """
-        self.log.info("Running with %d src dataRefs" % (len(dataRefs)))
+        datasetType = dataRefs[0].butlerSubset.datasetType
+        self.log.info("Running with %d %s dataRefs" % (len(dataRefs), datasetType))
 
         if self.config.doReferenceMatches:
             # Ensure that we have a LUT
@@ -294,11 +295,23 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask):
         # any heavy lifting has happened (fail early).
         calibFluxApertureRadius = None
         if self.config.doSubtractLocalBackground:
-            sourceSchema = butler.get('src_schema').schema
-            try:
-                calibFluxApertureRadius = computeApertureRadius(sourceSchema,
-                                                                self.config.instFluxField)
-            except (RuntimeError, LookupError):
+            # Check if the dataRefs are src tables our sourceTable_visit
+            found = False
+            if datasetType == 'src':
+                sourceSchema = butler.get('src_schema').schema
+                try:
+                    calibFluxApertureRadius = computeApertureRadiusFromSchema(sourceSchema,
+                                                                              self.config.instFluxField)
+                    found = True
+                except (RuntimeError, LookupError):
+                    pass
+            else:
+                try:
+                    calibFluxApertureRadius = computeApertureRadiusFromName(self.config.instFluxField)
+                    found = True
+                except (RuntimeError):
+                    pass
+            if not found:
                 raise RuntimeError("Could not determine aperture radius from %s. "
                                    "Cannot use doSubtractLocalBackground." %
                                    (self.config.instFluxField))
@@ -518,8 +531,14 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask):
         sourceMapper.addMapping(sourceSchema['coord_dec'].asKey(), 'dec')
         sourceMapper.addMapping(sourceSchema['slot_Centroid_x'].asKey(), 'x')
         sourceMapper.addMapping(sourceSchema['slot_Centroid_y'].asKey(), 'y')
-        sourceMapper.addMapping(sourceSchema[self.config.psfCandidateName].asKey(),
-                                'psf_candidate')
+        try:
+            sourceMapper.addMapping(sourceSchema[self.config.psfCandidateName].asKey(),
+                                    'psf_candidate')
+        except LookupError:
+            sourceMapper.editOutputSchema().addField(
+                "psf_candidate", type='Flag',
+                doc=("Flag set if the source was a candidate for PSF determination, "
+                     "as determined by the star selector."))
 
         # and add the fields we want
         sourceMapper.editOutputSchema().addField(

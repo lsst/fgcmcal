@@ -57,7 +57,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
             raise unittest.SkipTest("obs_subaru not setup")
 
     def setUp(self):
-        inputDir = os.path.join(self.dataDir, 'hsc')
+        # inputDir = os.path.join(self.dataDir, 'hsc')
+        inputDir = os.path.join(self.dataDir, 'hsc', 'rerun', 'parqtest3')
 
         self.testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
 
@@ -99,6 +100,13 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nObs = 3799
 
         self._testFgcmBuildStars(visits, nStar, nObs)
+
+        self.config = fgcmcal.FgcmBuildStarsTableConfig()
+        testConfigFile = os.path.join(ROOT, 'config', 'fgcmBuildStarsTableHsc.py')
+        self.configfiles = [testConfigFile]
+        self.otherArgs = []
+
+        self._testFgcmBuildStarsTable(visits, nStar, nObs)
 
         # Perform the fit cycle
         self.config = fgcmcal.FgcmFitCycleConfig()
@@ -156,7 +164,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                                      filterMapping, zpOffsets,
                                      36236, 87, 'i', 1)
 
-    def test_fgcmcalTract(self):
+    def notest_fgcmcalTract(self):
         # Set numpy seed for stability
         np.random.seed(seed=1000)
 

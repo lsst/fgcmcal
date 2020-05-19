@@ -187,6 +187,35 @@ class FgcmcalTestBase(object):
         starObs = butler.get('fgcmStarObservations')
         self.assertEqual(nObs, len(starObs))
 
+    def _testFgcmBuildStarsTable(self, visits, nStar, nObs):
+        """
+        Test running of FgcmBuildStarsTableTask
+
+        Parameters
+        ----------
+        visits: `list`
+           List of visits to calibrate
+        nStar: `int`
+           Number of stars expected
+        nObs: `int`
+           Number of observations of stars expected
+
+        Raises
+        ------
+        Exceptions on test failures
+        """
+        args = [self.testDir, '--output', os.path.join(self.testDir, 'rerun', 'sourceTable'),
+                '--id', 'visit='+'^'.join([str(visit) for visit in visits]),
+                '--doraise']
+        if len(self.configfiles) > 0:
+            args.extend(['--configfile', *self.configfiles])
+        args.extend(self.otherArgs)
+
+        result = fgcmcal.FgcmBuildStarsTableTask.parseAndRun(args=args, config=self.config)
+        self._checkResult(result)
+
+        asdflkjljk
+
     def _testFgcmFitCycle(self, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=False):
         """
         Test running of FgcmFitCycleTask
@@ -299,6 +328,7 @@ class FgcmcalTestBase(object):
         # Extract the offsets from the results
         offsets = result.resultList[0].results.offsets
 
+        print('offsets', offsets)
         self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-6)
 
         butler = dafPersist.butler.Butler(self.testDir)
@@ -434,6 +464,7 @@ class FgcmcalTestBase(object):
                                 dataId={visitDataRefName: visitCatalog[1]['visit']})
         testResp2 = testTrans2.sampleAt(position=geom.Point2D(0, 0),
                                         wavelengths=lutCat[0]['atmLambda'])
+
         # As above, we scale by the ratio to compare the shape of the curve.
         ratio = np.median(testResp/testResp2)
         self.assertFloatsAlmostEqual(testResp/ratio, testResp2, atol=0.04)

@@ -54,7 +54,7 @@ class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase):
 
     def setDefaults(self):
         self.instFluxField = 'ApFlux_12_0_instFlux'
-        self.localBackgroundFluxField = ''
+        self.localBackgroundFluxField = 'LocalBackground_instFlux'
         self.apertureInnerInstFluxField = 'ApFlux_12_0_instFlux'
         self.apertureOuterInstFluxField = 'ApFlux_17_0_instFlux'
         self.psfCandidateName = 'Calib_psf_candidate'
@@ -151,11 +151,15 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # Find an existing calexp (we need for psf and metadata)
             # and make the relevant dataRef
             for ccdId in ccdIds:
-                calexpRef = butler.dataRef('calexp', dataId={self.config.visitDataRefName: visit,
-                                                             self.config.ccdDataRefName: ccdId})
-                if calexpRef.datasetExists():
-                    groupedDataRefs[visit].append(calexpRef)
-                    break
+                try:
+                    calexpRef = butler.dataRef('calexp', dataId={self.config.visitDataRefName: visit,
+                                                                 self.config.ccdDataRefName: ccdId})
+                except RuntimeError:
+                    # Not found
+                    continue
+                # It was found.  Add and quit out
+                groupedDataRefs[visit].append(calexpRef)
+                break
 
             # And append this dataRef
             groupedDataRefs[visit].append(dataRef)
@@ -237,26 +241,27 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         # Prepare local background if desired
         if self.config.doSubtractLocalBackground:
-            # localBackgroundFluxKey = sourceSchema[self.config.localBackgroundFluxField].asKey()
-            localBackground = 0.0
-            # localBackgroundArea = np.pi*calibFluxApertureRadius**2.
+            localBackgroundArea = np.pi*calibFluxApertureRadius**2.
         else:
             localBackground = 0.0
 
         # Determine which columns we need from the sourceTable_visit catalogs
-        columns = ['ra', 'decl', 'x', 'y', self.config.psfCandidateName,
+        columns = [self.config.visitDataRefName, self.config.ccdDataRefName,
+                   'ra', 'decl', 'x', 'y', self.config.psfCandidateName,
+                   'LocalPhotoCalib',
                    self.config.instFluxField, self.config.instFluxField + 'Err',
                    self.config.apertureInnerInstFluxField, self.config.apertureInnerInstFluxField + 'Err',
                    self.config.apertureOuterInstFluxField, self.config.apertureOuterInstFluxField + 'Err']
-        if self.sourceSelector.doFlags:
-            columns.extend(self.sourceSelector.flags.bad)
-        if self.sourceSelector.doUnresolved:
-            columns.append(self.sourceSelector.unresolved.name)
-        if self.sourceSelector.doIsolated:
-            columns.append(self.sourceSelector.isolated.parentName)
-            columns.append(self.sourceSelector.isolated.nChiledName)
+        if self.sourceSelector.config.doFlags:
+            columns.extend(self.sourceSelector.config.flags.bad)
+        if self.sourceSelector.config.doUnresolved:
+            columns.append(self.sourceSelector.config.unresolved.name)
+        if self.sourceSelector.config.doIsolated:
+            columns.append(self.sourceSelector.config.isolated.parentName)
+            columns.append(self.sourceSelector.config.isolated.nChildName)
         if self.config.doSubtractLocalBackground:
-            columns.append(self.config.localBackgroundFluxField)
+            # The local background is called 'sky' in the sourceTable_visit.
+            columns.append('sky')
 
         k = 2.5/np.log(10.)
 
@@ -267,14 +272,14 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
             expTime = visit['exptime']
 
-            dataRef = groupedDataRefs[visit][-1]
+            dataRef = groupedDataRefs[visit['visit']][-1]
             srcTable = dataRef.get()
 
             df = srcTable.toDataFrame(columns)
 
             if self.config.doSubtractLocalBackground:
-                # THIS IS WRONG
-                df[self.instFluxField] -= localBackground
+                localBackground = localBackgroundArea*df['sky'].values/df['LocalPhotoCalib'].values
+                df[self.config.instFluxField] -= localBackground
 
             goodSrc = self.sourceSelector.selectSources(df)
             use, = np.where(goodSrc.selected)
@@ -284,16 +289,16 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
             # Copying in flag fields is slow and ungainly, until
             # DM-6981 is fixed.
-            Calib_psf_candidate = np.array(df['Calib_psf_candidate'])[use]
+            Calib_psf_candidate = df['Calib_psf_candidate'].values[use]
             for i in range(use.size):
                 rec = tempCat.addNew()
-                rec.set('psf_candidate', Calib_psf_candidate[use])
+                rec.set('psf_candidate', Calib_psf_candidate[i])
 
-            tempCat['ra'][:] = df['ra'].values[use]
-            tempCat['dec'][:] = df['decl'].values[use]
+            tempCat['ra'][:] = np.deg2rad(df['ra'].values[use])
+            tempCat['dec'][:] = np.deg2rad(df['decl'].values[use])
             tempCat['x'][:] = df['x'].values[use]
             tempCat['y'][:] = df['y'].values[use]
-            tempCat[visitKey][:] = df[self.config.visitDataRefname].values[use]
+            tempCat[visitKey][:] = df[self.config.visitDataRefName].values[use]
             tempCat[ccdKey][:] = df[self.config.ccdDataRefName].values[use]
 
             # Need to loop over ccds here
@@ -320,11 +325,11 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
             # Now do the aperture information
             instMagIn = -2.5*np.log10(df[self.config.apertureInnerInstFluxField].values[use])
-            instMagErrIn = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values /
-                              df[self.config.apertureInnerInstFluxField].values)
+            instMagErrIn = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values[use] /
+                              df[self.config.apertureInnerInstFluxField].values[use])
             instMagOut = -2.5*np.log10(df[self.config.apertureOuterInstFluxField].values[use])
-            instMagErrOut = k*(df[self.config.apertureOuterInstFluxField + 'Err'].values /
-                               df[self.config.apertureOuterInstFluxField].values)
+            instMagErrOut = k*(df[self.config.apertureOuterInstFluxField + 'Err'].values[use] /
+                               df[self.config.apertureOuterInstFluxField].values[use])
             ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn) &
                   np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
