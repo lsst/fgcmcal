@@ -63,35 +63,29 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
 
         config = fgcmcal.FgcmLoadReferenceCatalogConfig()
         config.applyColorTerms = True
-        config.refObjLoader.ref_dataset_name = 'sdss-dr9-fink-v5b'
+        config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
         config.refFilterMap = {'r': 'r', 'i': 'i'}
         config.colorterms.data = {}
-        config.colorterms.data['sdss*'] = lsst.pipe.tasks.colorterms.ColortermDict()
-        config.colorterms.data['sdss*'].data = {}
-        config.colorterms.data['sdss*'].data['g'] = lsst.pipe.tasks.colorterms.Colorterm()
-        config.colorterms.data['sdss*'].data['g'].primary = 'g'
-        config.colorterms.data['sdss*'].data['g'].secondary = 'r'
-        config.colorterms.data['sdss*'].data['g'].c0 = -0.00816446
-        config.colorterms.data['sdss*'].data['g'].c1 = -0.08366937
-        config.colorterms.data['sdss*'].data['g'].c2 = -0.00726883
-        config.colorterms.data['sdss*'].data['r'] = lsst.pipe.tasks.colorterms.Colorterm()
-        config.colorterms.data['sdss*'].data['r'].primary = 'r'
-        config.colorterms.data['sdss*'].data['r'].secondary = 'i'
-        config.colorterms.data['sdss*'].data['r'].c0 = 0.0013181
-        config.colorterms.data['sdss*'].data['r'].c1 = 0.01284177
-        config.colorterms.data['sdss*'].data['r'].c2 = -0.03068248
-        config.colorterms.data['sdss*'].data['i'] = lsst.pipe.tasks.colorterms.Colorterm()
-        config.colorterms.data['sdss*'].data['i'].primary = 'i'
-        config.colorterms.data['sdss*'].data['i'].secondary = 'z'
-        config.colorterms.data['sdss*'].data['i'].c0 = 0.00130204
-        config.colorterms.data['sdss*'].data['i'].c1 = -0.16922042
-        config.colorterms.data['sdss*'].data['i'].c2 = -0.01374245
+        config.colorterms.data['ps1*'] = lsst.pipe.tasks.colorterms.ColortermDict()
+        config.colorterms.data['ps1*'].data = {}
+        config.colorterms.data['ps1*'].data['r'] = lsst.pipe.tasks.colorterms.Colorterm()
+        config.colorterms.data['ps1*'].data['r'].primary = 'r'
+        config.colorterms.data['ps1*'].data['r'].secondary = 'i'
+        config.colorterms.data['ps1*'].data['r'].c0 = -0.000144
+        config.colorterms.data['ps1*'].data['r'].c1 = 0.001369
+        config.colorterms.data['ps1*'].data['r'].c2 = -0.008380
+        config.colorterms.data['ps1*'].data['i'] = lsst.pipe.tasks.colorterms.Colorterm()
+        config.colorterms.data['ps1*'].data['i'].primary = 'i'
+        config.colorterms.data['ps1*'].data['i'].secondary = 'z'
+        config.colorterms.data['ps1*'].data['i'].c0 = 0.000643
+        config.colorterms.data['ps1*'].data['i'].c1 = -0.130078
+        config.colorterms.data['ps1*'].data['i'].c2 = -0.006855
 
         butler = dafPersist.Butler(self.inputDir)
         loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler, config=config)
 
-        ra = 320.0
-        dec = 0.0
+        ra = 337.656174
+        dec = 0.823595
         rad = 0.1
 
         refCat = loadCat.getFgcmReferenceStarsSkyCircle(ra, dec, rad, filterList)
@@ -112,7 +106,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
 
         # And load a healpixel
         nside = 256
-        pixel = 393614
+        pixel = 387520
 
         refCat = loadCat.getFgcmReferenceStarsHealpix(nside, pixel, filterList)
 
@@ -129,29 +123,29 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
 
         config = fgcmcal.FgcmLoadReferenceCatalogConfig()
         config.applyColorTerms = True
-        config.refObjLoader.ref_dataset_name = 'sdss-dr9-fink-v5b'
+        config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
         config.refFilterMap = {'r2': 'r', 'i2': 'i'}
         config.colorterms.data = {}
-        config.colorterms.data['sdss*'] = lsst.pipe.tasks.colorterms.ColortermDict()
-        config.colorterms.data['sdss*'].data = {}
-        config.colorterms.data['sdss*'].data['r2'] = lsst.pipe.tasks.colorterms.Colorterm()
-        config.colorterms.data['sdss*'].data['r2'].primary = 'r'
-        config.colorterms.data['sdss*'].data['r2'].secondary = 'i'
-        config.colorterms.data['sdss*'].data['r2'].c0 = 0.0013181
-        config.colorterms.data['sdss*'].data['r2'].c1 = 0.01284177
-        config.colorterms.data['sdss*'].data['r2'].c2 = -0.03068248
-        config.colorterms.data['sdss*'].data['i2'] = lsst.pipe.tasks.colorterms.Colorterm()
-        config.colorterms.data['sdss*'].data['i2'].primary = 'i'
-        config.colorterms.data['sdss*'].data['i2'].secondary = 'z'
-        config.colorterms.data['sdss*'].data['i2'].c0 = 0.00130204
-        config.colorterms.data['sdss*'].data['i2'].c1 = -0.16922042
-        config.colorterms.data['sdss*'].data['i2'].c2 = -0.01374245
+        config.colorterms.data['ps1*'] = lsst.pipe.tasks.colorterms.ColortermDict()
+        config.colorterms.data['ps1*'].data = {}
+        config.colorterms.data['ps1*'].data['r2'] = lsst.pipe.tasks.colorterms.Colorterm()
+        config.colorterms.data['ps1*'].data['r2'].primary = 'r'
+        config.colorterms.data['ps1*'].data['r2'].secondary = 'i'
+        config.colorterms.data['ps1*'].data['r2'].c0 = -0.000032
+        config.colorterms.data['ps1*'].data['r2'].c1 = -0.002866
+        config.colorterms.data['ps1*'].data['r2'].c2 = -0.012638
+        config.colorterms.data['ps1*'].data['i2'] = lsst.pipe.tasks.colorterms.Colorterm()
+        config.colorterms.data['ps1*'].data['i2'].primary = 'i'
+        config.colorterms.data['ps1*'].data['i2'].secondary = 'z'
+        config.colorterms.data['ps1*'].data['i2'].c0 = 0.001625
+        config.colorterms.data['ps1*'].data['i2'].c1 = -0.200406
+        config.colorterms.data['ps1*'].data['i2'].c2 = -0.013666
 
         butler = dafPersist.Butler(self.inputDir)
         loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler, config=config)
 
-        ra = 320.0
-        dec = 0.0
+        ra = 337.656174
+        dec = 0.823595
         rad = 0.1
 
         refCat = loadCat.getFgcmReferenceStarsSkyCircle(ra, dec, rad, filterList)
