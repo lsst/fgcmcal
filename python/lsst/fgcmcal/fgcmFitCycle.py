@@ -871,6 +871,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             flagId = flaggedStars['objId'][:]
             flagFlag = flaggedStars['objFlag'][:]
         else:
+            flaggedStars = None
             flagId = None
             flagFlag = None
 
@@ -882,6 +883,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                      self.config.filterMap)
             refId = refStars['fgcm_id'][:]
         else:
+            refStars = None
             refId = None
             refMag = None
             refMagErr = None
@@ -927,17 +929,20 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                             computeNobs=True)
 
         # Release all references to temporary objects holding star data (see above)
-        starObs = None
-        starIds = None
-        starIndices = None
-        flagId = None
-        flagFlag = None
-        flaggedStars = None
-        refStars = None
+        del starObs
+        del starIds
+        del starIndices
+        del flagId
+        del flagFlag
+        del flaggedStars
+        del refStars
+        del refId
+        del refMag
+        del refMagErr
 
         # and set the bits in the cycle object
         fgcmFitCycle.setLUT(fgcmLut)
-        fgcmFitCycle.setStars(fgcmStars)
+        fgcmFitCycle.setStars(fgcmStars, fgcmPars)
         fgcmFitCycle.setPars(fgcmPars)
 
         # finish the setup

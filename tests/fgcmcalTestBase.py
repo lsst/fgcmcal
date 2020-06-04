@@ -299,10 +299,7 @@ class FgcmcalTestBase(object):
         # Extract the offsets from the results
         offsets = result.resultList[0].results.offsets
 
-        # The tolerance here has been loosened to account for different
-        # results on different platforms.
-        # TODO: Tighten tolerances with fixes in DM-25114
-        self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-5)
+        self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-6)
 
         butler = dafPersist.butler.Butler(self.testDir)
 
@@ -481,11 +478,8 @@ class FgcmcalTestBase(object):
         os.chdir(cwd)
 
         # Check that the converged repeatability is what we expect
-        # The tolerance here has been loosened to account for different
-        # results on different platforms.
-        # TODO: Tighten tolerances with fixes in DM-25114
         repeatability = result.resultList[0].results.repeatability
-        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=3e-3)
+        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=1e-6)
 
         butler = dafPersist.butler.Butler(self.testDir)
 
