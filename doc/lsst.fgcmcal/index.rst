@@ -41,6 +41,7 @@ Command-line tasks
 
 .. lsst-cmdlinetasks::
    :root: lsst.fgcmcal
+   :toctree: tasks
 
 .. _lsst.example.pythononly-tasks:
 
