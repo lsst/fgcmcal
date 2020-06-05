@@ -4,7 +4,7 @@
 FgcmBuildStarsTask
 ##################
 
-``FgcmBuildStarsTask`` finds all the single-visit sources in a repository (or a subset based on command-line parameters) and extracts all the potential photometric calibration stars for input into fgcm.  This task additionally uses fgcm to match star observations into unique stars, and performs as much cleaning of the input catalog as possible.  A tutorial on the steps of running ``fgcmcal`` are found in the `cookbook <https://github.com/lsst/fgcmcal/tree/master/cookbook>`_.
+``FgcmBuildStarsTask`` finds all the single-visit sources in a repository (or a subset based on command-line parameters) and extracts all the potential photometric calibration stars for input into fgcm.  This task additionally uses fgcm to match star observations into unique stars, and performs as much cleaning of the input catalog as possible.  A tutorial on the steps of running ``fgcmcal`` are found in the `cookbook`_.
 
 The ``fgcmcal`` code runs on calexp source catalogs from visits constrained by the ``--id`` parameter on the command line.  Best results are obtained when ``fgcmcal`` is run with full visits.
 
@@ -124,4 +124,6 @@ Configuration fields
 Examples
 ========
 
-See the `cookbook <https://github.com/lsst/fgcmcal/tree/master/cookbook/README.md>`_ for worked examples.
+See the `cookbook`_ for worked examples.
+
+.. _cookbook: https://github.com/lsst/fgcmcal/tree/master/cookbook/
