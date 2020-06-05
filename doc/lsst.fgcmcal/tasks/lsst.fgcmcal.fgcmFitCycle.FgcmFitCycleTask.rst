@@ -65,12 +65,12 @@ Input datasets
 --------------
 
 ``camera``
-   Camera geometry and detector object
+    Camera geometry and detector object
 ``fgcmLookupTable``
     FGCM look-up table produced by :doc:`lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`
 ``fgcmVisitCatalog``
     Catalog (`lsst.afw.table`) of visit metadata produced by :doc:`lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`
- ``fgcmStarObservations``
+``fgcmStarObservations``
     Catalog of star observations produced by :doc:`lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`
 ``fgcmStarIds``
     Catalog of unique star ids, positions, and number of observations produced by :doc:`lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`
@@ -117,11 +117,3 @@ Examples
 ========
 
 See the `cookbook <https://github.com/lsst/fgcmcal/tree/master/cookbook/README.md>`_ for worked examples.
-
-
-
-
-
-
-
-
