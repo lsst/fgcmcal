@@ -352,14 +352,13 @@ class FgcmCalibrateTractTask(pipeBase.CmdLineTask):
                             flagFlag=None,
                             computeNobs=True)
 
-        fgcmFitCycle.setLUT(fgcmLut)
-        fgcmFitCycle.setStars(fgcmStars)
-
         # Clear out some memory
-        # del fgcmStarObservationCat
         del fgcmStarIdCat
         del fgcmStarIndicesCat
         del fgcmRefCat
+
+        fgcmFitCycle.setLUT(fgcmLut)
+        fgcmFitCycle.setStars(fgcmStars, fgcmPars)
 
         converged = False
         cycleNumber = 0

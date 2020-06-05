@@ -871,6 +871,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             flagId = flaggedStars['objId'][:]
             flagFlag = flaggedStars['objFlag'][:]
         else:
+            flaggedStars = None
             flagId = None
             flagFlag = None
 
@@ -882,6 +883,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                      self.config.filterMap)
             refId = refStars['fgcm_id'][:]
         else:
+            refStars = None
             refId = None
             refMag = None
             refMagErr = None
@@ -927,17 +929,20 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                             computeNobs=True)
 
         # Release all references to temporary objects holding star data (see above)
-        starObs = None
-        starIds = None
-        starIndices = None
-        flagId = None
-        flagFlag = None
-        flaggedStars = None
-        refStars = None
+        del starObs
+        del starIds
+        del starIndices
+        del flagId
+        del flagFlag
+        del flaggedStars
+        del refStars
+        del refId
+        del refMag
+        del refMagErr
 
         # and set the bits in the cycle object
         fgcmFitCycle.setLUT(fgcmLut)
-        fgcmFitCycle.setStars(fgcmStars)
+        fgcmFitCycle.setStars(fgcmStars, fgcmPars)
         fgcmFitCycle.setPars(fgcmPars)
 
         # finish the setup
@@ -1049,13 +1054,11 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         parLutFilterNames = np.array(parCat[0]['lutFilterNames'].split(','))
         parFitBands = np.array(parCat[0]['fitBands'].split(','))
-        parNotFitBands = np.array(parCat[0]['notFitBands'].split(','))
 
         inParInfo = np.zeros(1, dtype=[('NCCD', 'i4'),
                                        ('LUTFILTERNAMES', parLutFilterNames.dtype.str,
                                         (parLutFilterNames.size, )),
                                        ('FITBANDS', parFitBands.dtype.str, (parFitBands.size, )),
-                                       ('NOTFITBANDS', parNotFitBands.dtype.str, (parNotFitBands.size, )),
                                        ('LNTAUUNIT', 'f8'),
                                        ('LNTAUSLOPEUNIT', 'f8'),
                                        ('ALPHAUNIT', 'f8'),
@@ -1071,7 +1074,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParInfo['NCCD'] = parCat['nCcd']
         inParInfo['LUTFILTERNAMES'][:] = parLutFilterNames
         inParInfo['FITBANDS'][:] = parFitBands
-        inParInfo['NOTFITBANDS'][:] = parNotFitBands
         inParInfo['HASEXTERNALPWV'] = parCat['hasExternalPwv']
         inParInfo['HASEXTERNALTAU'] = parCat['hasExternalTau']
 
@@ -1207,14 +1209,12 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                           for n in parInfo['LUTFILTERNAMES'][0]])
         fitBandString = comma.join([n.decode('utf-8')
                                     for n in parInfo['FITBANDS'][0]])
-        notFitBandString = comma.join([n.decode('utf-8')
-                                       for n in parInfo['NOTFITBANDS'][0]])
 
         parSchema = self._makeParSchema(parInfo, pars, fgcmFitCycle.fgcmPars.parSuperStarFlat,
-                                        lutFilterNameString, fitBandString, notFitBandString)
+                                        lutFilterNameString, fitBandString)
         parCat = self._makeParCatalog(parSchema, parInfo, pars,
                                       fgcmFitCycle.fgcmPars.parSuperStarFlat,
-                                      lutFilterNameString, fitBandString, notFitBandString)
+                                      lutFilterNameString, fitBandString)
 
         butler.put(parCat, 'fgcmFitParameters', fgcmcycle=self.config.cycleNumber)
 
@@ -1253,7 +1253,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             butler.put(stdCat, 'fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
 
     def _makeParSchema(self, parInfo, pars, parSuperStarFlat,
-                       lutFilterNameString, fitBandString, notFitBandString):
+                       lutFilterNameString, fitBandString):
         """
         Make the parameter persistence schema
 
@@ -1269,8 +1269,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
            Combined string of all the lutFilterNames
         fitBandString: `str`
            Combined string of all the fitBands
-        notFitBandString: `str`
-           Combined string of all the bands not used in the fit
 
         Returns
         -------
@@ -1285,8 +1283,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=len(lutFilterNameString))
         parSchema.addField('fitBands', type=str, doc='Bands that were fit',
                            size=len(fitBandString))
-        parSchema.addField('notFitBands', type=str, doc='Bands that were not fit',
-                           size=len(notFitBandString))
         parSchema.addField('lnTauUnit', type=np.float64, doc='Step units for ln(AOD)')
         parSchema.addField('lnTauSlopeUnit', type=np.float64,
                            doc='Step units for ln(AOD) slope')
@@ -1395,7 +1391,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         return parSchema
 
     def _makeParCatalog(self, parSchema, parInfo, pars, parSuperStarFlat,
-                        lutFilterNameString, fitBandString, notFitBandString):
+                        lutFilterNameString, fitBandString):
         """
         Make the FGCM parameter catalog for persistence
 
@@ -1411,8 +1407,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
            Combined string of all the lutFilterNames
         fitBandString: `str`
            Combined string of all the fitBands
-        notFitBandString: `str`
-           Combined string of all the bands not used in the fit
 
         Returns
         -------
@@ -1431,7 +1425,6 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         rec['nCcd'] = parInfo['NCCD']
         rec['lutFilterNames'] = lutFilterNameString
         rec['fitBands'] = fitBandString
-        rec['notFitBands'] = notFitBandString
         # note these are not currently supported here.
         rec['hasExternalPwv'] = 0
         rec['hasExternalTau'] = 0
