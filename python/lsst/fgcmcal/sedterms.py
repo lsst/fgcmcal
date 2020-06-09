@@ -50,12 +50,12 @@ class SedboundarytermDict(Config):
     To construct a SedboundarytermDict use keyword arguments:
     SedboundarytermDict(data=dataDict)
     where dataDict is a Python dict of name: Sedterm
-    For example:
+    For example::
 
-    SedboundarytermDict(data={
-        'gr': Sedboundaryterm(primary="g", secondary="r"),
-        'ri': Sedboundaryterm(primary="r", secondary="i"),
-    })
+        SedboundarytermDict(data={
+            'gr': Sedboundaryterm(primary="g", secondary="r"),
+            'ri': Sedboundaryterm(primary="r", secondary="i"),
+        })
 
     This is a subclass of Config.  This follows the form of
     `lsst.pipe.tasks.ColortermDict`.
@@ -75,13 +75,16 @@ class Sedterm(Config):
     as an "interpolated" or "extrapolated" computation.  See Burke et al. 2018
     Appendix A (https://ui.adsabs.harvard.edu/abs/2018AJ....155...41B).
 
-    For interpolation, with a secondary term:
+    For interpolation, with a secondary term::
+
        F'_nu ~ constant * (primaryTerm + secondaryTerm) / 2.0
 
-    For interpolation, without a secondary term:
+    For interpolation, without a secondary term::
+
        F'_nu ~ constant * primaryTerm
 
-    For extrapolation:
+    For extrapolation::
+
        F'_nu ~ primaryTerm + constant * (((lambda_primaryBand - lambda_secondaryBand) /
                                          (lambda_primaryBand - lambda_tertiaryBand)) *
                                          (primaryTerm - secondaryTerm))
@@ -89,16 +92,16 @@ class Sedterm(Config):
     where primaryTerm and secondaryTerm are names from a `SedboundarytermDict`, and
     primaryBand, secondaryBand, and tertiaryBand are band names.
 
-    To construct a Sedterm, use keyword arguments:
+    To construct a Sedterm, use keyword arguments::
 
-    Sedterm(primaryTerm=primaryTermName, secondaryTerm=secondaryTermName,
-            extrapolated=False, constant=1.0)
+        Sedterm(primaryTerm=primaryTermName, secondaryTerm=secondaryTermName,
+                extrapolated=False, constant=1.0)
 
-    or
+    or::
 
-    Sedterm(primaryTerm=primaryTermName, secondaryTerm=secondaryTermName,
-            extrapolated=True, constant=1.0, primaryBand=primaryBandName,
-            secondaryBand=secondaryBandName, tertiaryBand=tertiaryBandName)
+        Sedterm(primaryTerm=primaryTermName, secondaryTerm=secondaryTermName,
+                extrapolated=True, constant=1.0, primaryBand=primaryBandName,
+                secondaryBand=secondaryBandName, tertiaryBand=tertiaryBandName)
 
     This is a subclass of Config.  This follows the form of
     `lsst.pipe.tasks.Colorterm`.
@@ -128,16 +131,18 @@ class Sedterm(Config):
 class SedtermDict(Config):
     """A mapping of bands to Sedterms.
 
-    To construct a SedtermDict use keyword arguments:
-    SedtermDict(data=dataDict)
-    where dataDict is a Python dict of band to Sedterm
-    For example:
+    To construct a SedtermDict use keyword arguments::
 
-    SedtermDict(data={
-        'g': Sedterm(primaryTerm='gr', secondaryTerm='ri', extrapolated=True, constant=0.25,
-                     primaryBand='g', secondaryBand='r', tertiaryBand='i'),
-        'r': Sedterm(primaryTerm='gr', secondaryTerm='ri', extrapolated=False)
-    })
+        SedtermDict(data=dataDict)
+
+    where dataDict is a Python dict of band to Sedterm
+    For example::
+
+        SedtermDict(data={
+            'g': Sedterm(primaryTerm='gr', secondaryTerm='ri', extrapolated=True, constant=0.25,
+                         primaryBand='g', secondaryBand='r', tertiaryBand='i'),
+            'r': Sedterm(primaryTerm='gr', secondaryTerm='ri', extrapolated=False)
+        })
 
     This is a subclass of Config.  This follows the form of
     `lsst.pipe.tasks.ColortermDict`.
