@@ -32,6 +32,7 @@ input catalog as possible.
 import time
 
 import numpy as np
+import collections
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -53,6 +54,12 @@ class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase):
     )
 
     def setDefaults(self):
+        super().setDefaults()
+
+        # The names here correspond to the post-transformed
+        # sourceTable_visit catalogs, which differ from the raw src
+        # catalogs.  Therefore, all field and flag names cannot
+        # be derived from the base config class.
         self.instFluxField = 'ApFlux_12_0_instFlux'
         self.localBackgroundFluxField = 'LocalBackground_instFlux'
         self.apertureInnerInstFluxField = 'ApFlux_12_0_instFlux'
@@ -60,7 +67,6 @@ class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase):
         self.psfCandidateName = 'Calib_psf_candidate'
 
         sourceSelector = self.sourceSelector["science"]
-        sourceSelector.setDefaults()
 
         fluxFlagName = self.instFluxField[0: -len('instFlux')] + 'flag'
 
@@ -78,21 +84,13 @@ class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase):
             localBackgroundFlagName = self.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
             sourceSelector.flags.bad.append(localBackgroundFlagName)
 
-        sourceSelector.doFlags = True
-        sourceSelector.doUnresolved = True
-        sourceSelector.doSignalToNoise = True
-        sourceSelector.doIsolated = True
+        sourceSelector.signalToNoise.fluxField = self.instFluxField
+        sourceSelector.signalToNoise.errField = self.instFluxField + 'Err'
 
         sourceSelector.isolated.parentName = 'parentSourceId'
         sourceSelector.isolated.nChildName = 'Deblend_nChild'
 
-        sourceSelector.signalToNoise.fluxField = self.instFluxField
-        sourceSelector.signalToNoise.errField = self.instFluxField + 'Err'
-        sourceSelector.signalToNoise.minimum = 10.0
-        sourceSelector.signalToNoise.maximum = 1000.0
-
         sourceSelector.unresolved.name = 'extendedness'
-        sourceSelector.unresolved.maximum = 0.5
 
 
 class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
@@ -112,21 +110,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         return parser
 
     def findAndGroupDataRefs(self, butler, dataRefs):
-        """
-        Find and group dataRefs (by visit).
-
-        Parameters
-        ----------
-        butler: `lsst.daf.persistence.Butler`
-        dataRefs: `list` of `lsst.daf.persistence.ButlerDataRef`
-           Data references for the input visits.
-
-        Returns
-        -------
-        groupedDataRefs: `dict`
-           Dictionary with visit keys, and `list`s of `lsst.daf.persistence.ButlerDataRef`
-        """
-
         self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
 
         camera = butler.get('camera')
@@ -134,7 +117,9 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         ccdIds = []
         for detector in camera:
             ccdIds.append(detector.getId())
-        # Insert our referenceCCD first:
+        # Insert our preferred referenceCCD first:
+        # It is fine that this is listed twice, because we only need
+        # the first calexp that is found.
         ccdIds.insert(0, self.config.referenceCCD)
 
         # The visitTable building code expects a dictionary of groupedDataRefs
@@ -142,11 +127,9 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         # We then append the sourceTable_visit dataRef at the end for the
         # code which does the data reading (fgcmMakeAllStarObservations).
 
-        groupedDataRefs = {}
+        groupedDataRefs = collections.defaultdict(list)
         for dataRef in dataRefs:
             visit = dataRef.dataId[self.config.visitDataRefName]
-
-            groupedDataRefs[visit] = []
 
             # Find an existing calexp (we need for psf and metadata)
             # and make the relevant dataRef
@@ -157,7 +140,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                 except RuntimeError:
                     # Not found
                     continue
-                # It was found.  Add and quit out
+                # It was found.  Add and quit out, since we only
+                # need one calexp per visit.
                 groupedDataRefs[visit].append(calexpRef)
                 break
 
@@ -171,37 +155,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                                     visitCatDataRef=None,
                                     starObsDataRef=None,
                                     inStarObsCat=None):
-        """
-        Compile all good star observations from visits in visitCat.  Checkpoint files
-        will be stored if both visitCatDataRef and starObsDataRef are not None.
-
-        Parameters
-        ----------
-        groupedDataRefs: `dict` of `list`s
-           Lists of `lsst.daf.persistence.ButlerDataRef`, grouped by visit.
-        visitCat: `afw.table.BaseCatalog`
-           Catalog with visit data for FGCM
-        calibFluxApertureRadius: `float`, optional
-           Aperture radius for calibration flux.  Default is None.
-        visitCatDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
-           Dataref to write visitCat for checkpoints
-        starObsDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
-           Dataref to write the star observation catalog for checkpoints.
-        inStarObsCat: `afw.table.BaseCatalog`
-           Input (possibly incomplete) observation catalog
-
-        Returns
-        -------
-        fgcmStarObservations: `afw.table.BaseCatalog`
-           Full catalog of good observations.
-
-        Raises
-        ------
-        RuntimeError: Raised if doSubtractLocalBackground is True and
-           calibFluxApertureRadius is not set.
-        """
         startTime = time.time()
 
+        # If both dataRefs are None, then we assume the caller does not
+        # want to store checkpoint files.  If both are set, we will
+        # do checkpoint files.  And if only one is set, this is potentially
+        # unintentional and we will warn.
         if (visitCatDataRef is not None and starObsDataRef is None or
            visitCatDataRef is None and starObsDataRef is not None):
             self.log.warn("Only one of visitCatDataRef and starObsDataRef are set, so "
@@ -210,7 +169,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         if self.config.doSubtractLocalBackground and calibFluxApertureRadius is None:
             raise RuntimeError("Must set calibFluxApertureRadius if doSubtractLocalBackground is True.")
 
-        # To get the correct output schema, we use the same code as fgcmBuildStarsTask
+        # To get the correct output schema, we use similar code as fgcmBuildStarsTask
         # We are not actually using this mapper, except to grab the outputSchema
         dataRef = groupedDataRefs[list(groupedDataRefs.keys())[0]][0]
         sourceSchema = dataRef.get('src_schema', immediate=True).schema
@@ -246,27 +205,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             localBackground = 0.0
 
         # Determine which columns we need from the sourceTable_visit catalogs
-        columns = [self.config.visitDataRefName, self.config.ccdDataRefName,
-                   'ra', 'decl', 'x', 'y', self.config.psfCandidateName,
-                   'LocalPhotoCalib',
-                   self.config.instFluxField, self.config.instFluxField + 'Err',
-                   self.config.apertureInnerInstFluxField, self.config.apertureInnerInstFluxField + 'Err',
-                   self.config.apertureOuterInstFluxField, self.config.apertureOuterInstFluxField + 'Err']
-        if self.sourceSelector.config.doFlags:
-            columns.extend(self.sourceSelector.config.flags.bad)
-        if self.sourceSelector.config.doUnresolved:
-            columns.append(self.sourceSelector.config.unresolved.name)
-        if self.sourceSelector.config.doIsolated:
-            columns.append(self.sourceSelector.config.isolated.parentName)
-            columns.append(self.sourceSelector.config.isolated.nChildName)
-        if self.config.doSubtractLocalBackground:
-            # The local background is called 'sky' in the sourceTable_visit.
-            columns.append('sky')
+        columns = self._get_sourceTable_visit_columns()
 
         k = 2.5/np.log(10.)
 
-        # loop over visits
-        for ctr, visit in enumerate(visitCat):
+        for counter, visit in enumerate(visitCat):
+            # Check if these sources have already been read and stored in the checkpoint file
             if visit['sources_read']:
                 continue
 
@@ -278,21 +222,14 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             df = srcTable.toDataFrame(columns)
 
             if self.config.doSubtractLocalBackground:
-                localBackground = localBackgroundArea*df['sky'].values/df['LocalPhotoCalib'].values
+                localBackground = localBackgroundArea*df[self.config.localBackgroundFluxField].values
                 df[self.config.instFluxField] -= localBackground
 
             goodSrc = self.sourceSelector.selectSources(df)
             use, = np.where(goodSrc.selected)
 
             tempCat = afwTable.BaseCatalog(fullCatalog.schema)
-            tempCat.reserve(use.size)
-
-            # Copying in flag fields is slow and ungainly, until
-            # DM-6981 is fixed.
-            Calib_psf_candidate = df['Calib_psf_candidate'].values[use]
-            for i in range(use.size):
-                rec = tempCat.addNew()
-                rec.set('psf_candidate', Calib_psf_candidate[i])
+            tempCat.resize(use.size)
 
             tempCat['ra'][:] = np.deg2rad(df['ra'].values[use])
             tempCat['dec'][:] = np.deg2rad(df['decl'].values[use])
@@ -300,20 +237,21 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             tempCat['y'][:] = df['y'].values[use]
             tempCat[visitKey][:] = df[self.config.visitDataRefName].values[use]
             tempCat[ccdKey][:] = df[self.config.ccdDataRefName].values[use]
+            tempCat['psf_candidate'] = df['Calib_psf_candidate'].values[use]
 
             # Need to loop over ccds here
             for detector in camera:
                 ccdId = detector.getId()
-                u = (tempCat[ccdKey] == ccdId)
-                tempCat['jacobian'][u] = approxPixelAreaFields[ccdId].evaluate(tempCat['x'][u],
-                                                                               tempCat['y'][u])
-                scaledInstFlux = (df[self.config.instFluxField].values[use[u]] *
+                # used index for all observations with a given ccd
+                use2 = (tempCat[ccdKey] == ccdId)
+                tempCat['jacobian'][use2] = approxPixelAreaFields[ccdId].evaluate(tempCat['x'][use2],
+                                                                                  tempCat['y'][use2])
+                scaledInstFlux = (df[self.config.instFluxField].values[use[use2]] *
                                   visit['scaling'][ccdMapping[ccdId]])
-                tempCat[instMagKey][u] = (-2.5*np.log10(scaledInstFlux) + 2.5*np.log10(expTime))
+                tempCat[instMagKey][use2] = (-2.5*np.log10(scaledInstFlux) + 2.5*np.log10(expTime))
 
             # Compute instMagErr from instFluxErr/instFlux, any scaling
             # will cancel out.
-
             tempCat[instMagErrKey][:] = k*(df[self.config.instFluxField + 'Err'].values[use] /
                                            df[self.config.instFluxField].values[use])
 
@@ -334,12 +272,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                   np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
             visit['deltaAper'] = np.median(instMagIn[ok] - instMagOut[ok])
-            visit['sources_read'] = 1
+            visit['sources_read'] = True
 
-            self.log.info("  Found %d good stars in visit %d (deltaAper = %0.3f)" %
-                          (use.size, visit['visit'], visit['deltaAper']))
+            self.log.info("  Found %d good stars in visit %d (deltaAper = %0.3f)",
+                          use.size, visit['visit'], visit['deltaAper'])
 
-            if ((ctr % self.config.nVisitsPerCheckpoint) == 0 and
+            if ((counter % self.config.nVisitsPerCheckpoint) == 0 and
                starObsDataRef is not None and visitCatDataRef is not None):
                 # We need to persist both the stars and the visit catalog which gets
                 # additional metadata from each visit.
@@ -350,3 +288,29 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                       (time.time() - startTime))
 
         return fullCatalog
+
+    def _get_sourceTable_visit_columns(self):
+        """
+        Get the sourceTable_visit columns from the config.
+
+        Returns
+        -------
+        columns : `list`
+           List of columns to read from sourceTable_visit
+        """
+        columns = [self.config.visitDataRefName, self.config.ccdDataRefName,
+                   'ra', 'decl', 'x', 'y', self.config.psfCandidateName,
+                   self.config.instFluxField, self.config.instFluxField + 'Err',
+                   self.config.apertureInnerInstFluxField, self.config.apertureInnerInstFluxField + 'Err',
+                   self.config.apertureOuterInstFluxField, self.config.apertureOuterInstFluxField + 'Err']
+        if self.sourceSelector.config.doFlags:
+            columns.extend(self.sourceSelector.config.flags.bad)
+        if self.sourceSelector.config.doUnresolved:
+            columns.append(self.sourceSelector.config.unresolved.name)
+        if self.sourceSelector.config.doIsolated:
+            columns.append(self.sourceSelector.config.isolated.parentName)
+            columns.append(self.sourceSelector.config.isolated.nChildName)
+        if self.config.doSubtractLocalBackground:
+            columns.append(self.config.localBackgroundFluxField)
+
+        return columns

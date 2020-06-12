@@ -1,29 +1,12 @@
-import os.path
-
-import os
-from lsst.utils import getPackageDir
-
+# This override is to be consistent with the old tests
+config.referenceCCD = 13
+# The filterMap and bands are for the small subset of bands used in the tests
 config.filterMap = {'g': 'g', 'r': 'r', 'i': 'i'}
 config.requiredBands = ['r', 'i']
 config.primaryBands = ['i']
-config.minPerBand = 2
+# The coarseNside is set appropriate to the area of the test data
 config.coarseNside = 64
-config.visitDataRefName = 'visit'
-config.ccdDataRefName = 'ccd'
-config.doReferenceMatches = True
-# The testdata do not have local background information
-config.doSubtractLocalBackground = True
+# We have only a few visits, so checkpointing is more frequent
 config.nVisitsPerCheckpoint = 5
+# The tests are done with only the brightest reference stars
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.minimum = 50.0
-config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
-config.fgcmLoadReferenceCatalog.refFilterMap = {'g': 'g', 'r': 'r', 'r2': 'r',
-                                                'i': 'i', 'i2': 'i', 'z': 'z', 'y': 'y',
-                                                'N387': 'g', 'N816': 'i', 'N921': 'z',
-                                                'N1010': 'y'}
-config.fgcmLoadReferenceCatalog.applyColorTerms = True
-hscConfigDir = os.path.join(getPackageDir('obs_subaru'), 'config', 'hsc')
-config.fgcmLoadReferenceCatalog.colorterms.load(os.path.join(hscConfigDir, 'colorterms.py'))
-config.fgcmLoadReferenceCatalog.referenceSelector.doSignalToNoise = True
-config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.fluxField = 'i_flux'
-config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.errField = 'i_fluxErr'
-config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.minimum = 10.0

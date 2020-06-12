@@ -20,44 +20,45 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""Class for running fgcmcal on a single tract using src tables.
+"""Class for running fgcmcal on a single tract using sourceTable_visit tables.
 """
 
 import lsst.pipe.base as pipeBase
-from lsst.jointcal.dataIds import PerTractCcdDataIdContainer
 
+from .dataIds import TractCheckDataIdContainer
+from .fgcmBuildStarsTable import FgcmBuildStarsTableTask
 from .fgcmCalibrateTractBase import (FgcmCalibrateTractConfigBase, FgcmCalibrateTractRunner,
                                      FgcmCalibrateTractBaseTask)
 
-__all__ = ['FgcmCalibrateTractConfig', 'FgcmCalibrateTractTask']
+__all__ = ['FgcmCalibrateTractTableConfig', 'FgcmCalibrateTractTableTask']
 
 
-class FgcmCalibrateTractConfig(FgcmCalibrateTractConfigBase):
-    """Config for FgcmCalibrateTract task"""
+class FgcmCalibrateTractTableConfig(FgcmCalibrateTractConfigBase):
+    """Config for FgcmCalibrateTractTable task"""
     def setDefaults(self):
         super().setDefaults()
 
-        # For tract mode, turn off checkAllCcds optimization for
-        # FgcmBuildStarsTask.
-        self.fgcmBuildStars.checkAllCcds = False
+        # For the Table version of CalibrateTract, use the associated
+        # Table version of the BuildStars task.
+        self.fgcmBuildStars.retarget(FgcmBuildStarsTableTask)
         # For tract mode, we set a very high effective density cut.
         self.fgcmBuildStars.densityCutMaxPerPixel = 10000
 
 
-class FgcmCalibrateTractTask(FgcmCalibrateTractBaseTask):
+class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
     """
-    Calibrate a single tract using fgcmcal
+    Calibrate a single tract using fgcmcal, using sourceTable_visit
+    input catalogs.
     """
-    ConfigClass = FgcmCalibrateTractConfig
+    ConfigClass = FgcmCalibrateTractTableConfig
     RunnerClass = FgcmCalibrateTractRunner
     _DefaultName = "fgcmCalibrateTract"
 
     @classmethod
     def _makeArgumentParser(cls):
-        """Create an argument parser"""
-
         parser = pipeBase.ArgumentParser(name=cls._DefaultName)
-        parser.add_id_argument("--id", "src", help="Data ID, e.g. --id visit=6789",
-                               ContainerClass=PerTractCcdDataIdContainer)
+        parser.add_id_argument("--id", "sourceTable_visit",
+                               help="Data ID, e.g. --id visit=6789 tract=9617",
+                               ContainerClass=TractCheckDataIdContainer)
 
         return parser

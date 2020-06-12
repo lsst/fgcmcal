@@ -61,11 +61,15 @@ class FgcmBuildStarsConfig(FgcmBuildStarsConfigBase):
     )
 
     def setDefaults(self):
+        super().setDefaults()
+
         sourceSelector = self.sourceSelector["science"]
-        sourceSelector.setDefaults()
 
+        # The names here correspond to raw src catalogs, which differ
+        # from the post-transformed sourceTable_visit catalogs.
+        # Therefore, field and flag names cannot be easily
+        # derived from the base config class.
         fluxFlagName = self.instFluxField[0: -len('instFlux')] + 'flag'
-
         sourceSelector.flags.bad = ['base_PixelFlags_flag_edge',
                                     'base_PixelFlags_flag_interpolatedCenter',
                                     'base_PixelFlags_flag_saturatedCenter',
@@ -80,19 +84,8 @@ class FgcmBuildStarsConfig(FgcmBuildStarsConfigBase):
             localBackgroundFlagName = self.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
             sourceSelector.flags.bad.append(localBackgroundFlagName)
 
-        sourceSelector.doFlags = True
-        sourceSelector.doUnresolved = True
-        sourceSelector.doSignalToNoise = True
-        sourceSelector.doIsolated = True
-
         sourceSelector.signalToNoise.fluxField = self.instFluxField
         sourceSelector.signalToNoise.errField = self.instFluxField + 'Err'
-        sourceSelector.signalToNoise.minimum = 10.0
-        sourceSelector.signalToNoise.maximum = 1000.0
-
-        # FGCM operates on unresolved sources, and this setting is
-        # appropriate for the current base_ClassificationExtendedness
-        sourceSelector.unresolved.maximum = 0.5
 
 
 class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
@@ -112,21 +105,6 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
         return parser
 
     def findAndGroupDataRefs(self, butler, dataRefs):
-        """
-        Find and group dataRefs (by visit).
-
-        Parameters
-        ----------
-        butler: `lsst.daf.persistence.Butler`
-        dataRefs: `list` of `lsst.daf.persistence.ButlerDataRef`
-           Data references for the input visits.
-
-        Returns
-        -------
-        groupedDataRefs: `dict`
-           Dictionary with visit keys, and `list`s of `lsst.daf.persistence.ButlerDataRef`
-        """
-
         self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
 
         camera = butler.get('camera')
@@ -205,37 +183,12 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
                                     visitCatDataRef=None,
                                     starObsDataRef=None,
                                     inStarObsCat=None):
-        """
-        Compile all good star observations from visits in visitCat.  Checkpoint files
-        will be stored if both visitCatDataRef and starObsDataRef are not None.
-
-        Parameters
-        ----------
-        groupedDataRefs: `dict` of `list`s
-           Lists of `lsst.daf.persistence.ButlerDataRef`, grouped by visit.
-        visitCat: `afw.table.BaseCatalog`
-           Catalog with visit data for FGCM
-        calibFluxApertureRadius: `float`, optional
-           Aperture radius for calibration flux.  Default is None.
-        visitCatDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
-           Dataref to write visitCat for checkpoints
-        starObsDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
-           Dataref to write the star observation catalog for checkpoints.
-        inStarObsCat: `afw.table.BaseCatalog`
-           Input (possibly incomplete) observation catalog
-
-        Returns
-        -------
-        fgcmStarObservations: `afw.table.BaseCatalog`
-           Full catalog of good observations.
-
-        Raises
-        ------
-        RuntimeError: Raised if doSubtractLocalBackground is True and
-           calibFluxApertureRadius is not set.
-        """
         startTime = time.time()
 
+        # If both dataRefs are None, then we assume the caller does not
+        # want to store checkpoint files.  If both are set, we will
+        # do checkpoint files.  And if only one is set, this is potentially
+        # unintentional and we will warn.
         if (visitCatDataRef is not None and starObsDataRef is None or
            visitCatDataRef is None and starObsDataRef is not None):
             self.log.warn("Only one of visitCatDataRef and starObsDataRef are set, so "
@@ -406,7 +359,7 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
                   np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
             visit['deltaAper'] = np.median(instMagIn[ok] - instMagOut[ok])
-            visit['sources_read'] = 1
+            visit['sources_read'] = True
 
             self.log.info("  Found %d good stars in visit %d (deltaAper = %.3f)" %
                           (nStarInVisit, visit['visit'], visit['deltaAper']))

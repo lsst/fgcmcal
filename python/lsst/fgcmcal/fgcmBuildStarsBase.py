@@ -1,5 +1,3 @@
-# See COPYRIGHT file at the top of the source tree.
-#
 # This file is part of fgcmcal.
 #
 # Developed for the LSST Data Management System.
@@ -26,6 +24,7 @@
 import os
 import sys
 import traceback
+import abc
 
 import numpy as np
 
@@ -37,7 +36,7 @@ from lsst.daf.base import PropertyList
 from lsst.daf.base.dateTime import DateTime
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
-from .utilities import computeApertureRadiusFromSchema, computeApertureRadiusFromName
+from .utilities import computeApertureRadiusFromDataRef
 from .fgcmLoadReferenceCatalog import FgcmLoadReferenceCatalogTask
 
 import fgcm
@@ -51,8 +50,8 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
     """Base config for FgcmBuildStars tasks"""
 
     instFluxField = pexConfig.Field(
-        doc=("Name of the source instFlux field to use.  The associated flag field "
-             "('<name>_flag') will be implicitly included in badFlags"),
+        doc=("Faull name of the source instFlux field to use, including 'instFlux'. "
+             "The associated flag will be implicitly included in badFlags"),
         dtype=str,
         default='slot_CalibFlux_instFlux',
     )
@@ -110,12 +109,12 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
         default=None
     )
     visitDataRefName = pexConfig.Field(
-        doc="dataRef name for the 'visit' field",
+        doc="dataRef name for the 'visit' field, usually 'visit'.",
         dtype=str,
         default="visit"
     )
     ccdDataRefName = pexConfig.Field(
-        doc="dataRef name for the 'ccd' field",
+        doc="dataRef name for the 'ccd' field, usually 'ccd' or 'detector'.",
         dtype=str,
         default="ccd"
     )
@@ -136,7 +135,7 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
         default=False
     )
     localBackgroundFluxField = pexConfig.Field(
-        doc="Name of the local background instFlux field to use.",
+        doc="Full name of the local background instFlux field to use.",
         dtype=str,
         default='base_LocalBackground_instFlux'
     )
@@ -145,12 +144,14 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
         default="science"
     )
     apertureInnerInstFluxField = pexConfig.Field(
-        doc="Field that contains inner aperture for aperture correction proxy",
+        doc=("Full name of instFlux field that contains inner aperture "
+             "flux for aperture correction proxy"),
         dtype=str,
         default='base_CircularApertureFlux_12_0_instFlux'
     )
     apertureOuterInstFluxField = pexConfig.Field(
-        doc="Field that contains outer aperture for aperture correction proxy",
+        doc=("Full name of instFlux field that contains outer aperture "
+             "flux for aperture correction proxy"),
         dtype=str,
         default='base_CircularApertureFlux_17_0_instFlux'
     )
@@ -168,6 +169,22 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
         dtype=int,
         default=500,
     )
+
+    def setDefaults(self):
+        sourceSelector = self.sourceSelector["science"]
+        sourceSelector.setDefaults()
+
+        sourceSelector.doFlags = True
+        sourceSelector.doUnresolved = True
+        sourceSelector.doSignalToNoise = True
+        sourceSelector.doIsolated = True
+
+        sourceSelector.signalToNoise.minimum = 10.0
+        sourceSelector.signalToNoise.maximum = 1000.0
+
+        # FGCM operates on unresolved sources, and this setting is
+        # appropriate for the current base_ClassificationExtendedness
+        sourceSelector.unresolved.maximum = 0.5
 
 
 class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
@@ -240,19 +257,15 @@ class FgcmBuildStarsRunner(pipeBase.ButlerInitializedTaskRunner):
         return resultList
 
 
-class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask):
+class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask, abc.ABC):
     """
     Base task to build stars for FGCM global calibration
+
+    Parameters
+    ----------
+    butler : `lsst.daf.persistence.Butler`
     """
     def __init__(self, butler=None, **kwargs):
-        """
-        Instantiate an `FgcmBuildStarsBaseTask`.
-
-        Parameters
-        ----------
-        butler : `lsst.daf.persistence.Butler`
-        """
-
         pipeBase.CmdLineTask.__init__(self, **kwargs)
         self.makeSubtask("sourceSelector")
         # Only log warning and fatal errors from the sourceSelector
@@ -272,11 +285,6 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask):
         butler:  `lsst.daf.persistence.Butler`
         dataRefs: `list` of `lsst.daf.persistence.ButlerDataRef`
            Source data references for the input visits.
-           If this is an empty list, all visits with src catalogs in
-           the repository are used.
-           Only one individual dataRef from a visit need be specified
-           and the code will find the other source catalogs from
-           each visit.
 
         Raises
         ------
@@ -285,7 +293,7 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask):
            fails if the calibFlux is not a CircularAperture flux.
         """
         datasetType = dataRefs[0].butlerSubset.datasetType
-        self.log.info("Running with %d %s dataRefs" % (len(dataRefs), datasetType))
+        self.log.info("Running with %d %s dataRefs", len(dataRefs), datasetType)
 
         if self.config.doReferenceMatches:
             # Ensure that we have a LUT
@@ -295,33 +303,23 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask):
         # any heavy lifting has happened (fail early).
         calibFluxApertureRadius = None
         if self.config.doSubtractLocalBackground:
-            # Check if the dataRefs are src tables our sourceTable_visit
-            found = False
-            if datasetType == 'src':
-                sourceSchema = butler.get('src_schema').schema
-                try:
-                    calibFluxApertureRadius = computeApertureRadiusFromSchema(sourceSchema,
-                                                                              self.config.instFluxField)
-                    found = True
-                except (RuntimeError, LookupError):
-                    pass
-            else:
-                try:
-                    calibFluxApertureRadius = computeApertureRadiusFromName(self.config.instFluxField)
-                    found = True
-                except (RuntimeError):
-                    pass
-            if not found:
+            try:
+                calibFluxApertureRadius = computeApertureRadiusFromDataRef(dataRefs[0],
+                                                                           self.config.instFluxField)
+            except RuntimeError as e:
                 raise RuntimeError("Could not determine aperture radius from %s. "
                                    "Cannot use doSubtractLocalBackground." %
-                                   (self.config.instFluxField))
+                                   (self.config.instFluxField)) from e
 
         groupedDataRefs = self.findAndGroupDataRefs(butler, dataRefs)
 
         camera = butler.get('camera')
 
         # Make the visit catalog if necessary
-        # First check if the visit catalog is in the current path
+        # First check if the visit catalog is in the _current_ path
+        # We cannot use Gen2 datasetExists() because that checks all parent
+        # directories as well, which would make recovering from faults
+        # and fgcmcal reruns impossible.
         visitCatDataRef = butler.dataRef('fgcmVisitCatalog')
         filename = visitCatDataRef.get('fgcmVisitCatalog_filename')[0]
         if os.path.exists(filename):
@@ -368,14 +366,60 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask):
         if fgcmRefCat is not None:
             butler.put(fgcmRefCat, 'fgcmReferenceStars')
 
+    @abc.abstractmethod
     def findAndGroupDataRefs(self, butler, dataRefs):
+        """
+        Find and group dataRefs (by visit).
+
+        Parameters
+        ----------
+        butler: `lsst.daf.persistence.Butler`
+        dataRefs: `list` of `lsst.daf.persistence.ButlerDataRef`
+           Data references for the input visits.
+
+        Returns
+        -------
+        groupedDataRefs: `dict` [`int`, `list`]
+           Dictionary with visit keys, and `list`s of `lsst.daf.persistence.ButlerDataRef`
+        """
         raise NotImplementedError("findAndGroupDataRefs not implemented.")
 
+    @abc.abstractmethod
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
                                     calibFluxApertureRadius=None,
                                     visitCatDataRef=None,
                                     starObsDataRef=None,
                                     inStarObsCat=None):
+        """
+        Compile all good star observations from visits in visitCat.  Checkpoint files
+        will be stored if both visitCatDataRef and starObsDataRef are not None.
+
+        Parameters
+        ----------
+        groupedDataRefs: `dict` of `list`s
+           Lists of `lsst.daf.persistence.ButlerDataRef`, grouped by visit.
+        visitCat: `afw.table.BaseCatalog`
+           Catalog with visit data for FGCM
+        calibFluxApertureRadius: `float`, optional
+           Aperture radius for calibration flux.
+        visitCatDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
+           Dataref to write visitCat for checkpoints
+        starObsDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
+           Dataref to write the star observation catalog for checkpoints.
+        inStarObsCat: `afw.table.BaseCatalog`
+           Input observation catalog.  If this is incomplete, observations
+           will be appended from when it was cut off.
+
+        Returns
+        -------
+        fgcmStarObservations: `afw.table.BaseCatalog`
+           Full catalog of good observations.
+
+        Raises
+        ------
+        RuntimeError: Raised if doSubtractLocalBackground is True and
+           calibFluxApertureRadius is not set.
+        """
         raise NotImplementedError("fgcmMakeAllStarObservations not implemented.")
 
     def fgcmMakeVisitCatalog(self, camera, groupedDataRefs,
@@ -531,6 +575,10 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask):
         sourceMapper.addMapping(sourceSchema['coord_dec'].asKey(), 'dec')
         sourceMapper.addMapping(sourceSchema['slot_Centroid_x'].asKey(), 'x')
         sourceMapper.addMapping(sourceSchema['slot_Centroid_y'].asKey(), 'y')
+        # Add the mapping if the field exists in the input catalog.
+        # If the field does not exist, simply add it (set to False).
+        # This field is not required for calibration, but is useful
+        # to collate if available.
         try:
             sourceMapper.addMapping(sourceSchema[self.config.psfCandidateName].asKey(),
                                     'psf_candidate')
@@ -736,7 +784,7 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask):
         schema.addField('scaling', type='ArrayD', doc="Scaling applied due to flat adjustment",
                         size=nCcd)
         schema.addField('used', type=np.int32, doc="This visit has been ingested.")
-        schema.addField('sources_read', type=np.int32, doc="This visit had sources read.")
+        schema.addField('sources_read', type='Flag', doc="This visit had sources read.")
 
         return schema
 

@@ -29,7 +29,9 @@ data from testdata_jointcal.
 import os
 import shutil
 import numpy as np
+import numpy.testing as testing
 import glob
+import esutil
 
 import lsst.daf.persistence as dafPersist
 import lsst.geom as geom
@@ -93,10 +95,6 @@ class FgcmcalTestBase(object):
            Values of reconstructed i0 to compare to
         i10Recon: `np.array`, size nBand
            Values of reconsntructed i10 to compare to
-
-        Raises
-        ------
-        Exceptions on test failures
         """
 
         args = [self.inputDir, '--output', self.testDir,
@@ -148,9 +146,9 @@ class FgcmcalTestBase(object):
 
         self.assertFloatsAlmostEqual(i10Recon, i1/i0, msg='i10Recon', rtol=1e-5)
 
-    def _testFgcmBuildStars(self, visits, nStar, nObs):
+    def _testFgcmBuildStarsTable(self, visits, nStar, nObs):
         """
-        Test running of FgcmBuildStarsTask
+        Test running of FgcmBuildStarsTableTask
 
         Parameters
         ----------
@@ -160,10 +158,6 @@ class FgcmcalTestBase(object):
            Number of stars expected
         nObs: `int`
            Number of observations of stars expected
-
-        Raises
-        ------
-        Exceptions on test failures
         """
 
         args = [self.inputDir, '--output', self.testDir,
@@ -173,7 +167,7 @@ class FgcmcalTestBase(object):
             args.extend(['--configfile', *self.configfiles])
         args.extend(self.otherArgs)
 
-        result = fgcmcal.FgcmBuildStarsTask.parseAndRun(args=args, config=self.config)
+        result = fgcmcal.FgcmBuildStarsTableTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
 
         butler = dafPersist.butler.Butler(self.testDir)
@@ -187,34 +181,32 @@ class FgcmcalTestBase(object):
         starObs = butler.get('fgcmStarObservations')
         self.assertEqual(nObs, len(starObs))
 
-    def _testFgcmBuildStarsTable(self, visits, nStar, nObs):
+    def _testFgcmBuildStarsAndCompare(self, visits):
         """
-        Test running of FgcmBuildStarsTableTask
+        Test running of FgcmBuildStarsTask and compare to Table run
 
         Parameters
         ----------
         visits: `list`
            List of visits to calibrate
-        nStar: `int`
-           Number of stars expected
-        nObs: `int`
-           Number of observations of stars expected
-
-        Raises
-        ------
-        Exceptions on test failures
         """
-        args = [self.testDir, '--output', os.path.join(self.testDir, 'rerun', 'sourceTable'),
+        args = [self.testDir, '--output', os.path.join(self.testDir, 'rerun', 'src'),
                 '--id', 'visit='+'^'.join([str(visit) for visit in visits]),
                 '--doraise']
         if len(self.configfiles) > 0:
             args.extend(['--configfile', *self.configfiles])
         args.extend(self.otherArgs)
 
-        result = fgcmcal.FgcmBuildStarsTableTask.parseAndRun(args=args, config=self.config)
+        result = fgcmcal.FgcmBuildStarsTask.parseAndRun(args=args, config=self.config)
         self._checkResult(result)
 
-        asdflkjljk
+        butlerSrc = dafPersist.Butler(os.path.join(self.testDir, 'rerun', 'src'))
+        butlerTable = dafPersist.Butler(os.path.join(self.testDir))
+
+        # We compare the two catalogs to ensure they contain the same data.  They will
+        # not be identical in ordering because the input data was ingested in a different
+        # order (hence the stars are rearranged).
+        self._compareBuildStars(butlerSrc, butlerTable)
 
     def _testFgcmFitCycle(self, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=False):
         """
@@ -328,7 +320,6 @@ class FgcmcalTestBase(object):
         # Extract the offsets from the results
         offsets = result.resultList[0].results.offsets
 
-        print('offsets', offsets)
         self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-6)
 
         butler = dafPersist.butler.Butler(self.testDir)
@@ -501,8 +492,8 @@ class FgcmcalTestBase(object):
         cwd = os.getcwd()
         os.chdir(self.testDir)
 
-        result = fgcmcal.FgcmCalibrateTractTask.parseAndRun(args=args, config=self.config,
-                                                            doReturnResults=True)
+        result = fgcmcal.FgcmCalibrateTractTableTask.parseAndRun(args=args, config=self.config,
+                                                                 doReturnResults=True)
         self._checkResult(result)
 
         # Move back to the previous directory
@@ -510,7 +501,7 @@ class FgcmcalTestBase(object):
 
         # Check that the converged repeatability is what we expect
         repeatability = result.resultList[0].results.repeatability
-        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=1e-6)
+        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=4e-6)
 
         butler = dafPersist.butler.Butler(self.testDir)
 
@@ -551,6 +542,91 @@ class FgcmcalTestBase(object):
         self.assertFalse(butler.datasetExists('fgcmStarIndices'))
         self.assertFalse(butler.datasetExists('fgcmReferenceStars'))
 
+    def _compareBuildStars(self, butler1, butler2):
+        """
+        Compare the full set of BuildStars outputs with files from two
+        repos.
+
+        Parameters
+        ----------
+        butler1, butler2 : `lsst.daf.persistence.Butler`
+        """
+        # Check the visit catalogs are identical
+        visitCat1 = butler1.get('fgcmVisitCatalog').asAstropy()
+        visitCat2 = butler2.get('fgcmVisitCatalog').asAstropy()
+
+        for col in visitCat1.columns:
+            if isinstance(visitCat1[col][0], str):
+                testing.assert_array_equal(visitCat1[col], visitCat2[col])
+            else:
+                testing.assert_array_almost_equal(visitCat1[col], visitCat2[col])
+
+        # Check that the observation catalogs have the same length
+        # Detailed comparisons of the contents are below.
+        starObs1 = butler1.get('fgcmStarObservations')
+        starObs2 = butler2.get('fgcmStarObservations')
+        self.assertEqual(len(starObs1), len(starObs2))
+
+        # Check that the number of stars is the same and all match.
+        starIds1 = butler1.get('fgcmStarIds')
+        starIds2 = butler2.get('fgcmStarIds')
+        self.assertEqual(len(starIds1), len(starIds2))
+        matcher = esutil.htm.Matcher(11, starIds1['ra'], starIds1['dec'])
+        matches = matcher.match(starIds2['ra'], starIds2['dec'], 1./3600., maxmatch=1)
+        self.assertEqual(len(matches[0]), len(starIds1))
+
+        # Check that the number of observations of each star is the same.
+        testing.assert_array_equal(starIds1['nObs'][matches[1]],
+                                   starIds2['nObs'][matches[0]])
+
+        # And to test the contents, we need to unravel the observations and make
+        # sure that they are matched individually, because the two catalogs
+        # are constructed in a different order.
+        starIndices1 = butler1.get('fgcmStarIndices')
+        starIndices2 = butler2.get('fgcmStarIndices')
+
+        test1 = np.zeros(len(starIndices1), dtype=[('ra', 'f8'),
+                                                   ('dec', 'f8'),
+                                                   ('x', 'f8'),
+                                                   ('y', 'f8'),
+                                                   ('psf_candidate', 'b1'),
+                                                   ('visit', 'i4'),
+                                                   ('ccd', 'i4'),
+                                                   ('instMag', 'f4'),
+                                                   ('instMagErr', 'f4'),
+                                                   ('jacobian', 'f4')])
+        test2 = np.zeros_like(test1)
+
+        # Fill the test1 numpy recarray with sorted and unpacked data from starObs1.
+        # Note that each star has a different number of observations, leading to
+        # a "ragged" array that is packed in here.
+        counter = 0
+        obsIndex = starIndices1['obsIndex']
+        for i in range(len(starIds1)):
+            ind = starIds1['obsArrIndex'][matches[1][i]]
+            nObs = starIds1['nObs'][matches[1][i]]
+            for name in test1.dtype.names:
+                test1[name][counter: counter + nObs] = starObs1[name][obsIndex][ind: ind + nObs]
+            counter += nObs
+
+        # Fill the test2 numpy recarray with sorted and unpacked data from starObs2.
+        # Note that we have to match these observations per star by matching "visit"
+        # (implicitly assuming each star is observed only once per visit) to ensure
+        # that the observations in test2 are in the same order as test1.
+        counter = 0
+        obsIndex = starIndices2['obsIndex']
+        for i in range(len(starIds2)):
+            ind = starIds2['obsArrIndex'][matches[0][i]]
+            nObs = starIds2['nObs'][matches[0][i]]
+            a, b = esutil.numpy_util.match(test1['visit'][counter: counter + nObs],
+                                           starObs2['visit'][obsIndex][ind: ind + nObs])
+            for name in test2.dtype.names:
+                test2[name][counter: counter + nObs][a] = starObs2[name][obsIndex][ind: ind + nObs][b]
+            counter += nObs
+
+        for name in test1.dtype.names:
+            testing.assert_array_almost_equal(test1[name], test2[name])
+
     def _checkResult(self, result):
         """
         Check the result output from the task
@@ -559,10 +635,6 @@ class FgcmcalTestBase(object):
         ----------
         result: `pipeBase.struct`
            Result structure output from a task
-
-        Raises
-        ------
-        Exceptions on test failures
         """
 
         self.assertNotEqual(result.resultList, [], 'resultList should not be empty')

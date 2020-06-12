@@ -57,8 +57,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
             raise unittest.SkipTest("obs_subaru not setup")
 
     def setUp(self):
-        # inputDir = os.path.join(self.dataDir, 'hsc')
-        inputDir = os.path.join(self.dataDir, 'hsc', 'rerun', 'parqtest3')
+        inputDir = os.path.join(self.dataDir, 'hsc')
 
         self.testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
 
@@ -89,8 +88,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         # Build the stars, adding in the reference stars
-        self.config = fgcmcal.FgcmBuildStarsConfig()
-        testConfigFile = os.path.join(ROOT, 'config', 'fgcmBuildStarsHsc.py')
+        self.config = fgcmcal.FgcmBuildStarsTableConfig()
+        testConfigFile = os.path.join(ROOT, 'config', 'fgcmBuildStarsTableHsc.py')
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
@@ -99,14 +98,14 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nStar = 304
         nObs = 3799
 
-        self._testFgcmBuildStars(visits, nStar, nObs)
+        self._testFgcmBuildStarsTable(visits, nStar, nObs)
 
-        self.config = fgcmcal.FgcmBuildStarsTableConfig()
-        testConfigFile = os.path.join(ROOT, 'config', 'fgcmBuildStarsTableHsc.py')
+        self.config = fgcmcal.FgcmBuildStarsConfig()
+        testConfigFile = os.path.join(ROOT, 'config', 'fgcmBuildStarsHsc.py')
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        self._testFgcmBuildStarsTable(visits, nStar, nObs)
+        self._testFgcmBuildStarsAndCompare(visits)
 
         # Perform the fit cycle
         self.config = fgcmcal.FgcmFitCycleConfig()
@@ -119,7 +118,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nGoodZp = 27
         nOkZp = 27
         nBadZp = 1093
-        nStdStars = 256
+        nStdStars = 252
         nPlots = 40
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -158,13 +157,13 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.otherArgs = []
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([0.00129685504, 0.006424042396])
+        zpOffsets = np.array([-0.0010568995494, 0.00553833786398])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
                                      36236, 87, 'i', 1)
 
-    def notest_fgcmcalTract(self):
+    def test_fgcmcalTract(self):
         # Set numpy seed for stability
         np.random.seed(seed=1000)
 
@@ -182,17 +181,17 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self._testFgcmMakeLut(nBand, i0Std, i0Recon, i10Std, i10Recon)
 
-        self.config = fgcmcal.FgcmCalibrateTractConfig()
-        testConfigFile = os.path.join(ROOT, 'config', 'fgcmCalibrateTractHsc.py')
+        self.config = fgcmcal.FgcmCalibrateTractTableConfig()
+        testConfigFile = os.path.join(ROOT, 'config', 'fgcmCalibrateTractTableHsc.py')
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        rawRepeatability = np.array([0.0, 0.00456888661, 0.00878837692])
+        rawRepeatability = np.array([0.0, 0.007815538231, 0.0099641318989])
         filterNCalibMap = {'HSC-R': 14,
                            'HSC-I': 15}
 
         visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
-        tract = 0
+        tract = 9697
 
         self._testFgcmCalibrateTract(visits, tract,
                                      rawRepeatability, filterNCalibMap)

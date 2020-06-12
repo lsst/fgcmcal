@@ -1,7 +1,3 @@
-import os.path
-
-from lsst.utils import getPackageDir
-
 config.filterMap = {'g': 'g', 'r': 'r', 'i': 'i'}
 config.requiredBands = ['r', 'i']
 config.primaryBands = ['i']
