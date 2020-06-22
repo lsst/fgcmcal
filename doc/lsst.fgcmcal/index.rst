@@ -6,7 +6,8 @@
 lsst.fgcmcal
 ############
 
-The ``lsst.fgcmcal`` module runs the Forward Global Calibration Method (FGCM) to perform global photometric survey calibration for LSST.  Please see `Burke, Rykoff, et al. 2018 <http://adsabs.harvard.edu/abs/2018AJ....155...41B>`_ for the paper describing the method.  This ``lsst.fgcmcal`` package wraps the third-party package `fgcm <https://github.com/lsst/fgcm/tree/lsst-dev>`_.
+The ``lsst.fgcmcal`` module runs the Forward Global Calibration Method (FGCM) to perform global photometric survey calibration for the Rubin Observatory LSST.
+Please see `Burke, Rykoff, et al. 2018 <http://adsabs.harvard.edu/abs/2018AJ....155...41B>`_ for the paper describing the method.  This ``lsst.fgcmcal`` package wraps the third-party package `fgcm <https://github.com/lsst/fgcm/tree/lsst-dev>`_.
 
 .. _lsst.example.pythononly-using:
 
