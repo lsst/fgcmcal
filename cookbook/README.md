@@ -24,8 +24,8 @@ The environment should be set up as follows:
 ```
 setup lsst_distrib
 
-export RCRERUN=RC/w_2020_03/DM-23121-sfm
-export COOKBOOKRERUN=fgcm_cookbook_w_2020_03
+export RCRERUN=RC/v20_0_0_rc1/DM-25349-sfm
+export COOKBOOKRERUN=fgcm_cookbook_v20_0_0_rc1
 ```
 
 The `RCRERUN` env variable should be set to the most recent completed rerun
@@ -103,23 +103,13 @@ In order to make the fit cycles tractable without redoing processor-intensive
 steps, all data are collated and star observations are matched and indexed
 before the fit runs are started.  Depending on how many visits are being
 processed, and where the data are located, this step can take quite a while.
-(In the future, with a database backend for the Gen3 butler, I believe this step
-will be much faster).
+With the addition of the `sourceTable_visit` parquet files which consolidate
+all the ccds for each visit into one easy-to-read file, this step has gotten a
+lot faster.
 
-The FGCM code runs on calexp source catalogs from visits constrained by the
-`--id` parameter on the command line.  Best results are obtained when FGCM is
-run with **full visits**.  Due to limitations in the Gen2 Butler (the only
-Butler currently supported by `fgcmcal`), optimal performance is obtained by
-specifying a single "reference" ccd on the command line (e.g. `ccd=13`) and
-setting the config variable `checkAllCcds = True` (which is the default).  The
-alternative is to specify all the desired CCDs and set `checkAllCcds = False`,
-e.g., "ccd=0..8^10..103".  However, this is slower than the first option, and
-the improvement in speed in the first option is greater the more visits are
-specified.  If instead you want to process all the visits in a rerun selected
-by filter, field, or some other dataid field, then by using a reference ccd and
-setting `checkAllCcds = True` you can speed things up by a factor of
-approximately 100 relative to the alternative (naming CCDs specifically).  For
-config settings, please see the [sample config](fgcmBuildStarsHsc.py).
+The FGCM code runs on `sourceTable_visit` catalogs constrained by the `--id`
+parameter on the command line.  For config settings, please see the [sample
+config](fgcmBuildStarsTableHsc.py).
 
 If `doReferenceCalibration = True` in the configuration (the default), then
 stars from a reference catalog (e.g. PS1) will be loaded and matched to the
@@ -127,16 +117,16 @@ internal stars.  The signal-to-noise cut specified here should be the minimum
 one expects to use in the actual fit, and the fit may also be performed without
 the use of reference stars if desired.
 
-### Running `fgcmBuildStars.py`
+### Running `fgcmBuildStarsTable.py`
 
-This is also a simple command-line task.  This task will take around 2.5 hours
+This is also a simple command-line task.  This task will take around 20 minutes
 on `lsst-dev01`:
 
 ```bash
-fgcmBuildStars.py /datasets/hsc/repo --rerun \
+fgcmBuildStarsTable.py /datasets/hsc/repo --rerun \
 private/${USER}/${COOKBOOKRERUN}/lut:private/${USER}/${COOKBOOKRERUN}/wide+deep+udeep \
---configfile $FGCMCAL_DIR/cookbook/fgcmBuildStarsHsc.py \
---id ccd=13 filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y
+--configfile $FGCMCAL_DIR/cookbook/fgcmBuildStarsTableHsc.py \
+--id filter=HSC-G^HSC-R^HSC-I^HSC-Z^HSC-Y
 ```
 
 ## Running a Fit Cycle
