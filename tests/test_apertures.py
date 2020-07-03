@@ -27,7 +27,7 @@ import os
 import lsst.utils
 import lsst.daf.persistence as dafPersist
 
-from lsst.fgcmcal.utilities import computeApertureRadius
+from lsst.fgcmcal.utilities import computeApertureRadiusFromDataRef, computeApertureRadiusFromName
 
 
 class FgcmApertureTest(lsst.utils.tests.TestCase):
@@ -46,13 +46,21 @@ class FgcmApertureTest(lsst.utils.tests.TestCase):
 
         butler = dafPersist.Butler(os.path.join(self.dataDir, 'hsc'))
 
-        schema = butler.get('src_schema').schema
+        dataRef = butler.dataRef('src', visit=34648, ccd=51)
 
-        self.assertRaises(RuntimeError, computeApertureRadius, schema, 'base_PsfFlux_instFlux')
-        self.assertRaises(LookupError, computeApertureRadius, schema, 'not_a_field')
-        self.assertEqual(computeApertureRadius(schema, 'slot_CalibFlux_instFlux'), 12.0)
-        self.assertEqual(computeApertureRadius(schema, 'base_CircularApertureFlux_12_0_instFlux'), 12.0)
-        self.assertEqual(computeApertureRadius(schema, 'base_CircularApertureFlux_4_5_instFlux'), 4.5)
+        self.assertRaises(RuntimeError, computeApertureRadiusFromDataRef, dataRef, 'base_PsfFlux_instFlux')
+        self.assertRaises(RuntimeError, computeApertureRadiusFromDataRef, dataRef, 'not_a_field')
+        self.assertEqual(computeApertureRadiusFromDataRef(dataRef, 'slot_CalibFlux_instFlux'), 12.0)
+        self.assertEqual(computeApertureRadiusFromDataRef(dataRef,
+                                                          'base_CircularApertureFlux_12_0_instFlux'),
+                         12.0)
+        self.assertEqual(computeApertureRadiusFromDataRef(dataRef,
+                                                          'base_CircularApertureFlux_4_5_instFlux'),
+                         4.5)
+
+        self.assertEqual(computeApertureRadiusFromName('ApFlux_12_0_instFlux'), 12.0)
+        self.assertEqual(computeApertureRadiusFromName('ApFlux_4_5_instFlux'), 4.5)
+        self.assertRaises(RuntimeError, computeApertureRadiusFromName, 'not_a_field')
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):

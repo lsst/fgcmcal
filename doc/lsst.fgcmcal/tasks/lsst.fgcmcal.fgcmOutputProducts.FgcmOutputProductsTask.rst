@@ -6,7 +6,7 @@ FgcmOutputProductsTask
 
 ``FgcmOutputProductsTask`` uses the output from :doc:`lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask` to generate a full suite of output products (photometric calibration files, ``fgcm_photoCalib``; atmosphere transmissions, ``transmission_atmosphere_fgcm``; and standard star calibrated reference catalogs ``ref_cat``) for use in downstream processing.
 
-This is the fourth and final task in a typical ``fgcmcal`` processing chain. The first is :doc:`lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`, the second is :doc:`lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`, and the third is :doc:`lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask`.
+This is the fourth and final task in a typical ``fgcmcal`` processing chain. The first is :doc:`lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`, the second is :doc:`lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask` or :doc:`lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`, and the third is :doc:`lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask`.
 
 ``FgcmOutputProductsTask`` is available as a :ref:`command-line task <pipe-tasks-command-line-tasks>`, :command:`fgcmOutputProducts.py`.
 
@@ -68,6 +68,10 @@ Input datasets
     Catalog of zero-point information.
 ``fgcmAtmosphereParameters``
     Catalog of atmosphere parameters.
+``fgcmBuildStars_config`` or ``fgcmBuildStarsTable_config``
+    Configuration of task used to build stars for the ``fgcmcal`` run.  Only one should be available depending on the specific task used.
+``fgcmFitCycle_config``
+    Configuration of :doc:`lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask` used for the final fit cycle.
 
 .. _lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask-butler-outputs:
 

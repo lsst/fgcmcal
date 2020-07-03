@@ -4,17 +4,26 @@
 FgcmBuildStarsTask
 ##################
 
-``FgcmBuildStarsTask`` finds all the single-visit sources in a repository (or a subset based on command-line parameters) and extracts all the potential photometric calibration stars for input into fgcm.  This task additionally uses fgcm to match star observations into unique stars, and performs as much cleaning of the input catalog as possible.  A tutorial on the steps of running ``fgcmcal`` are found in the `cookbook`_.
+``FgcmBuildStarsTask`` finds all the single-visit sources in a repository (or a subset based on command-line parameters) and extracts all the potential photometric calibration stars for input into fgcm.
+This task additionally uses fgcm to match star observations into unique stars, and performs as much cleaning of the input catalog as possible.
+A tutorial on the steps of running ``fgcmcal`` are found in the `cookbook`_.
 
-The ``fgcmcal`` code runs on calexp source catalogs from visits constrained by the ``--id`` parameter on the command line.  Best results are obtained when ``fgcmcal`` is run with full visits.
+This ``fgcmcal`` task runs on calexp source catalogs from visits constrained by the ``--id`` parameter on the command line.
+Best results are obtained when ``fgcmcal`` is run with full visits.
+If ``sourceTable_visit`` parquet tables are available, use of :doc:`lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask` is recommended in place of this task.
 
-In Gen2, due to limitations of the Gen2 Butler, optimal performance is obtained by specifying a single "reference" ccd on the command line (e.g. ``ccd=13``) and setting the config variable ``checkAllCcds = True`` (which is the default).  The alternative is to specify all the desired CCDs and set ``checkAllCcds = False``, e.g., ``ccd=0..8^10..103``.  However, this is slower than the first option, and the improvement in speed in the first option is greater the more visits are specified.  If instead you want to process all the visits in a rerun selected by filter, field, or some other dataid field, then by using a reference ccd and setting ``checkAllCcds = True`` you can speed things up by a factor of approximately 100 relative to the alternative (naming CCDs specifically).
+In Gen2, due to limitations of the Gen2 Butler, optimal performance is obtained by specifying a single "reference" ccd on the command line (e.g. ``ccd=13``) and setting the config variable ``checkAllCcds = True`` (which is the default).
+The alternative is to specify all the desired CCDs and set ``checkAllCcds = False``, e.g., ``ccd=0..8^10..103``.
+However, this is slower than the first option, and the improvement in speed in the first option is greater the more visits are specified.
+If instead you want to process all the visits in a rerun selected by filter, field, or some other dataid field, then by using a reference ccd and setting ``checkAllCcds = True`` you can speed things up by a factor of approximately 100 relative to the alternative (naming CCDs specifically).
 
-Be aware that if a visit does not have a ``calexp`` available with the given reference CCD then it will be skipped.  If this is possibly an issue, multiple reference ccds can be specified on the command line, although performance will degrade the more are specified.
+Be aware that if a visit does not have a ``calexp`` available with the given reference CCD then it will be skipped.
+If this is possibly an issue, multiple reference ccds can be specified on the command line, although performance will degrade the more are specified.
 
 At the current time, ``fgcmcal`` does not support Gen3.
 
-This is the second task in a typical ``fgcmcal`` processing chain.  The first is :doc:`lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`, the third is :doc:`lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask`, and the fourth is :doc:`lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask`.
+This is the second task in a typical ``fgcmcal`` processing chain.
+The first is :doc:`lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`, the third is :doc:`lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask`, and the fourth is :doc:`lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask`.
 
 ``FgcmBuildStarsTask`` is available as a :ref:`command-line task <pipe-tasks-command-line-tasks>`, :command:`fgcmBuildStars.py`.
 

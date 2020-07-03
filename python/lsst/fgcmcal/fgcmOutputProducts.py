@@ -284,21 +284,34 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Raises
         ------
-        RuntimeError: Raised if butler cannot find fgcmBuildStars_config, or
-           fgcmFitCycle_config, or fgcmAtmosphereParameters (and
-           `self.config.doAtmosphereOutput` is true), or fgcmStandardStars (and
-           `self.config.doReferenceCalibration or `self.config.doRefcatOutput`
-           is true), or fgcmZeropoints (and self.config.doZeropointOutput is true).
-           Also will raise if the fgcmFitCycle_config does not refer to the
-           final fit cycle.
+        RuntimeError:
+           Raised if any one of the following is true:
+
+           - butler cannot find "fgcmBuildStars_config" or
+             "fgcmBuildStarsTable_config".
+           - butler cannot find "fgcmFitCycle_config".
+           - "fgcmFitCycle_config" does not refer to
+             `self.config.cycleNumber`.
+           - butler cannot find "fgcmAtmosphereParameters" and
+             `self.config.doAtmosphereOutput` is `True`.
+           - butler cannot find "fgcmStandardStars" and
+             `self.config.doReferenceCalibration` is `True` or
+             `self.config.doRefcatOutput` is `True`.
+           - butler cannot find "fgcmZeropoints" and
+             `self.config.doZeropointOutput` is `True`.
         """
 
         # Check to make sure that the fgcmBuildStars config exists, to retrieve
         # the visit and ccd dataset tags
-        if not butler.datasetExists('fgcmBuildStars_config'):
-            raise RuntimeError("Cannot find fgcmBuildStars_config, which is prereq for fgcmOutputProducts")
+        if not butler.datasetExists('fgcmBuildStarsTable_config') and \
+                not butler.datasetExists('fgcmBuildStars_config'):
+            raise RuntimeError("Cannot find fgcmBuildStarsTable_config or fgcmBuildStars_config, "
+                               "which is prereq for fgcmOutputProducts")
 
-        fgcmBuildStarsConfig = butler.get('fgcmBuildStars_config')
+        if butler.datasetExists('fgcmBuildStarsTable_config'):
+            fgcmBuildStarsConfig = butler.get('fgcmBuildStarsTable_config')
+        else:
+            fgcmBuildStarsConfig = butler.get('fgcmBuildStars_config')
         self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
         self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
         self.filterMap = fgcmBuildStarsConfig.filterMap

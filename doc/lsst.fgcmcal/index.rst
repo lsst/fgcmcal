@@ -20,13 +20,13 @@ There are four tasks to be run in a typical global ``fgcmcal`` processing chain.
 
 #. Make a look-up table: :doc:`tasks/lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`
 
-#. Build the star lists: :doc:`tasks/lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`
+#. Build the star lists: :doc:`tasks/lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask` (if ``sourceTable_visit`` parquet tables are available) or :doc:`tasks/lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`
 
 #. Run the fitter: :doc:`tasks/lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask`
 
 #. Output the final products: :doc:`tasks/lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask`
 
-Alternatively, ``fgcmcal`` can be run on a single tract (with multi-band coverage), although the results will not be as robust as a full global calibration.  This can be run with :doc:`tasks/lsst.fgcmcal.fgcmCalibrateTract.FgcmCalibrateTractTask`, which will run all of the tasks above except for the making of the look-up table.
+Alternatively, ``fgcmcal`` can be run on a single tract (with multi-band coverage), although the results will not be as robust as a full global calibration.  This can be run with :doc:`tasks/lsst.fgcmcal.fgcmCalibrateTractTable.FgcmCalibrateTractTableTask` or :doc:`tasks/lsst.fgcmcal.fgcmCalibrateTract.FgcmCalibrateTractTask`, which will run all of the tasks above except for the making of the look-up table.
 
 .. _lsst.fgcmcal.pythononly-contributing:
 

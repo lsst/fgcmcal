@@ -1,5 +1,3 @@
-# See COPYRIGHT file at the top of the source tree.
-#
 # This file is part of fgcmcal.
 #
 # Developed for the LSST Data Management System.
@@ -690,9 +688,7 @@ def makeAtmCat(atmSchema, atmStruct):
     """
 
     atmCat = afwTable.BaseCatalog(atmSchema)
-    atmCat.reserve(atmStruct.size)
-    for i in range(atmStruct.size):
-        atmCat.addNew()
+    atmCat.resize(atmStruct.size)
 
     atmCat['visit'][:] = atmStruct['VISIT']
     atmCat['pmb'][:] = atmStruct['PMB']
@@ -759,10 +755,7 @@ def makeStdCat(stdSchema, stdStruct, goodBands):
     """
 
     stdCat = afwTable.SimpleCatalog(stdSchema)
-
-    stdCat.reserve(stdStruct.size)
-    for i in range(stdStruct.size):
-        stdCat.addNew()
+    stdCat.resize(stdStruct.size)
 
     stdCat['id'][:] = stdStruct['FGCM_ID']
     stdCat['coord_ra'][:] = stdStruct['RA'] * geom.degrees
@@ -780,36 +773,71 @@ def makeStdCat(stdSchema, stdStruct, goodBands):
     return stdCat
 
 
-def computeApertureRadius(schema, fluxField):
+def computeApertureRadiusFromDataRef(dataRef, fluxField):
     """
     Compute the radius associated with a CircularApertureFlux field or
     associated slot.
 
     Parameters
     ----------
-    schema : `lsst.afw.table.schema`
+    dataRef : `lsst.daf.persistence.ButlerDataRef`
     fluxField : `str`
-       CircularApertureFlux field or associated slot.
+       CircularApertureFlux or associated slot.
 
     Returns
     -------
-    apertureRadius: `float`
+    apertureRadius : `float`
        Radius of the aperture field, in pixels.
 
     Raises
     ------
-    RuntimeError: Raised if flux field is not a CircularApertureFlux
+    RuntimeError: Raised if flux field is not a CircularApertureFlux, ApFlux,
        or associated slot.
     """
-    fluxFieldName = schema[fluxField].asField().getName()
+    # TODO: Move this method to more general stack method in DM-25775
+    datasetType = dataRef.butlerSubset.datasetType
 
-    m = re.search(r'CircularApertureFlux_(\d+)_(\d+)_', fluxFieldName)
+    if datasetType == 'src':
+        schema = dataRef.get(datasetType='src_schema').schema
+        try:
+            fluxFieldName = schema[fluxField].asField().getName()
+        except LookupError:
+            raise RuntimeError("Could not find %s or associated slot in schema." % (fluxField))
+        # This may also raise a RuntimeError
+        apertureRadius = computeApertureRadiusFromName(fluxFieldName)
+    else:
+        # This is a sourceTable_visit
+        apertureRadius = computeApertureRadiusFromName(fluxField)
+
+    return apertureRadius
+
+
+def computeApertureRadiusFromName(fluxField):
+    """
+    Compute the radius associated with a CircularApertureFlux or ApFlux field.
+
+    Parameters
+    ----------
+    fluxField : `str`
+       CircularApertureFlux or ApFlux
+
+    Returns
+    -------
+    apertureRadius : `float`
+        Radius of the aperture field, in pixels.
+
+    Raises
+    ------
+     RuntimeError: Raised if flux field is not a CircularApertureFlux
+       or ApFlux.
+    """
+    # TODO: Move this method to more general stack method in DM-25775
+    m = re.search(r'(CircularApertureFlux|ApFlux)_(\d+)_(\d+)_', fluxField)
 
     if m is None:
-        raise RuntimeError("Flux field %s does not correspond to a circular aperture"
-                           % (fluxField))
+        raise RuntimeError(f"Flux field {fluxField} does not correspond to a CircularApertureFlux or ApFlux")
 
-    apertureRadius = float(m.groups()[0]) + float(m.groups()[1])/10.
+    apertureRadius = float(m.groups()[1]) + float(m.groups()[2])/10.
 
     return apertureRadius
 

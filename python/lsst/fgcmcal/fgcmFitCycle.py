@@ -1494,9 +1494,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         """
 
         flagStarCat = afwTable.BaseCatalog(flagStarSchema)
-        flagStarCat.reserve(flagStarStruct.size)
-        for i in range(flagStarStruct.size):
-            flagStarCat.addNew()
+        flagStarCat.resize(flagStarStruct.size)
 
         flagStarCat['objId'][:] = flagStarStruct['OBJID']
         flagStarCat['objFlag'][:] = flagStarStruct['OBJFLAG']

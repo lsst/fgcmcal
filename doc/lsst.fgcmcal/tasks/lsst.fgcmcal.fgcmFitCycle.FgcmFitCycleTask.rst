@@ -6,7 +6,7 @@ FgcmFitCycleTask
 
 ``FgcmFitCycleTask`` runs a single ``fgcm`` fit on the star observations generated from :doc:`lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask` using the look-up table generated from :doc:`lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`.  This code is meant to be run multiple times until convergence, and the results output from one "fit cycle" are used as an input to the subsequent fit cycle.  One final cleanup run is performed to generate the tables required for input to :doc:`lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask`.
 
-This is the third task in a typical ``fgcmcal`` processing chain.  The first is :doc:`lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`, the second is :doc:`lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`, and the fourth is :doc:`lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask`.
+This is the third task in a typical ``fgcmcal`` processing chain.  The first is :doc:`lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`, the second is :doc:`lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask` or :doc:`lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`, and the fourth is :doc:`lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask`.
 
 ``FgcmFitCycleTask`` is available as a :ref:`command-line task <pipe-tasks-command-line-tasks>`, :command:`fgcmFitCycle.py`.
 
