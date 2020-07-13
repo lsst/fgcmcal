@@ -39,6 +39,7 @@ import numpy as np
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+import lsst.pipe.base.connectionTypes as cT
 import lsst.afw.table as afwTable
 import lsst.afw.cameraGeom as afwCameraGeom
 from lsst.afw.image import Filter
@@ -48,6 +49,50 @@ import fgcm
 
 __all__ = ['FgcmMakeLutParametersConfig', 'FgcmMakeLutConfig', 'FgcmMakeLutTask',
            'FgcmMakeLutRunner']
+
+
+class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
+                             dimensions=('instrument',),
+                             defaultTemplates={}):
+    camera = cT.PrerequisiteInput(
+        doc="Camera instrument",
+        name="camera",
+        storageClass="Camera",
+        dimensions=("instrument", "calibration_label",),
+    )
+
+    transmission_optics = cT.PrerequisiteInput(
+        doc="Optics transmission curve information",
+        name="transmission_optics",
+        storageClass="TransmissionCurve",
+        dimensions=("instrument", "calibration_label",),
+        deferLoad=True,
+    )
+
+    transmission_sensor = cT.PrerequisiteInput(
+        doc="Sensor transmission curve information",
+        name="transmission_sensor",
+        storageClass="TransmissionCurve",
+        dimensions=("instrument", "detector", "calibration_label",),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    transmission_filter = cT.PrerequisiteInput(
+        doc="Filter transmission curve information",
+        name="transmission_filter",
+        storageClass="TransmissionCurve",
+        dimensions=("instrument", "physical_filter", "calibration_label",),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    fgcmLookUpTable = cT.Output(
+        doc=("Atmosphere + instrument look-up-table for FGCM throughput and "
+             "chromatic corrections."),
+        name="fgcmLookUpTable",
+        storageClass="Catalog",
+    )
 
 
 class FgcmMakeLutParametersConfig(pexConfig.Config):
@@ -173,7 +218,8 @@ class FgcmMakeLutParametersConfig(pexConfig.Config):
     )
 
 
-class FgcmMakeLutConfig(pexConfig.Config):
+class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
+                        pipelineConnections=FgcmMakeLutConnections):
     """Config for FgcmMakeLutTask"""
 
     filterNames = pexConfig.ListField(
@@ -219,7 +265,8 @@ class FgcmMakeLutConfig(pexConfig.Config):
         # check if we have an atmosphereTableName, and if valid
         if self.atmosphereTableName is not None:
             try:
-                fgcm.FgcmAtmosphereTable.initWithTableName(self.atmosphereTableName)
+                pass
+                # fgcm.FgcmAtmosphereTable.initWithTableName(self.atmosphereTableName)
             except IOError:
                 raise RuntimeError("Could not find atmosphereTableName: %s" %
                                    (self.atmosphereTableName))
@@ -292,7 +339,7 @@ class FgcmMakeLutRunner(pipeBase.ButlerInitializedTaskRunner):
         return resultList
 
 
-class FgcmMakeLutTask(pipeBase.CmdLineTask):
+class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
     """
     Make Look-Up Table for FGCM.
 
@@ -310,16 +357,16 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
     RunnerClass = FgcmMakeLutRunner
     _DefaultName = "fgcmMakeLut"
 
-    def __init__(self, butler=None, **kwargs):
+    def __init__(self, butler=None, initInputs=None, **kwargs):
         """
         Instantiate an fgcmMakeLutTask.
 
         Parameters
         ----------
-        butler: `lsst.daf.persistence.Butler`
+        butler : `lsst.daf.persistence.Butler`
+        initInputs : `????`
         """
-
-        pipeBase.CmdLineTask.__init__(self, **kwargs)
+        super().__init__(**kwargs)
 
     # no saving of metadata for now
     def _getMetadataName(self):
@@ -336,6 +383,10 @@ class FgcmMakeLutTask(pipeBase.CmdLineTask):
         """
 
         self._fgcmMakeLut(butler)
+
+    def runQuantum(self, butlerQC, inputRefs, outputRefs):
+        import IPython
+        IPython.embed()
 
     def _fgcmMakeLut(self, butler):
         """
