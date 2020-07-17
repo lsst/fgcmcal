@@ -82,7 +82,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         config.colorterms.data['ps1*'].data['i'].c2 = -0.006855
 
         butler = dafPersist.Butler(self.inputDir)
-        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler, config=config)
+        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler=butler, config=config)
 
         ra = 337.656174
         dec = 0.823595
@@ -142,7 +142,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         config.colorterms.data['ps1*'].data['i2'].c2 = -0.013666
 
         butler = dafPersist.Butler(self.inputDir)
-        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler, config=config)
+        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler=butler, config=config)
 
         ra = 337.656174
         dec = 0.823595

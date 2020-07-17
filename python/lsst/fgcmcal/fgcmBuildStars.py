@@ -32,6 +32,7 @@ the input catalog as possible.
 import time
 
 import numpy as np
+import collections
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -104,10 +105,12 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
 
         return parser
 
-    def findAndGroupDataRefs(self, butler, dataRefs):
-        self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
+    def findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
+        if butler is None or calexpDataRefDict is not None:
+            raise RuntimeError("Running findAndGroupDataRefs with FgcmBuildStarsTask must "
+                               "be run with a butler and only supports Gen2.")
 
-        camera = butler.get('camera')
+        self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
 
         ccdIds = []
         for detector in camera:
@@ -176,9 +179,12 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
             for visit in groupedDataRefs:
                 groupedDataRefs[visit] = sorted(groupedDataRefs[visit], key=ccdSorter)
 
-        return groupedDataRefs
+        # This should be sorted by visit (the key)
+        return collections.OrderedDict(sorted(groupedDataRefs.items()))
 
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
+                                    srcSchemaDataRef,
+                                    camera,
                                     calibFluxApertureRadius=None,
                                     visitCatDataRef=None,
                                     starObsDataRef=None,
@@ -202,7 +208,6 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
         sourceSchema = dataRef.get('src_schema', immediate=True).schema
 
         # Construct a mapping from ccd number to index
-        camera = dataRef.get('camera')
         ccdMapping = {}
         for ccdIndex, detector in enumerate(camera):
             ccdMapping[detector.getId()] = ccdIndex

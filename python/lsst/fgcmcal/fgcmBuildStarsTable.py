@@ -36,15 +36,129 @@ import collections
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+import lsst.pipe.base.connectionTypes as cT
 import lsst.afw.table as afwTable
+from lsst.meas.algorithms import ReferenceObjectLoader
 
 from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsRunner, FgcmBuildStarsBaseTask
-from .utilities import computeApproxPixelAreaFields
+from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromDataRef
 
 __all__ = ['FgcmBuildStarsTableConfig', 'FgcmBuildStarsTableTask']
 
 
-class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase):
+class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
+                                     dimensions=("instrument",),
+                                     defaultTemplates={}):
+    camera = cT.PrerequisiteInput(
+        doc="Camera instrument",
+        name="camera",
+        storageClass="Camera",
+        dimensions=("instrument", "calibration_label",),
+    )
+
+    fgcmLookUpTable = cT.PrerequisiteInput(
+        doc=("Atmosphere + instrument look-up-table for FGCM throughput and "
+             "chromatic corrections."),
+        name="fgcmLookUpTable",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    srcSchema = cT.PrerequisiteInput(
+        doc="Schema for source catalogs",
+        name="src_schema",
+        storageClass="SourceCatalog",
+        deferLoad=True,
+    )
+
+    refCat = cT.PrerequisiteInput(
+        doc="Reference catalog to use for photometric calibration",
+        name="cal_ref_cat",
+        storageClass="SimpleCatalog",
+        dimensions=("skypix",),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    sourceTable_visit = cT.Input(
+        doc="Source table in parquet format, per visit",
+        name="sourceTable_visit",
+        storageClass="DataFrame",
+        dimensions=("instrument", "visit"),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    calexp = cT.Input(
+        doc="Calibrated exposures used for psf and metadata",
+        name="calexp",
+        storageClass="ExposureF",
+        dimensions=("instrument", "visit", "detector"),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    background = cT.Input(
+        doc="Calexp background model",
+        name="calexpBackground",
+        storageClass="Background",
+        dimensions=("instrument", "visit", "detector"),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    fgcmVisitCatalog = cT.Output(
+        doc="Catalog of visit information for fgcm",
+        name="fgcmVisitCatalog",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmStarObservations = cT.Output(
+        doc="Catalog of star observations for fgcm",
+        name="fgcmStarObservations",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmStarIds = cT.Output(
+        doc="Catalog of fgcm calibration star IDs",
+        name="fgcmStarIds",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmStarIndices = cT.Output(
+        doc="Catalog of fgcm calibration star indices",
+        name="fgcmStarIndices",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmReferenceStars = cT.Output(
+        doc="Catalog of fgcm-matched reference stars",
+        name="fgcmReferenceStars",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+
+        if not config.doReferenceMatches:
+            self.prerequisiteInputs.remove("refCat")
+            self.prerequisiteInputs.remove("fgcmLookUpTable")
+
+        if not config.doModelErrorsWithBackground:
+            self.inputs.remove("background")
+
+        if not config.doReferenceMatches:
+            self.outputs.remove("fgcmReferenceStars")
+
+
+class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase, pipeBase.PipelineTaskConfig,
+                                pipelineConnections=FgcmBuildStarsTableConnections):
     """Config for FgcmBuildStarsTableTask"""
 
     referenceCCD = pexConfig.Field(
@@ -101,6 +215,90 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
     RunnerClass = FgcmBuildStarsRunner
     _DefaultName = "fgcmBuildStarsTable"
 
+    canMultiprocess = False
+
+    def runQuantum(self, butlerQC, inputRefs, outputRefs):
+        self.isGen3 = True
+
+        dataRefs = butlerQC.get(inputRefs.sourceTable_visit)
+
+        self.log.info("Running with %d sourceTable_visit dataRefs" % (len(dataRefs)))
+
+        if self.config.doReferenceMatches:
+            # Get the LUT dataRef
+            lutDataRef = butlerQC.get(inputRefs.fgcmLookUpTable)
+
+            # Prepare the refCat loader
+            refConfig = self.config.fgcmLoadReferenceCatalog.refObjLoader
+            refObjLoader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
+                                                          for ref in inputRefs.refCat],
+                                                 refCats=butlerQC.get(inputRefs.refCat),
+                                                 config=refConfig,
+                                                 log=self.log)
+            self.makeSubtask('fgcmLoadReferenceCatalog', refObjLoader=refObjLoader)
+        else:
+            lutDataRef = None
+
+        # Compute aperture radius if necessary.  This is useful to do now before
+        # any heave lifting has happened (fail early).
+        calibFluxApertureRadius = None
+        if self.config.doSubtractLocalBackground:
+            try:
+                calibFluxApertureRadius = computeApertureRadiusFromDataRef(dataRefs[0],
+                                                                           self.config.instFluxField)
+            except RuntimeError as e:
+                raise RuntimeError("Could not determine aperture radius from %s. "
+                                   "Cannot use doSubtractLocalBackground." %
+                                   (self.config.instFluxField)) from e
+
+        calexpRefs = butlerQC.get(inputRefs.calexp)
+        calexpDataRefDict = {(calexpRef.dataId.byName()['visit'],
+                              calexpRef.dataId.byName()['detector']): calexpRef for
+                             calexpRef in calexpRefs}
+
+        camera = butlerQC.get(inputRefs.camera)
+        groupedDataRefs = self.findAndGroupDataRefs(camera, dataRefs,
+                                                    calexpDataRefDict=calexpDataRefDict)
+
+        # This may be...
+        # visitCatDataRef = outputRefs.fgcmVisitCatalog
+
+        if self.config.doModelErrorsWithBackground:
+            bkgRefs = butlerQC.get(inputRefs.background)
+            bkgDataRefDict = {(bkgRef.dataId.byName()['visit'],
+                               bkgRef.dataId.byName()['detector']): bkgRef for
+                              bkgRef in bkgRefs}
+        else:
+            bkgDataRefDict = None
+
+        # No internal saving at the moment...
+        visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs,
+                                             bkgDataRefDict=bkgDataRefDict,
+                                             visitCatDataRef=None,
+                                             inVisitCat=None)
+
+        rad = calibFluxApertureRadius
+        srcSchemaDataRef = butlerQC.get(inputRefs.srcSchema)
+        fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
+                                                                  visitCat,
+                                                                  srcSchemaDataRef,
+                                                                  camera,
+                                                                  calibFluxApertureRadius=rad,
+                                                                  starObsDataRef=None,
+                                                                  visitCatDataRef=None,
+                                                                  inStarObsCat=None)
+        butlerQC.put(visitCat, outputRefs.fgcmVisitCatalog)
+        butlerQC.put(fgcmStarObservationCat, outputRefs.fgcmStarObservations)
+
+        fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = self.fgcmMatchStars(visitCat,
+                                                                            fgcmStarObservationCat,
+                                                                            lutDataRef=lutDataRef)
+
+        butlerQC.put(fgcmStarIdCat, outputRefs.fgcmStarIds)
+        butlerQC.put(fgcmStarIndicesCat, outputRefs.fgcmStarIndices)
+        if fgcmRefCat is not None:
+            butlerQC.put(fgcmRefCat, outputRefs.fgcmReferenceStars)
+
     @classmethod
     def _makeArgumentParser(cls):
         """Create an argument parser"""
@@ -109,10 +307,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         return parser
 
-    def findAndGroupDataRefs(self, butler, dataRefs):
-        self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
+    def findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
+        if (butler is None and calexpDataRefDict is None) or \
+                (butler is not None and calexpDataRefDict is not None):
+            raise RuntimeError("Must either set butler (Gen2) or dataRefDict (Gen3)")
 
-        camera = butler.get('camera')
+        self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
 
         ccdIds = []
         for detector in camera:
@@ -134,12 +334,22 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # Find an existing calexp (we need for psf and metadata)
             # and make the relevant dataRef
             for ccdId in ccdIds:
-                try:
-                    calexpRef = butler.dataRef('calexp', dataId={self.config.visitDataRefName: visit,
-                                                                 self.config.ccdDataRefName: ccdId})
-                except RuntimeError:
-                    # Not found
-                    continue
+                if butler is not None:
+                    # Gen2 Mode
+                    try:
+                        calexpRef = butler.dataRef('calexp', dataId={self.config.visitDataRefName: visit,
+                                                                     self.config.ccdDataRefName: ccdId})
+                    except RuntimeError:
+                        # Not found
+                        continue
+                else:
+                    # Gen3 mode
+                    try:
+                        calexpRef = calexpDataRefDict[(visit, ccdId)]
+                    except KeyError:
+                        # Not found
+                        continue
+
                 # It was found.  Add and quit out, since we only
                 # need one calexp per visit.
                 groupedDataRefs[visit].append(calexpRef)
@@ -148,9 +358,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # And append this dataRef
             groupedDataRefs[visit].append(dataRef)
 
-        return groupedDataRefs
+        # This should be sorted by visit (the key)
+        return collections.OrderedDict(sorted(groupedDataRefs.items()))
 
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
+                                    srcSchemaDataRef,
+                                    camera,
                                     calibFluxApertureRadius=None,
                                     visitCatDataRef=None,
                                     starObsDataRef=None,
@@ -171,13 +384,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         # To get the correct output schema, we use similar code as fgcmBuildStarsTask
         # We are not actually using this mapper, except to grab the outputSchema
-        dataRef = groupedDataRefs[list(groupedDataRefs.keys())[0]][0]
-        sourceSchema = dataRef.get('src_schema', immediate=True).schema
+        # dataRef = groupedDataRefs[list(groupedDataRefs.keys())[0]][0]
+        sourceSchema = srcSchemaDataRef.get().schema
         sourceMapper = self._makeSourceMapper(sourceSchema)
         outputSchema = sourceMapper.getOutputSchema()
 
         # Construct mapping from ccd number to index
-        camera = dataRef.get('camera')
         ccdMapping = {}
         for ccdIndex, detector in enumerate(camera):
             ccdMapping[detector.getId()] = ccdIndex
@@ -215,9 +427,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             expTime = visit['exptime']
 
             dataRef = groupedDataRefs[visit['visit']][-1]
-            srcTable = dataRef.get()
 
-            df = srcTable.toDataFrame(columns)
+            if self.isGen3:
+                df = dataRef.get(parameters={'columns': columns})
+            else:
+                srcTable = dataRef.get()
+                df = srcTable.toDataFrame(columns)
 
             goodSrc = self.sourceSelector.selectSources(df)
 

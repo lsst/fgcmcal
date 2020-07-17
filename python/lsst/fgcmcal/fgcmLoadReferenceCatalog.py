@@ -38,6 +38,8 @@ from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask, ReferenceSourc
 from lsst.meas.algorithms import getRefFluxField
 from lsst.pipe.tasks.colorterms import ColortermLibrary
 from lsst.afw.image import abMagErrFromFluxErr
+from lsst.meas.algorithms import ReferenceObjectLoader
+
 import lsst.geom
 
 __all__ = ['FgcmLoadReferenceCatalogConfig', 'FgcmLoadReferenceCatalogTask']
@@ -93,7 +95,7 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
     ConfigClass = FgcmLoadReferenceCatalogConfig
     _DefaultName = 'fgcmLoadReferenceCatalog'
 
-    def __init__(self, butler, *args, **kwargs):
+    def __init__(self, butler=None, refObjLoader=None, **kwargs):
         """Construct an FgcmLoadReferenceCatalogTask
 
         Parameters
@@ -101,9 +103,12 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         butler: `lsst.daf.persistence.Buter`
            Data butler for reading catalogs.
         """
-        pipeBase.Task.__init__(self, *args, **kwargs)
-        self.butler = butler
-        self.makeSubtask('refObjLoader', butler=butler)
+        pipeBase.Task.__init__(self, **kwargs)
+        if refObjLoader is None and butler is not None:
+            self.makeSubtask('refObjLoader', butler=butler)
+        else:
+            self.refObjLoader = refObjLoader
+
         self.makeSubtask('referenceSelector')
         self._fluxFilters = None
         self._fluxFields = None
@@ -237,12 +242,12 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         fgcmRefCat['refMagErr'][:, :] = 99.0
 
         if self.config.applyColorTerms:
-            try:
+            if isinstance(self.refObjLoader, ReferenceObjectLoader):
+                # Gen3
+                refCatName = self.refObjLoader.config.value.ref_dataset_name
+            else:
+                # Gen2
                 refCatName = self.refObjLoader.ref_dataset_name
-            except AttributeError:
-                # NOTE: we need this try:except: block in place until we've
-                # completely removed a.net support
-                raise RuntimeError("Cannot perform colorterm corrections with a.net refcats.")
 
             for i, (filterName, fluxField) in enumerate(zip(self._fluxFilters, self._fluxFields)):
                 if fluxField is None:
@@ -269,14 +274,12 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         else:
             # No colorterms
 
-            # TODO: need to use Jy here until RFC-549 is completed and refcats return nanojansky
-
             for i, (filterName, fluxField) in enumerate(zip(self._fluxFilters, self._fluxFields)):
                 # nan_to_num replaces nans with zeros, and this ensures that we select
                 # fluxes that both filter out nans and are positive.
                 good, = np.where((np.nan_to_num(refCat[fluxField][selected]) > 0.0) &
                                  (np.nan_to_num(refCat[fluxField+'Err'][selected]) > 0.0))
-                refMag = (refCat[fluxField][selected][good] * units.Jy).to_value(units.ABmag)
+                refMag = (refCat[fluxField][selected][good] * units.nJy).to_value(units.ABmag)
                 refMagErr = abMagErrFromFluxErr(refCat[fluxField+'Err'][selected][good],
                                                 refCat[fluxField][selected][good])
                 fgcmRefCat['refMag'][good, i] = refMag

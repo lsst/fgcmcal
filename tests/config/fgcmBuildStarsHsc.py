@@ -7,7 +7,7 @@ config.coarseNside = 64
 config.visitDataRefName = 'visit'
 config.ccdDataRefName = 'ccd'
 config.doReferenceMatches = True
-# The testdata do not have local background information
-config.doSubtractLocalBackground = True
 config.nVisitsPerCheckpoint = 5
+# The test data do not have persisted backgrounds, so don't use them
+config.doModelErrorsWithBackground = False
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.minimum = 50.0

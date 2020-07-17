@@ -796,7 +796,8 @@ def computeApertureRadiusFromDataRef(dataRef, fluxField):
 
     Parameters
     ----------
-    dataRef : `lsst.daf.persistence.ButlerDataRef`
+    dataRef : `lsst.daf.persistence.ButlerDataRef` or
+              `lsst.daf.butler.DeferredDatasetHandle`
     fluxField : `str`
        CircularApertureFlux or associated slot.
 
@@ -811,7 +812,12 @@ def computeApertureRadiusFromDataRef(dataRef, fluxField):
        or associated slot.
     """
     # TODO: Move this method to more general stack method in DM-25775
-    datasetType = dataRef.butlerSubset.datasetType
+    try:
+        # Gen2 dataRef
+        datasetType = dataRef.butlerSubset.datasetType
+    except AttributeError:
+        # Gen3 dataRef
+        datasetType = dataRef.ref.datasetType.name
 
     if datasetType == 'src':
         schema = dataRef.get(datasetType='src_schema').schema

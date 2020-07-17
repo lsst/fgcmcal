@@ -208,6 +208,8 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
            doSubtractLocalBackground is True and aperture radius cannot be
            determined.
         """
+        self.isGen3 = False
+
         datasetType = dataRefs[0].butlerSubset.datasetType
         self.log.info("Running with %d %s dataRefs" % (len(dataRefs), datasetType))
 
@@ -223,6 +225,8 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
 
         self.makeSubtask("fgcmBuildStars", butler=butler)
         self.makeSubtask("fgcmOutputProducts", butler=butler)
+
+        self.fgcmBuildStars.isGen3 = self.isGen3
 
         # Compute the aperture radius if necessary.  This is useful to do now before
         # any heavy lifting has happened (fail early).
@@ -242,18 +246,27 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
         self.log.info("Running on tract %d" % (tract))
 
         # Note that we will need visitCat at the end of the procedure for the outputs
-        groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(butler, dataRefs)
         camera = butler.get('camera')
+        groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(camera, dataRefs, butler=butler)
         visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(camera, groupedDataRefs)
         rad = calibFluxApertureRadius
+        srcSchemaDataRef = butler.dataRef('src_schema')
         fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                                  visitCat,
+                                                                                 srcSchemaDataRef,
+                                                                                 camera,
                                                                                  calibFluxApertureRadius=rad)
 
+        if self.fgcmBuildStars.config.doReferenceMatches:
+            lutDataRef = butler.dataRef('fgcmLookUpTable')
+            self.fgcmBuildStars.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
+        else:
+            lutDataRef = None
+
         fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = \
-            self.fgcmBuildStars.fgcmMatchStars(butler,
-                                               visitCat,
-                                               fgcmStarObservationCat)
+            self.fgcmBuildStars.fgcmMatchStars(visitCat,
+                                               fgcmStarObservationCat,
+                                               lutDataRef=lutDataRef)
 
         # Load the LUT
         lutCat = butler.get('fgcmLookUpTable')
