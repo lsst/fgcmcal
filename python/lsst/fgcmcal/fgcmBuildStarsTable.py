@@ -287,6 +287,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                                                                   starObsDataRef=None,
                                                                   visitCatDataRef=None,
                                                                   inStarObsCat=None)
+
         butlerQC.put(visitCat, outputRefs.fgcmVisitCatalog)
         butlerQC.put(fgcmStarObservationCat, outputRefs.fgcmStarObservations)
 

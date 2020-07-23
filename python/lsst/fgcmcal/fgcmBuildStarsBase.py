@@ -549,13 +549,14 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             dataRef = groupedDataRefs[visit][0]
 
             if self.isGen3:
-                exp = dataRef.get(parameters={'bbox': bbox})
+                visitInfo = dataRef.get(component='visitInfo')
+                f = dataRef.get(component='filter')
+                psf = dataRef.get(component='psf')
             else:
                 exp = dataRef.get(datasetType='calexp_sub', bbox=bbox)
-
-            visitInfo = exp.getInfo().getVisitInfo()
-            f = exp.getFilter()
-            psf = exp.getPsf()
+                visitInfo = exp.getInfo().getVisitInfo()
+                f = exp.getFilter()
+                psf = exp.getPsf()
 
             rec = visitCat[i]
             rec['visit'] = visit

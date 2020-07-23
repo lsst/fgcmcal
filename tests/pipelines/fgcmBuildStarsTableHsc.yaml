@@ -1,0 +1,15 @@
+description: Build fgcmcal input stars
+instrument: lsst.obs.subaru.HyperSuprimeCam
+tasks:
+  fgcmBuildStarsTableTask:
+    class: lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask
+    # config:
+    #   filterMap: {'g': 'g', 'r': 'r', 'i': 'i'}
+    #   requiredBands: ['r', 'i']
+    #   primaryBands: ['i']
+    #   coarseNside: 64
+    #   nVisitsPerCheckpoint: 5
+      # fgcmLoadReferenceCatalog:
+      #   referenceSelector:
+      #     signalToNoise:
+      #       minimum = 50.0
