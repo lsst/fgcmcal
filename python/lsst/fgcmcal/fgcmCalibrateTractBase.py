@@ -325,6 +325,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
                             fgcmStarIdCat['nObs'][:],
                             obsX=fgcmStarObservationCat['x'][obsIndex],
                             obsY=fgcmStarObservationCat['y'][obsIndex],
+                            obsDeltaMagBkg=fgcmStarObservationCat['deltaMagBkg'][obsIndex],
                             psfCandidate=fgcmStarObservationCat['psf_candidate'][obsIndex],
                             refID=refId,
                             refMag=refMag,

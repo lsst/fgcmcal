@@ -233,13 +233,12 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
         ccdKey = outputSchema['ccd'].asKey()
         instMagKey = outputSchema['instMag'].asKey()
         instMagErrKey = outputSchema['instMagErr'].asKey()
+        deltaMagBkgKey = outputSchema['deltaMagBkg'].asKey()
 
         # Prepare local background if desired
         if self.config.doSubtractLocalBackground:
             localBackgroundFluxKey = sourceSchema[self.config.localBackgroundFluxField].asKey()
             localBackgroundArea = np.pi*calibFluxApertureRadius**2.
-        else:
-            localBackground = 0.0
 
         aperOutputSchema = aperMapper.getOutputSchema()
 
@@ -271,11 +270,20 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
                 ccdId = dataRef.dataId[self.config.ccdDataRefName]
 
                 sources = dataRef.get(datasetType='src', flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
+                goodSrc = self.sourceSelector.selectSources(sources)
 
-                # If we are subtracting the local background, then correct here
-                # before we do the s/n selection.  This ensures we do not have
-                # bad stars after local background subtraction.
+                tempCat = afwTable.BaseCatalog(fullCatalog.schema)
+                tempCat.reserve(goodSrc.selected.sum())
+                tempCat.extend(sources[goodSrc.selected], mapper=sourceMapper)
+                tempCat[visitKey][:] = visit['visit']
+                tempCat[ccdKey][:] = ccdId
 
+                # Compute "instrumental magnitude" by scaling flux with exposure time.
+                scaledInstFlux = (sources[instFluxKey][goodSrc.selected] *
+                                  visit['scaling'][ccdMapping[ccdId]])
+                tempCat[instMagKey][:] = (-2.5*np.log10(scaledInstFlux) + 2.5*np.log10(expTime))
+
+                # Compute the change in magnitude from the background offset
                 if self.config.doSubtractLocalBackground:
                     # At the moment we only adjust the flux and not the flux
                     # error by the background because the error on
@@ -289,20 +297,14 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
                     # than a mmag in quadrature).
 
                     localBackground = localBackgroundArea*sources[localBackgroundFluxKey]
-                    sources[instFluxKey] -= localBackground
 
-                goodSrc = self.sourceSelector.selectSources(sources)
-
-                tempCat = afwTable.BaseCatalog(fullCatalog.schema)
-                tempCat.reserve(goodSrc.selected.sum())
-                tempCat.extend(sources[goodSrc.selected], mapper=sourceMapper)
-                tempCat[visitKey][:] = visit['visit']
-                tempCat[ccdKey][:] = ccdId
-
-                # Compute "instrumental magnitude" by scaling flux with exposure time.
-                scaledInstFlux = (sources[instFluxKey][goodSrc.selected] *
-                                  visit['scaling'][ccdMapping[ccdId]])
-                tempCat[instMagKey][:] = (-2.5*np.log10(scaledInstFlux) + 2.5*np.log10(expTime))
+                    # This is the difference between the mag with background correction
+                    # and the mag without background correction.
+                    tempCat[deltaMagBkgKey][:] = (-2.5*np.log10(sources[instFluxKey][goodSrc.selected] -
+                                                                localBackground[goodSrc.selected]) -
+                                                  -2.5*np.log10(sources[instFluxKey][goodSrc.selected]))
+                else:
+                    tempCat[deltaMagBkgKey][:] = 0.0
 
                 # Compute instMagErr from instFluxErr/instFlux, any scaling
                 # will cancel out.
