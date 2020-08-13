@@ -99,6 +99,11 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         dtype=bool,
         default=True,
     )
+    doApplyMeanChromaticCorrection = pexConfig.Field(
+        doc="Apply the mean chromatic correction to the zeropoints?",
+        dtype=bool,
+        default=True,
+    )
     refObjLoader = pexConfig.ConfigurableField(
         target=LoadIndexedReferenceObjectsTask,
         doc="reference object loader for 'absolute' photometric calibration",
@@ -834,12 +839,21 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             # Retrieve overall scaling
             scaling = scalingMapping[rec['visit']][ccdMapping[rec['ccd']]]
 
+            # The postCalibrationOffset describe any zeropoint offsets
+            # to apply after the fgcm calibration.  The first part comes
+            # from the reference catalog match (used in testing).  The
+            # second part comes from the mean chromatic correction
+            # (if configured).
+            postCalibrationOffset = offsetMapping[rec['filtername']]
+            if self.config.doApplyMeanChromaticCorrection:
+                postCalibrationOffset += rec['fgcmDeltaChrom']
+
             fgcmSuperStarField = self._getChebyshevBoundedField(rec['fgcmfZptSstarCheb'],
                                                                 rec['fgcmfZptChebXyMax'])
             # Convert from FGCM AB to nJy
             fgcmZptField = self._getChebyshevBoundedField((rec['fgcmfZptCheb']*units.AB).to_value(units.nJy),
                                                           rec['fgcmfZptChebXyMax'],
-                                                          offset=offsetMapping[rec['filtername']],
+                                                          offset=postCalibrationOffset,
                                                           scaling=scaling)
 
             if self.config.doComposeWcsJacobian:

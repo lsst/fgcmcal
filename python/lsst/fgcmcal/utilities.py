@@ -126,6 +126,8 @@ def makeConfigDict(config, log, camera, maxIter,
                   'ccdGraySubCCDTriangular': config.ccdGraySubCcdTriangular,
                   'cycleNumber': config.cycleNumber,
                   'maxIter': maxIter,
+                  'deltaMagBkgOffsetPercentile': config.deltaMagBkgOffsetPercentile,
+                  'deltaMagBkgPerCcd': config.deltaMagBkgPerCcd,
                   'UTBoundary': config.utBoundary,
                   'washMJDs': config.washMjds,
                   'epochMJDs': config.epochMjds,
@@ -560,7 +562,10 @@ def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
                        doc='Retrieved i10 integral, estimated from stars (only for flag 1)')
     zptSchema.addField('fgcmGry', type=np.float64,
                        doc='Estimated gray extinction relative to atmospheric solution; '
-                       'only for flag <= 4')
+                       'only for fgcmFlag <= 4 (see fgcmFlag) ')
+    zptSchema.addField('fgcmDeltaChrom', type=np.float64,
+                       doc='Mean chromatic correction for stars in this ccd; '
+                       'only for fgcmFlag <= 4 (see fgcmFlag)')
     zptSchema.addField('fgcmZptVar', type=np.float64, doc='Variance of zeropoint over ccd')
     zptSchema.addField('fgcmTilings', type=np.float64,
                        doc='Number of photometric tilings used for solution for ccd')
@@ -587,6 +592,10 @@ def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
                        'at the time of the exposure')
     zptSchema.addField('fgcmFlat', type=np.float64, doc='Superstarflat illumination correction')
     zptSchema.addField('fgcmAperCorr', type=np.float64, doc='Aperture correction estimated by fgcm')
+    zptSchema.addField('fgcmDeltaMagBkg', type=np.float64,
+                       doc=('Local background correction from brightest percentile '
+                            '(value set by deltaMagBkgOffsetPercentile) calibration '
+                            'stars.'))
     zptSchema.addField('exptime', type=np.float32, doc='Exposure time')
     zptSchema.addField('filtername', type=str, size=10, doc='Filter name')
 
@@ -630,6 +639,7 @@ def makeZptCat(zptSchema, zpStruct):
     zptCat['fgcmR0'][:] = zpStruct['FGCM_R0']
     zptCat['fgcmR10'][:] = zpStruct['FGCM_R10']
     zptCat['fgcmGry'][:] = zpStruct['FGCM_GRY']
+    zptCat['fgcmDeltaChrom'][:] = zpStruct['FGCM_DELTACHROM']
     zptCat['fgcmZptVar'][:] = zpStruct['FGCM_ZPTVAR']
     zptCat['fgcmTilings'][:] = zpStruct['FGCM_TILINGS']
     zptCat['fgcmFpGry'][:] = zpStruct['FGCM_FPGRY']
@@ -641,6 +651,7 @@ def makeZptCat(zptSchema, zpStruct):
     zptCat['fgcmDust'][:] = zpStruct['FGCM_DUST']
     zptCat['fgcmFlat'][:] = zpStruct['FGCM_FLAT']
     zptCat['fgcmAperCorr'][:] = zpStruct['FGCM_APERCORR']
+    zptCat['fgcmDeltaMagBkg'][:] = zpStruct['FGCM_DELTAMAGBKG']
     zptCat['exptime'][:] = zpStruct['EXPTIME']
 
     return zptCat

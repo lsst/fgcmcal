@@ -389,7 +389,8 @@ class FgcmcalTestBase(object):
         # and doesn't know about that yet)
         testZpInd, = np.where((zptCat['visit'] == testVisit) &
                               (zptCat['ccd'] == testCcd))
-        fgcmZpt = zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex]
+        fgcmZpt = (zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex] +
+                   zptCat['fgcmDeltaChrom'][testZpInd])
         fgcmZptGrayErr = np.sqrt(zptCat['fgcmZptVar'][testZpInd])
 
         if self.config.doComposeWcsJacobian:
@@ -422,6 +423,28 @@ class FgcmcalTestBase(object):
         # wrong.
         self.assertFloatsAlmostEqual(photoCalMeanCalMags,
                                      photoCalMags, rtol=1e-2)
+
+        # The next test compares the "FGCM standard magnitudes" (which are output
+        # from the fgcm code itself) to the "calibrated magnitudes" that are
+        # obtained from running photoCalib.calibrateCatalog() on the original
+        # src catalogs.  This summary comparison ensures that using photoCalibs
+        # yields the same results as what FGCM is computing internally.
+        # Note that we additionally need to take into account the post-processing
+        # offsets used in the tests.
+
+        # For decent statistics, we are matching all the sources from one visit
+        # (multiple ccds)
+
+        subset = butler.subset('src', dataId={visitDataRefName: int(testVisit)})
+
+        matchMag, matchDelta = self._getMatchedVisitCat(rawStars, subset, testBandIndex, offsets)
+
+        st = np.argsort(matchMag)
+        # Compare the brightest 25% of stars.  No matter the setting of
+        # deltaMagBkgOffsetPercentile, we want to ensure that these stars
+        # match on average.
+        brightest, = np.where(matchMag < matchMag[st[int(0.25*st.size)]])
+        self.assertFloatsAlmostEqual(np.median(matchDelta[brightest]), 0.0, atol=0.002)
 
         # And the photoCal error is just the zeropoint gray error
         self.assertFloatsAlmostEqual(testCal.getCalibrationErr(),
@@ -626,6 +649,56 @@ class FgcmcalTestBase(object):
 
         for name in test1.dtype.names:
             testing.assert_array_almost_equal(test1[name], test2[name])
+
+    def _getMatchedVisitCat(self, rawStars, dataRefs, bandIndex, offsets):
+        """
+        Get a list of matched magnitudes and deltas from calibrated src catalogs.
+
+        Parameters
+        ----------
+        rawStars : `lsst.afw.table.SourceCatalog`
+           Fgcm standard stars
+        dataRefs : `list` or `lsst.daf.persist.ButlerSubset`
+           Data references for source catalogs to match
+        bandIndex : `int`
+           Index of the band for the source catalogs
+        offsets : `np.ndarray`
+           Testing calibration offsets to apply to rawStars
+
+        Returns
+        -------
+        matchMag : `np.ndarray`
+           Array of matched magnitudes
+        matchDelta : `np.ndarray`
+           Array of matched deltas between src and standard stars.
+        """
+        matcher = esutil.htm.Matcher(11, np.rad2deg(rawStars['coord_ra']),
+                                     np.rad2deg(rawStars['coord_dec']))
+
+        matchDelta = None
+        for dataRef in dataRefs:
+            src = dataRef.get()
+            photoCal = dataRef.get('fgcm_photoCalib')
+            src = photoCal.calibrateCatalog(src)
+
+            gdSrc, = np.where(np.nan_to_num(src['slot_CalibFlux_flux']) > 0.0)
+
+            matches = matcher.match(np.rad2deg(src['coord_ra'][gdSrc]),
+                                    np.rad2deg(src['coord_dec'][gdSrc]),
+                                    1./3600., maxmatch=1)
+
+            srcMag = src['slot_CalibFlux_mag'][gdSrc][matches[0]]
+            # Apply offset here to the catalog mag
+            catMag = rawStars['mag_std_noabs'][matches[1]][:, bandIndex] + offsets[bandIndex]
+            delta = srcMag - catMag
+            if matchDelta is None:
+                matchDelta = delta
+                matchMag = catMag
+            else:
+                matchDelta = np.append(matchDelta, delta)
+                matchMag = np.append(matchMag, catMag)
+
+        return matchMag, matchDelta
 
     def _checkResult(self, result):
         """

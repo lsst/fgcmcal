@@ -231,6 +231,18 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=int,
         default=50,
     )
+    deltaMagBkgOffsetPercentile = pexConfig.Field(
+        doc=("Percentile brightest stars on a visit/ccd to use to compute net "
+             "offset from local background subtraction."),
+        dtype=float,
+        default=0.25,
+    )
+    deltaMagBkgPerCcd = pexConfig.Field(
+        doc=("Compute net offset from local background subtraction per-ccd? "
+             "Otherwise, use computation per visit."),
+        dtype=bool,
+        default=False,
+    )
     utBoundary = pexConfig.Field(
         doc="Boundary (in UTC) from day-to-day",
         dtype=float,
@@ -920,6 +932,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                             starIds['nObs'][:],
                             obsX=starObs['x'][starIndices['obsIndex']],
                             obsY=starObs['y'][starIndices['obsIndex']],
+                            obsDeltaMagBkg=starObs['deltaMagBkg'][starIndices['obsIndex']],
                             psfCandidate=starObs['psf_candidate'][starIndices['obsIndex']],
                             refID=refId,
                             refMag=refMag,
@@ -1111,6 +1124,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        (parCat['compMirrorChromaticity'].size, )),
                                       ('MIRRORCHROMATICITYPIVOT', 'f8',
                                        (parCat['mirrorChromaticityPivot'].size, )),
+                                      ('COMPMEDIANSEDSLOPE', 'f8',
+                                       (parCat['compMedianSedSlope'].size, )),
                                       ('COMPAPERCORRPIVOT', 'f8',
                                        (parCat['compAperCorrPivot'].size, )),
                                       ('COMPAPERCORRSLOPE', 'f8',
@@ -1131,6 +1146,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                        (parCat['compExpGray'].size, )),
                                       ('COMPVARGRAY', 'f8',
                                        (parCat['compVarGray'].size, )),
+                                      ('COMPEXPDELTAMAGBKG', 'f8',
+                                       (parCat['compExpDeltaMagBkg'].size, )),
                                       ('COMPNGOODSTARPEREXP', 'i4',
                                        (parCat['compNGoodStarPerExp'].size, )),
                                       ('COMPSIGFGCM', 'f8',
@@ -1165,6 +1182,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParams['COMPREFSIGMA'][:] = parCat['compRefSigma'][0, :]
         inParams['COMPMIRRORCHROMATICITY'][:] = parCat['compMirrorChromaticity'][0, :]
         inParams['MIRRORCHROMATICITYPIVOT'][:] = parCat['mirrorChromaticityPivot'][0, :]
+        inParams['COMPMEDIANSEDSLOPE'][:] = parCat['compMedianSedSlope'][0, :]
         inParams['COMPAPERCORRPIVOT'][:] = parCat['compAperCorrPivot'][0, :]
         inParams['COMPAPERCORRSLOPE'][:] = parCat['compAperCorrSlope'][0, :]
         inParams['COMPAPERCORRSLOPEERR'][:] = parCat['compAperCorrSlopeErr'][0, :]
@@ -1175,6 +1193,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inParams['COMPMODELERRPARS'][:] = parCat['compModelErrPars'][0, :]
         inParams['COMPEXPGRAY'][:] = parCat['compExpGray'][0, :]
         inParams['COMPVARGRAY'][:] = parCat['compVarGray'][0, :]
+        inParams['COMPEXPDELTAMAGBKG'][:] = parCat['compExpDeltaMagBkg'][0, :]
         inParams['COMPNGOODSTARPEREXP'][:] = parCat['compNGoodStarPerExp'][0, :]
         inParams['COMPSIGFGCM'][:] = parCat['compSigFgcm'][0, :]
         inParams['COMPSIGMACAL'][:] = parCat['compSigmaCal'][0, :]
@@ -1347,6 +1366,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         parSchema.addField('mirrorChromaticityPivot', type='ArrayD',
                            doc='Mirror chromaticity pivot mjd',
                            size=pars['MIRRORCHROMATICITYPIVOT'].size)
+        parSchema.addField('compMedianSedSlope', type='ArrayD',
+                           doc='Computed median SED slope (per band)',
+                           size=pars['COMPMEDIANSEDSLOPE'].size)
         parSchema.addField('compAperCorrPivot', type='ArrayD', doc='Aperture correction pivot',
                            size=pars['COMPAPERCORRPIVOT'].size)
         parSchema.addField('compAperCorrSlope', type='ArrayD', doc='Aperture correction slope',
@@ -1367,6 +1389,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                            size=pars['COMPEXPGRAY'].size)
         parSchema.addField('compVarGray', type='ArrayD', doc='Computed exposure variance',
                            size=pars['COMPVARGRAY'].size)
+        parSchema.addField('compExpDeltaMagBkg', type='ArrayD',
+                           doc='Computed exposure offset due to background',
+                           size=pars['COMPEXPDELTAMAGBKG'].size)
         parSchema.addField('compNGoodStarPerExp', type='ArrayI',
                            doc='Computed number of good stars per exposure',
                            size=pars['COMPNGOODSTARPEREXP'].size)
@@ -1444,7 +1469,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                     'compModelErrExptimePivot', 'compModelErrFwhmPivot',
                     'compModelErrSkyPivot', 'compModelErrPars',
                     'compExpGray', 'compVarGray', 'compNGoodStarPerExp', 'compSigFgcm',
-                    'compSigmaCal',
+                    'compSigmaCal', 'compExpDeltaMagBkg', 'compMedianSedSlope',
                     'compRetrievedLnPwv', 'compRetrievedLnPwvRaw', 'compRetrievedLnPwvFlag',
                     'compRetrievedTauNight']
 

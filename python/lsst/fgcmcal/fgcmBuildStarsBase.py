@@ -599,6 +599,8 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask, abc.ABC):
             "instMagErr", type=np.float32, doc="Instrumental magnitude error")
         sourceMapper.editOutputSchema().addField(
             "jacobian", type=np.float32, doc="Relative pixel scale from wcs jacobian")
+        sourceMapper.editOutputSchema().addField(
+            "deltaMagBkg", type=np.float32, doc="Change in magnitude due to local background offset")
 
         return sourceMapper
 

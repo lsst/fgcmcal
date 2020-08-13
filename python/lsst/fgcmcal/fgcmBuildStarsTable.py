@@ -201,8 +201,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         # Prepare local background if desired
         if self.config.doSubtractLocalBackground:
             localBackgroundArea = np.pi*calibFluxApertureRadius**2.
-        else:
-            localBackground = 0.0
 
         # Determine which columns we need from the sourceTable_visit catalogs
         columns = self._get_sourceTable_visit_columns()
@@ -221,10 +219,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
             df = srcTable.toDataFrame(columns)
 
-            if self.config.doSubtractLocalBackground:
-                localBackground = localBackgroundArea*df[self.config.localBackgroundFluxField].values
-                df[self.config.instFluxField] -= localBackground
-
             goodSrc = self.sourceSelector.selectSources(df)
             use, = np.where(goodSrc.selected)
 
@@ -238,6 +232,28 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             tempCat[visitKey][:] = df[self.config.visitDataRefName].values[use]
             tempCat[ccdKey][:] = df[self.config.ccdDataRefName].values[use]
             tempCat['psf_candidate'] = df['Calib_psf_candidate'].values[use]
+
+            if self.config.doSubtractLocalBackground:
+                # At the moment we only adjust the flux and not the flux
+                # error by the background because the error on
+                # base_LocalBackground_instFlux is the rms error in the
+                # background annulus, not the error on the mean in the
+                # background estimate (which is much smaller, by sqrt(n)
+                # pixels used to estimate the background, which we do not
+                # have access to in this task).  In the default settings,
+                # the annulus is sufficiently large such that these
+                # additional errors are are negligibly small (much less
+                # than a mmag in quadrature).
+
+                localBackground = localBackgroundArea*df[self.config.localBackgroundFluxField].values
+
+                # This is the difference between the mag with local background correction
+                # and the mag without local background correction.
+                tempCat['deltaMagBkg'] = (-2.5*np.log10(df[self.config.instFluxField].values[use] -
+                                                        localBackground[use]) -
+                                          -2.5*np.log10(df[self.config.instFluxField].values[use]))
+            else:
+                tempCat['deltaMagBkg'][:] = 0.0
 
             # Need to loop over ccds here
             for detector in camera:

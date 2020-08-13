@@ -95,8 +95,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
 
-        nStar = 304
-        nObs = 3799
+        nStar = 305
+        nObs = 3789
 
         self._testFgcmBuildStarsTable(visits, nStar, nObs)
 
@@ -118,8 +118,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nGoodZp = 27
         nOkZp = 27
         nBadZp = 1093
-        nStdStars = 252
-        nPlots = 40
+        nStdStars = 257
+        nPlots = 35
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
 
@@ -157,7 +157,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.otherArgs = []
 
         filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
-        zpOffsets = np.array([-0.0010568995494, 0.00553833786398])
+        zpOffsets = np.array([-0.003520437516272068, 0.005638898815959692])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      filterMapping, zpOffsets,
@@ -186,7 +186,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        rawRepeatability = np.array([0.0, 0.007815538231, 0.0099641318989])
+        rawRepeatability = np.array([0.0, 0.00976151819391, 0.004126379444775])
         filterNCalibMap = {'HSC-R': 14,
                            'HSC-I': 15}
 
