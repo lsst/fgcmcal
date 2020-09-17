@@ -212,6 +212,18 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=bool,
         default=True,
     )
+    ccdGrayFocalPlaneDict = pexConfig.DictField(
+        doc=("Per-band specification on whether to compute focal-plane residual "
+             "('ccd gray') corrections."),
+        keytype=str,
+        itemtype=bool,
+        default={},
+    )
+    ccdGrayFocalPlaneChebyshevOrder = pexConfig.Field(
+        doc="Order of the 2D chebyshev polynomials for focal plane fit.",
+        dtype=int,
+        default=3,
+    )
     cycleNumber = pexConfig.Field(
         doc=("FGCM fit cycle number.  This is automatically incremented after each run "
              "and stage of outlier rejection.  See cookbook for details."),
