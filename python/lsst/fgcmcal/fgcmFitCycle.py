@@ -186,6 +186,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=5.0,
     )
+    focalPlaneSigmaClip = pexConfig.Field(
+        doc="Number of sigma to clip outliers per focal-plane.",
+        dtype=float,
+        default=5.0,
+    )
     ccdGraySubCcd = pexConfig.Field(
         doc="Compute CCD gray terms on sub-ccd scale",
         dtype=bool,
