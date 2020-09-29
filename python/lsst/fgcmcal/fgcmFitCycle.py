@@ -189,7 +189,7 @@ class FgcmFitCycleConfig(pexConfig.Config):
     focalPlaneSigmaClip = pexConfig.Field(
         doc="Number of sigma to clip outliers per focal-plane.",
         dtype=float,
-        default=5.0,
+        default=4.0,
     )
     ccdGraySubCcd = pexConfig.Field(
         doc="Compute CCD gray terms on sub-ccd scale",
@@ -616,6 +616,12 @@ class FgcmFitCycleConfig(pexConfig.Config):
         doc="Be less verbose with logging.",
         dtype=bool,
         default=False,
+    )
+    randomSeed = pexConfig.Field(
+        doc="Random seed for fgcm for consistency in tests.",
+        dtype=int,
+        default=None,
+        optional=True,
     )
 
     def setDefaults(self):
