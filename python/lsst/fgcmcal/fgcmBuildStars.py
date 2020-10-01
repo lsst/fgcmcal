@@ -272,6 +272,14 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
                 sources = dataRef.get(datasetType='src', flags=afwTable.SOURCE_IO_NO_FOOTPRINTS)
                 goodSrc = self.sourceSelector.selectSources(sources)
 
+                # Need to add a selection based on the local background correction
+                # if necessary
+                if self.config.doSubtractLocalBackground:
+                    localBackground = localBackgroundArea*sources[localBackgroundFluxKey]
+
+                    bad, = np.where((sources[instFluxKey] - localBackground) <= 0.0)
+                    goodSrc.selected[bad] = False
+
                 tempCat = afwTable.BaseCatalog(fullCatalog.schema)
                 tempCat.reserve(goodSrc.selected.sum())
                 tempCat.extend(sources[goodSrc.selected], mapper=sourceMapper)
@@ -295,8 +303,6 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
                     # the annulus is sufficiently large such that these
                     # additional errors are are negligibly small (much less
                     # than a mmag in quadrature).
-
-                    localBackground = localBackgroundArea*sources[localBackgroundFluxKey]
 
                     # This is the difference between the mag with background correction
                     # and the mag without background correction.

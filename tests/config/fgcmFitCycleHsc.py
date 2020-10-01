@@ -44,7 +44,7 @@ config.ccdGraySubCcdDict = {'g': False,
 config.ccdGrayFocalPlaneDict = {'g': True,
                                 'r': True,
                                 'i': True}
-config.ccdGrayFocalPlaneChebyshevOrder = 2
+config.ccdGrayFocalPlaneChebyshevOrder = 1
 config.modelMagErrors = False
 config.sigmaCalRange = (0.003, 0.003)
 config.instrumentParsPerBand = False

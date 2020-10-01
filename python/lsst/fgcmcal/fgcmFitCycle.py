@@ -224,6 +224,13 @@ class FgcmFitCycleConfig(pexConfig.Config):
         itemtype=bool,
         default={},
     )
+    ccdGrayFocalPlaneFitMinCcd = pexConfig.Field(
+        doc=("Minimum number of 'good' CCDs required to perform focal-plane "
+             "gray corrections.  If there are fewer good CCDs then the gray "
+             "correction is computed per-ccd."),
+        dtype=int,
+        default=1,
+    )
     ccdGrayFocalPlaneChebyshevOrder = pexConfig.Field(
         doc="Order of the 2D chebyshev polynomials for focal plane fit.",
         dtype=int,
