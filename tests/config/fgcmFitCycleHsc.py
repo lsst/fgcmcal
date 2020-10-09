@@ -41,7 +41,11 @@ config.superStarSubCcdChebyshevOrder = 1
 config.ccdGraySubCcdDict = {'g': False,
                             'r': False,
                             'i': False}
+config.ccdGrayFocalPlaneDict = {'g': True,
+                                'r': True,
+                                'i': True}
+config.ccdGrayFocalPlaneChebyshevOrder = 1
 config.modelMagErrors = False
 config.sigmaCalRange = (0.003, 0.003)
 config.instrumentParsPerBand = False
-
+config.randomSeed = 12345

@@ -520,6 +520,9 @@ class FgcmBuildStarsBaseTask(pipeBase.CmdLineTask, abc.ABC):
             rec = visitCat[i]
             rec['visit'] = visit
             rec['filtername'] = f.getName()
+            # TODO DM-26991: when gen2 is removed, gen3 workflow will make it
+            # much easier to get the wcs's necessary to recompute the pointing
+            # ra/dec at the center of the camera.
             radec = visitInfo.getBoresightRaDec()
             rec['telra'] = radec.getRa().asDegrees()
             rec['teldec'] = radec.getDec().asDegrees()

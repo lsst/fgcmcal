@@ -186,6 +186,11 @@ class FgcmFitCycleConfig(pexConfig.Config):
         dtype=float,
         default=5.0,
     )
+    focalPlaneSigmaClip = pexConfig.Field(
+        doc="Number of sigma to clip outliers per focal-plane.",
+        dtype=float,
+        default=4.0,
+    )
     ccdGraySubCcd = pexConfig.Field(
         doc="Compute CCD gray terms on sub-ccd scale",
         dtype=bool,
@@ -211,6 +216,25 @@ class FgcmFitCycleConfig(pexConfig.Config):
              "suppress high-order cross terms?"),
         dtype=bool,
         default=True,
+    )
+    ccdGrayFocalPlaneDict = pexConfig.DictField(
+        doc=("Per-band specification on whether to compute focal-plane residual "
+             "('ccd gray') corrections."),
+        keytype=str,
+        itemtype=bool,
+        default={},
+    )
+    ccdGrayFocalPlaneFitMinCcd = pexConfig.Field(
+        doc=("Minimum number of 'good' CCDs required to perform focal-plane "
+             "gray corrections.  If there are fewer good CCDs then the gray "
+             "correction is computed per-ccd."),
+        dtype=int,
+        default=1,
+    )
+    ccdGrayFocalPlaneChebyshevOrder = pexConfig.Field(
+        doc="Order of the 2D chebyshev polynomials for focal plane fit.",
+        dtype=int,
+        default=3,
     )
     cycleNumber = pexConfig.Field(
         doc=("FGCM fit cycle number.  This is automatically incremented after each run "
@@ -599,6 +623,12 @@ class FgcmFitCycleConfig(pexConfig.Config):
         doc="Be less verbose with logging.",
         dtype=bool,
         default=False,
+    )
+    randomSeed = pexConfig.Field(
+        doc="Random seed for fgcm for consistency in tests.",
+        dtype=int,
+        default=None,
+        optional=True,
     )
 
     def setDefaults(self):

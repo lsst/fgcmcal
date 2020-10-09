@@ -220,7 +220,15 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             df = srcTable.toDataFrame(columns)
 
             goodSrc = self.sourceSelector.selectSources(df)
-            use, = np.where(goodSrc.selected)
+
+            # Need to add a selection based on the local background correction
+            # if necessary
+            if self.config.doSubtractLocalBackground:
+                localBackground = localBackgroundArea*df[self.config.localBackgroundFluxField].values
+                use, = np.where((goodSrc.selected) &
+                                ((df[self.config.instFluxField].values - localBackground) > 0.0))
+            else:
+                use, = np.where(goodSrc.selected)
 
             tempCat = afwTable.BaseCatalog(fullCatalog.schema)
             tempCat.resize(use.size)
@@ -244,8 +252,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                 # the annulus is sufficiently large such that these
                 # additional errors are are negligibly small (much less
                 # than a mmag in quadrature).
-
-                localBackground = localBackgroundArea*df[self.config.localBackgroundFluxField].values
 
                 # This is the difference between the mag with local background correction
                 # and the mag without local background correction.
@@ -278,12 +284,17 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             fullCatalog.extend(tempCat)
 
             # Now do the aperture information
-            instMagIn = -2.5*np.log10(df[self.config.apertureInnerInstFluxField].values[use])
-            instMagErrIn = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values[use] /
-                              df[self.config.apertureInnerInstFluxField].values[use])
-            instMagOut = -2.5*np.log10(df[self.config.apertureOuterInstFluxField].values[use])
-            instMagErrOut = k*(df[self.config.apertureOuterInstFluxField + 'Err'].values[use] /
-                               df[self.config.apertureOuterInstFluxField].values[use])
+            with np.warnings.catch_warnings():
+                # Ignore warnings, we will filter infinites and nans below
+                np.warnings.simplefilter("ignore")
+
+                instMagIn = -2.5*np.log10(df[self.config.apertureInnerInstFluxField].values[use])
+                instMagErrIn = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values[use] /
+                                  df[self.config.apertureInnerInstFluxField].values[use])
+                instMagOut = -2.5*np.log10(df[self.config.apertureOuterInstFluxField].values[use])
+                instMagErrOut = k*(df[self.config.apertureOuterInstFluxField + 'Err'].values[use] /
+                                   df[self.config.apertureOuterInstFluxField].values[use])
+
             ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn) &
                   np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
