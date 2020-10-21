@@ -1,5 +1,5 @@
 description: Perform an fgcmcal fit cycle
 instrument: lsst.obs.subaru.HyperSuprimeCam
 tasks:
-  fgcmFitCycleTask:
+  fgcmFitCycle:
     class: lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask

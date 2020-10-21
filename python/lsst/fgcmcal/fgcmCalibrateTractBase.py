@@ -24,6 +24,7 @@ or sourceTable_visit tables.
 
 import sys
 import traceback
+import abc
 
 import numpy as np
 
@@ -168,9 +169,8 @@ class FgcmCalibrateTractRunner(pipeBase.ButlerInitializedTaskRunner):
         return resultList
 
 
-class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
-    """
-    Base class to calibrate a single tract using fgcmcal
+class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.ABC):
+    """Base class to calibrate a single tract using fgcmcal
     """
     def __init__(self, butler=None, **kwargs):
         """
@@ -178,10 +178,9 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler : `lsst.daf.persistence.Butler`
+        butler : `lsst.daf.persistence.Butler`, optional
         """
-
-        pipeBase.CmdLineTask.__init__(self, **kwargs)
+        super().__init__(**kwargs)
 
     # no saving of metadata for now
     def _getMetadataName(self):
@@ -226,7 +225,62 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
         self.makeSubtask("fgcmBuildStars", butler=butler)
         self.makeSubtask("fgcmOutputProducts", butler=butler)
 
+        tract = int(dataRefs[0].dataId['tract'])
+        camera = butler.get('camera')
+
+        dataRefDict = {}
+        dataRefDict['camera'] = camera
+        dataRefDict['source_catalogs'] = dataRefs
+        dataRefDict['src_schema'] = butler.dataRef('src_schema')
+        dataRefDict['fgcmLookUpTable'] = butler.dataRef('fgcmLookUpTable')
+
+        return self.run(dataRefDict, tract, butler=butler)
+
+    def run(self, dataRefDict, tract, butler=None):
+        """Run the calibrations for a single tract with fgcm.
+
+        Parameters
+        ----------
+        dataRefDict : `dict`
+            All dataRefs are `lsst.daf.persistence.ButlerDataRef` (gen2) or
+            `lsst.daf.butler.DeferredDatasetHandle` (gen3)
+            dataRef dictionary with keys:
+
+            ``"camera"``
+                Camera object (`lsst.afw.cameraGeom.Camera`)
+            ``"source_catalogs"``
+                `list` of dataRefs for input source catalogs.
+            ``"src_schema"``
+                Schema for the source catalogs.
+            ``"fgcmLookUpTable"``
+                dataRef for the FGCM look-up table.
+            ``"calexps"``
+                `list` of dataRefs for the input calexps (Gen3 only)
+            ``"fgcmPhotoCalibs"``
+                `dict` of output photoCalib dataRefs.  Key is
+                (tract, visit, detector). (Gen3 only)
+            ``"fgcmTransmissionAtmospheres"``
+                `dict` of output atmosphere transmission dataRefs.
+                Key is (tract, visit). (Gen3 only)
+        tract : `int`
+            Tract number
+        butler : `lsst.daf.persistance.Butler` or `lsst.daf.butler.Butler`
+            Data butler for persisting photoCalibs.
+
+        Returns
+        -------
+        outstruct : `lsst.pipe.base.Struct`
+            Output structure with keys:
+
+            offsets : `np.ndarray`
+                Final reference offsets, per band.
+            repeatability : `np.ndarray`
+                Raw fgcm repeatability for bright stars, per band.
+        """
+        self.log.info("Running on tract %d" % (tract))
+
         self.fgcmBuildStars.isGen3 = self.isGen3
+        self.fgcmOutputProducts.isGen3 = self.isGen3
 
         # Compute the aperture radius if necessary.  This is useful to do now before
         # any heavy lifting has happened (fail early).
@@ -234,7 +288,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
         if self.config.fgcmBuildStars.doSubtractLocalBackground:
             try:
                 field = self.config.fgcmBuildStars.instFluxField
-                calibFluxApertureRadius = computeApertureRadiusFromDataRef(dataRefs[0],
+                calibFluxApertureRadius = computeApertureRadiusFromDataRef(dataRefDict['source_catalogs'][0],
                                                                            field)
             except RuntimeError:
                 raise RuntimeError("Could not determine aperture radius from %s. "
@@ -242,24 +296,32 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
                                    (field))
 
         # Run the build stars tasks
-        tract = int(dataRefs[0].dataId['tract'])
-        self.log.info("Running on tract %d" % (tract))
 
         # Note that we will need visitCat at the end of the procedure for the outputs
-        camera = butler.get('camera')
-        groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(camera, dataRefs, butler=butler)
-        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(camera, groupedDataRefs)
+        if self.isGen3:
+            cdrd = dataRefDict['calexps']
+            groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(dataRefDict['camera'],
+                                                                       dataRefDict['source_catalogs'],
+                                                                       calexpDataRefDict=cdrd)
+        else:
+            groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(dataRefDict['camera'],
+                                                                       dataRefDict['source_catalogs'],
+                                                                       butler=butler)
+        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(dataRefDict['camera'], groupedDataRefs)
         rad = calibFluxApertureRadius
-        srcSchemaDataRef = butler.dataRef('src_schema')
         fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                                  visitCat,
-                                                                                 srcSchemaDataRef,
-                                                                                 camera,
+                                                                                 dataRefDict['src_schema'],
+                                                                                 dataRefDict['camera'],
                                                                                  calibFluxApertureRadius=rad)
 
         if self.fgcmBuildStars.config.doReferenceMatches:
-            lutDataRef = butler.dataRef('fgcmLookUpTable')
-            self.fgcmBuildStars.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
+            lutDataRef = dataRefDict['fgcmLookUpTable']
+            if self.isGen3:
+                self.fgcmBuildStars.makeSubtask("fgcmLoadReferenceCatalog",
+                                                refObjLoader=self.buildStarsRefObjLoader)
+            else:
+                self.fgcmBuildStars.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
         else:
             lutDataRef = None
 
@@ -269,7 +331,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
                                                lutDataRef=lutDataRef)
 
         # Load the LUT
-        lutCat = butler.get('fgcmLookUpTable')
+        lutCat = dataRefDict['fgcmLookUpTable'].get()
         fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat,
                                                          dict(self.config.fgcmFitCycle.filterMap))
         del lutCat
@@ -277,8 +339,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
         # Translate the visit catalog into fgcm format
         fgcmExpInfo = translateVisitCatalog(visitCat)
 
-        camera = butler.get('camera')
-        configDict = makeConfigDict(self.config.fgcmFitCycle, self.log, camera,
+        configDict = makeConfigDict(self.config.fgcmFitCycle, self.log, dataRefDict['camera'],
                                     self.config.fgcmFitCycle.maxIterBeforeFinalCycle,
                                     True, False, tract=tract)
         # Turn off plotting in tract mode
@@ -286,8 +347,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
 
         # Use the first orientation.
         # TODO: DM-21215 will generalize to arbitrary camera orientations
-        ccdOffsets = computeCcdOffsets(camera, fgcmExpInfo['TELROT'][0])
-        del camera
+        ccdOffsets = computeCcdOffsets(dataRefDict['camera'], fgcmExpInfo['TELROT'][0])
 
         # Set up the fit cycle task
 
@@ -466,11 +526,12 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
         stdSchema = makeStdSchema(len(goodBands))
         stdCat = makeStdCat(stdSchema, stdStruct, goodBands)
 
-        outStruct = self.fgcmOutputProducts.generateTractOutputProducts(butler, tract,
+        outStruct = self.fgcmOutputProducts.generateTractOutputProducts(butler,
+                                                                        dataRefDict,
+                                                                        tract,
                                                                         visitCat,
                                                                         zptCat, atmCat, stdCat,
-                                                                        self.config.fgcmBuildStars,
-                                                                        self.config.fgcmFitCycle)
+                                                                        self.config.fgcmBuildStars)
         outStruct.repeatability = fgcmFitCycle.fgcmPars.compReservedRawRepeatability
 
         return outStruct

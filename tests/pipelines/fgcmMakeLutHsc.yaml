@@ -1,9 +1,5 @@
 description: Make fgcmcal look-up table
 instrument: lsst.obs.subaru.HyperSuprimeCam
 tasks:
-  fgcmMakeLutTask:
+  fgcmMakeLut:
     class: lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask
-    config:
-      filterNames: ['g', 'r', 'i']
-      stdFilterNames: ['g', 'r', 'i']
-      atmosphereTableName: 'fgcm_atm_subaru2_test'

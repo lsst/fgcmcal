@@ -1,0 +1,5 @@
+description: Calibrate a single tract using fgcmcal
+instrument: lsst.obs.subaru.HyperSuprimeCam
+tasks:
+   fgcmCalibrateTractTable:
+     class: lsst.fgcmcal.fgcmCalibrateTractTable.FgcmCalibrateTractTableTask

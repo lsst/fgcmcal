@@ -43,8 +43,10 @@ from astropy import units
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+import lsst.pipe.base.connectionTypes as cT
 from lsst.afw.image import TransmissionCurve
 from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask
+from lsst.meas.algorithms import ReferenceObjectLoader
 from lsst.pipe.tasks.photoCal import PhotoCalTask
 import lsst.geom
 import lsst.afw.image as afwImage
@@ -55,13 +57,130 @@ from lsst.meas.algorithms import DatasetConfig
 from lsst.meas.algorithms.ingestIndexReferenceTask import addRefCatMetadata
 
 from .utilities import computeApproxPixelAreaFields
+from .utilities import lookupStaticCalibrations
 
 import fgcm
 
 __all__ = ['FgcmOutputProductsConfig', 'FgcmOutputProductsTask', 'FgcmOutputProductsRunner']
 
 
-class FgcmOutputProductsConfig(pexConfig.Config):
+class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
+                                    dimensions=("instrument",),
+                                    defaultTemplates={"cycleNumber": "0"}):
+    camera = cT.PrerequisiteInput(
+        doc="Camera instrument",
+        name="camera",
+        storageClass="Camera",
+        dimensions=("instrument",),
+        lookupFunction=lookupStaticCalibrations,
+        isCalibration=True,
+    )
+
+    fgcmLookUpTable = cT.PrerequisiteInput(
+        doc=("Atmosphere + instrument look-up-table for FGCM throughput and "
+             "chromatic corrections."),
+        name="fgcmLookUpTable",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmVisitCatalog = cT.PrerequisiteInput(
+        doc="Catalog of visit information for fgcm",
+        name="fgcmVisitCatalog",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmStandardStars = cT.PrerequisiteInput(
+        doc="Catalog of standard star data from fgcm fit",
+        name="fgcmStandardStars{cycleNumber}",
+        storageClass="SimpleCatalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmZeropoints = cT.PrerequisiteInput(
+        doc="Catalog of zeropoints from fgcm fit",
+        name="fgcmZeropoints{cycleNumber}",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmAtmosphereParameters = cT.PrerequisiteInput(
+        doc="Catalog of atmosphere parameters from fgcm fit",
+        name="fgcmAtmosphereParameters{cycleNumber}",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    refCat = cT.PrerequisiteInput(
+        doc="Reference catalog to use for photometric calibration",
+        name="cal_ref_cat",
+        storageClass="SimpleCatalog",
+        dimensions=("skypix",),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    fgcmBuildStarsTableConfig = cT.PrerequisiteInput(
+        doc="Config used to build FGCM input stars",
+        name="fgcmBuildStarsTable_config",
+        storageClass="Config",
+    )
+
+    calexp = cT.Input(
+        doc="Calibrated exposures used to match fgcmBuildStars input",
+        name="calexp",
+        storageClass="ExposureF",
+        dimensions=("instrument", "visit", "detector",),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    fgcmPhotoCalib = cT.Output(
+        doc="Per-detector photoCalib files produced from fgcm calibration",
+        name="fgcm_photoCalib",
+        storageClass="PhotoCalib",
+        dimensions=("instrument", "visit", "detector",),
+        multiple=True,
+    )
+
+    fgcmTransmissionAtmosphere = cT.Output(
+        doc="Per-visit atmosphere transmission files produced from fgcm calibration",
+        name="transmission_atmosphere_fgcm",
+        storageClass="TransmissionCurve",
+        dimensions=("instrument",
+                    "visit",),
+        multiple=True,
+    )
+
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+
+        if str(int(config.connections.cycleNumber)) != config.connections.cycleNumber:
+            raise ValueError("cycleNumber must be of integer format")
+        if config.connections.refCat != config.refObjLoader.ref_dataset_name:
+            raise ValueError("connections.refCat must be the same as refObjLoader.ref_dataset_name")
+
+        if config.doRefcatOutput:
+            raise ValueError("FgcmOutputProductsTask (Gen3) does not support doRefcatOutput")
+
+        if not config.doRefcatOutput and not config.doReferenceCalibration:
+            self.prerequisiteInputs.remove("fgcmStandardStars")
+        if not config.doReferenceCalibration:
+            self.prerequisiteInputs.remove("refCat")
+        if not config.doAtmosphereOutput:
+            self.prerequisiteInputs.remove("fgcmAtmosphereParameters")
+        if not config.doZeropointOutput:
+            self.prerequisiteInputs.remove("fgcmZeropoints")
+
+
+class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
+                               pipelineConnections=FgcmOutputProductsConnections):
     """Config for FgcmOutputProductsTask"""
 
     cycleNumber = pexConfig.Field(
@@ -168,6 +287,12 @@ class FgcmOutputProductsConfig(pexConfig.Config):
         self.datasetConfig.ref_dataset_name = 'fgcm_stars'
         self.datasetConfig.format_version = 1
 
+    def validate(self):
+        super().validate()
+
+        # Force the connections to conform with cycleNumber
+        self.connections.cycleNumber = str(self.cycleNumber)
+
 
 class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
     """Subclass of TaskRunner for fgcmOutputProductsTask
@@ -239,7 +364,7 @@ class FgcmOutputProductsRunner(pipeBase.ButlerInitializedTaskRunner):
         return resultList
 
 
-class FgcmOutputProductsTask(pipeBase.CmdLineTask):
+class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
     """
     Output products from FGCM global calibration.
     """
@@ -249,27 +374,57 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
     _DefaultName = "fgcmOutputProducts"
 
     def __init__(self, butler=None, **kwargs):
-        """
-        Instantiate an fgcmOutputProductsTask.
-
-        Parameters
-        ----------
-        butler : `lsst.daf.persistence.Butler`
-        """
-
-        pipeBase.CmdLineTask.__init__(self, **kwargs)
-
-        if self.config.doReferenceCalibration:
-            # We need the ref obj loader to get the flux field
-            self.makeSubtask("refObjLoader", butler=butler)
-
-        if self.config.doRefcatOutput:
-            self.indexer = IndexerRegistry[self.config.datasetConfig.indexer.name](
-                self.config.datasetConfig.indexer.active)
+        super().__init__(**kwargs)
 
     # no saving of metadata for now
     def _getMetadataName(self):
         return None
+
+    def runQuantum(self, butlerQC, inputRefs, outputRefs):
+        self.isGen3 = True
+
+        dataRefDict = {}
+        dataRefDict['camera'] = butlerQC.get(inputRefs.camera)
+        dataRefDict['fgcmLookUpTable'] = butlerQC.get(inputRefs.fgcmLookUpTable)
+        dataRefDict['fgcmVisitCatalog'] = butlerQC.get(inputRefs.fgcmVisitCatalog)
+        dataRefDict['fgcmStandardStars'] = butlerQC.get(inputRefs.fgcmStandardStars)
+
+        if self.config.doZeropointOutput:
+            dataRefDict['fgcmZeropoints'] = butlerQC.get(inputRefs.fgcmZeropoints)
+            photoCalibRefDict = {(photoCalibRef.dataId.byName()['visit'],
+                                  photoCalibRef.dataId.byName()['detector']): photoCalibRef for
+                                 photoCalibRef in outputRefs.fgcmPhotoCalib}
+            dataRefDict['fgcmPhotoCalibs'] = photoCalibRefDict
+
+        if self.config.doAtmosphereOutput:
+            dataRefDict['fgcmAtmosphereParameters'] = butlerQC.get(inputRefs.fgcmAtmosphereParameters)
+            atmRefDict = {atmRef.dataId.byName()['visit']: atmRef for
+                          atmRef in outputRefs.fgcmTransmissionAtmosphere}
+            dataRefDict['fgcmTransmissionAtmospheres'] = atmRefDict
+
+        if self.config.doReferenceCalibration:
+            refConfig = self.config.refObjLoader
+            self.refObjLoader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
+                                                               for ref in inputRefs.refCat],
+                                                      refCats=butlerQC.get(inputRefs.refCat),
+                                                      config=refConfig,
+                                                      log=self.log)
+
+        dataRefDict['fgcmBuildStarsTableConfig'] = butlerQC.get(inputRefs.fgcmBuildStarsTableConfig)
+
+        fgcmBuildStarsConfig = butlerQC.get(inputRefs.fgcmBuildStarsTableConfig)
+        self.filterMap = fgcmBuildStarsConfig.filterMap
+
+        if self.config.doComposeWcsJacobian and not fgcmBuildStarsConfig.doApplyWcsJacobian:
+            raise RuntimeError("Cannot compose the WCS jacobian if it hasn't been applied "
+                               "in fgcmBuildStarsTask.")
+        if not self.config.doComposeWcsJacobian and fgcmBuildStarsConfig.doApplyWcsJacobian:
+            self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
+
+        # This is used for logging
+        self.visitDataRefName = 'visit'
+
+        self._runOutputProducts(butlerQC, dataRefDict)
 
     @pipeBase.timeMethod
     def runDataRef(self, butler):
@@ -305,6 +460,11 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
            - butler cannot find "fgcmZeropoints" and
              `self.config.doZeropointOutput` is `True`.
         """
+        self.isGen3 = False
+
+        if self.config.doReferenceCalibration:
+            # We need the ref obj loader to get the flux field
+            self.makeSubtask("refObjLoader", butler=butler)
 
         # Check to make sure that the fgcmBuildStars config exists, to retrieve
         # the visit and ccd dataset tags
@@ -328,27 +488,14 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         if not self.config.doComposeWcsJacobian and fgcmBuildStarsConfig.doApplyWcsJacobian:
             self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
 
-        # Make sure that the fit config exists, to retrieve bands and other info
-        if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber):
-            raise RuntimeError("Cannot find fgcmFitCycle_config from cycle %d " % (self.config.cycleNumber) +
-                               "which is required for fgcmOutputProducts.")
-
-        fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
-        self.configBands = fitCycleConfig.bands
-
-        if self.config.doReferenceCalibration and fitCycleConfig.doReferenceCalibration:
-            self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
-                          "fitCycleConfig.doReferenceCalibration")
-
         # And make sure that the atmosphere was output properly
         if (self.config.doAtmosphereOutput and
                 not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)):
             raise RuntimeError("Atmosphere parameters are missing for cycle %d." %
                                (self.config.cycleNumber))
 
-        if ((self.config.doReferenceCalibration or self.config.doRefcatOutput) and
-                (not butler.datasetExists('fgcmStandardStars',
-                                          fgcmcycle=self.config.cycleNumber))):
+        if not butler.datasetExists('fgcmStandardStars',
+                                    fgcmcycle=self.config.cycleNumber):
             raise RuntimeError("Standard stars are missing for cycle %d." %
                                (self.config.cycleNumber))
 
@@ -357,48 +504,99 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             raise RuntimeError("Zeropoints are missing for cycle %d." %
                                (self.config.cycleNumber))
 
-        # And make sure this is the last cycle
-        if butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber + 1):
-            raise RuntimeError("The task fgcmOutputProducts should only be run"
-                               "on the final fit cycle products")
+        dataRefDict = {}
+        # This is the _actual_ camera
+        dataRefDict['camera'] = butler.get('camera')
+        dataRefDict['fgcmLookUpTable'] = butler.dataRef('fgcmLookUpTable')
+        dataRefDict['fgcmVisitCatalog'] = butler.dataRef('fgcmVisitCatalog')
 
         if self.config.doReferenceCalibration or self.config.doRefcatOutput:
-            stdCat = butler.get('fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
-            md = stdCat.getMetadata()
-            self.bands = md.getArray('BANDS')
+            dataRefDict['fgcmStandardStars'] = butler.dataRef('fgcmStandardStars',
+                                                              fgcmcycle=self.config.cycleNumber)
+            md = dataRefDict['fgcmStandardStars'].get('fgcmStandardStars_md')
         else:
-            stdCat = None
-            self.bands = self.configBands
+            md = butler.get('fgcmStandardStars_metadata', fgcmcycle=self.config.cycleNumber)
+        self.bands = md.getArray('BANDS')
+
+        if self.config.doZeropointOutput:
+            dataRefDict['fgcmZeropoints'] = butler.dataRef('fgcmZeropoints',
+                                                           fgcmcycle=self.config.cycleNumber)
+        if self.config.doAtmosphereOutput:
+            dataRefDict['fgcmAtmosphereParameters'] = butler.dataRef('fgcmAtmosphereParameters',
+                                                                     fgcmcycle=self.config.cycleNumber)
+
+        return self._runOutputProducts(butler, dataRefDict)
+
+    def _runOutputProducts(self, butler, dataRefDict):
+        """Run the output products task.
+
+        Parameters
+        ----------
+        butler : `lsst.daf.persistence.Butler` or
+                 `lsst.pipe.base.ButlerQuantumContext`
+        dataRefDict : `dict`
+            All dataRefs are `lsst.daf.persistence.ButlerDataRef` (gen2) or
+            `lsst.daf.butler.DeferredDatasetHandle` (gen3)
+            dataRef dictionary with keys:
+
+            ``"camera"``
+                Camera object (`lsst.afw.cameraGeom.Camera`)
+            ``"fgcmLookUpTable"``
+                dataRef for the FGCM look-up table.
+            ``"fgcmVisitCatalog"``
+                dataRef for visit summary catalog.
+            ``"fgcmStandardStars"``
+                dataRef for the output standard star catalog.
+            ``"fgcmZeropoints"``
+                dataRef for the zeropoint data catalog.
+            ``"fgcmAtmosphereParameters"``
+                dataRef for the atmosphere parameter catalog.
+            ``"fgcmPhotoCalibs"``
+                `dict` of output photoCalib dataRefs.  Key is
+                (visit, detector). (Gen3 only)
+            ``"fgcmTransmissionAtmospheres"``
+                `dict` of output atmosphere transmission dataRefs.  Key is
+                (visit).  (Gen3 only)
+            ``"fgcmBuildStarsTableConfig"``
+                Config for `lsst.fgcmcal.fgcmBuildStarsTableTask`.
+
+        Returns
+        -------
+        outstruct : `lsst.pipe.base.Struct`
+            Output structure with keys:
+
+            offsets : `np.ndarray`
+                Final reference offsets, per band.
+        """
+        stdCat = dataRefDict['fgcmStandardStars'].get()
+        md = stdCat.getMetadata()
+        self.bands = md.getArray('BANDS')
 
         if self.config.doReferenceCalibration:
-            offsets = self._computeReferenceOffsets(butler, stdCat)
+            offsets = self._computeReferenceOffsets(stdCat)
         else:
             offsets = np.zeros(len(self.bands))
 
-        # Output the standard stars in stack format
         if self.config.doRefcatOutput:
             self._outputStandardStars(butler, stdCat, offsets, self.config.datasetConfig)
 
         del stdCat
 
-        # Output the gray zeropoints
         if self.config.doZeropointOutput:
-            zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
-            visitCat = butler.get('fgcmVisitCatalog')
+            zptCat = dataRefDict['fgcmZeropoints'].get()
+            visitCat = dataRefDict['fgcmVisitCatalog'].get()
 
-            self._outputZeropoints(butler, zptCat, visitCat, offsets)
+            self._outputZeropoints(butler, dataRefDict, zptCat, visitCat, offsets)
 
-        # Output the atmospheres
         if self.config.doAtmosphereOutput:
-            atmCat = butler.get('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
-            self._outputAtmospheres(butler, atmCat)
+            atmCat = dataRefDict['fgcmAtmosphereParameters'].get()
+            self._outputAtmospheres(butler, dataRefDict, atmCat)
 
-        # We return the zp offsets
         return pipeBase.Struct(offsets=offsets)
 
-    def generateTractOutputProducts(self, butler, tract,
+    def generateTractOutputProducts(self, butler, dataRefDict, tract,
                                     visitCat, zptCat, atmCat, stdCat,
-                                    fgcmBuildStarsConfig, fgcmFitCycleConfig):
+                                    fgcmBuildStarsConfig):
         """
         Generate the output products for a given tract, as specified in the config.
 
@@ -407,7 +605,19 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler: `lsst.daf.persistence.Butler`
+        butler: `lsst.daf.persistence.Butler` or
+                `lsst.pipe.base.ButlerQuantumContext`
+        dataRefDict : `dict`
+            All dataRefs are `lsst.daf.persistence.ButlerDataRef` (gen2) or
+            `lsst.daf.butler.DeferredDatasetHandle` (gen3)
+            dataRef dictionary with keys:
+
+            ``"fgcmPhotoCalibs"``
+                `dict` of output photoCalib dataRefs.  Key is
+                (tract, visit, detector). (Gen3 only)
+            ``"fgcmTransmissionAtmospheres"``
+                `dict` of output atmosphere transmission dataRefs.
+                Key is (tract, visit). (Gen3 only)
         tract: `int`
            Tract number
         visitCat: `lsst.afw.table.BaseCatalog`
@@ -420,24 +630,13 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
            FGCM standard star catalog from `FgcmFitCycleTask`
         fgcmBuildStarsConfig: `lsst.fgcmcal.FgcmBuildStarsConfig`
            Configuration object from `FgcmBuildStarsTask`
-        fgcmFitCycleConfig: `lsst.fgcmcal.FgcmFitCycleConfig`
-           Configuration object from `FgcmFitCycleTask`
         """
-
-        self.configBands = fgcmFitCycleConfig.bands
         self.visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
         self.ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
         self.filterMap = fgcmBuildStarsConfig.filterMap
 
-        if stdCat is not None:
-            md = stdCat.getMetadata()
-            self.bands = md.getArray('BANDS')
-        else:
-            self.bands = self.configBands
-
-        if self.config.doReferenceCalibration and fgcmFitCycleConfig.doReferenceCalibration:
-            self.log.warn("doReferenceCalibration is set, and is possibly redundant with "
-                          "fitCycleConfig.doReferenceCalibration")
+        md = stdCat.getMetadata()
+        self.bands = md.getArray('BANDS')
 
         if self.config.doComposeWcsJacobian and not fgcmBuildStarsConfig.doApplyWcsJacobian:
             raise RuntimeError("Cannot compose the WCS jacobian if it hasn't been applied "
@@ -447,7 +646,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
 
         if self.config.doReferenceCalibration:
-            offsets = self._computeReferenceOffsets(butler, stdCat)
+            offsets = self._computeReferenceOffsets(stdCat)
         else:
             offsets = np.zeros(len(self.bands))
 
@@ -459,14 +658,14 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             self._outputStandardStars(butler, stdCat, offsets, datasetConfig)
 
         if self.config.doZeropointOutput:
-            self._outputZeropoints(butler, zptCat, visitCat, offsets, tract=tract)
+            self._outputZeropoints(butler, dataRefDict, zptCat, visitCat, offsets, tract=tract)
 
         if self.config.doAtmosphereOutput:
-            self._outputAtmospheres(butler, atmCat, tract=tract)
+            self._outputAtmospheres(butler, dataRefDict, atmCat, tract=tract)
 
         return pipeBase.Struct(offsets=offsets)
 
-    def _computeReferenceOffsets(self, butler, stdCat):
+    def _computeReferenceOffsets(self, stdCat):
         """
         Compute offsets relative to a reference catalog.
 
@@ -478,7 +677,6 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler: `lsst.daf.persistence.Butler`
         stdCat: `lsst.afw.table.SimpleCatalog`
            FGCM standard stars
 
@@ -648,6 +846,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
     def _outputStandardStars(self, butler, stdCat, offsets, datasetConfig):
         """
         Output standard stars in indexed reference catalog format.
+        This is not currently supported in Gen2.
 
         Parameters
         ----------
@@ -662,20 +861,23 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         self.log.info("Outputting standard stars to %s" % (datasetConfig.ref_dataset_name))
 
+        indexer = IndexerRegistry[self.config.datasetConfig.indexer.name](
+            self.config.datasetConfig.indexer.active)
+
         # We determine the conversion from the native units (typically radians) to
         # degrees for the first star.  This allows us to treat coord_ra/coord_dec as
         # numpy arrays rather than Angles, which would we approximately 600x slower.
         # TODO: Fix this after DM-16524 (HtmIndexer.indexPoints should take coords
         # (as Angles) for input
         conv = stdCat[0]['coord_ra'].asDegrees()/float(stdCat[0]['coord_ra'])
-        indices = np.array(self.indexer.indexPoints(stdCat['coord_ra']*conv,
-                                                    stdCat['coord_dec']*conv))
+        indices = np.array(indexer.indexPoints(stdCat['coord_ra']*conv,
+                                               stdCat['coord_dec']*conv))
 
         formattedCat = self._formatCatalog(stdCat, offsets)
 
         # Write the master schema
-        dataId = self.indexer.makeDataId('master_schema',
-                                         datasetConfig.ref_dataset_name)
+        dataId = indexer.makeDataId('master_schema',
+                                    datasetConfig.ref_dataset_name)
         masterCat = afwTable.SimpleCatalog(formattedCat.schema)
         addRefCatMetadata(masterCat)
         butler.put(masterCat, 'ref_cat', dataId=dataId)
@@ -694,12 +896,12 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             selected[i1a] = True
 
             # Write the individual pixel
-            dataId = self.indexer.makeDataId(indices[i1a[0]],
-                                             datasetConfig.ref_dataset_name)
+            dataId = indexer.makeDataId(indices[i1a[0]],
+                                        datasetConfig.ref_dataset_name)
             butler.put(formattedCat[selected], 'ref_cat', dataId=dataId)
 
         # And save the dataset configuration
-        dataId = self.indexer.makeDataId(None, datasetConfig.ref_dataset_name)
+        dataId = indexer.makeDataId(None, datasetConfig.ref_dataset_name)
         butler.put(datasetConfig, 'ref_cat_config', dataId=dataId)
 
         self.log.info("Done outputting standard stars.")
@@ -755,13 +957,15 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         return formattedCat
 
-    def _outputZeropoints(self, butler, zptCat, visitCat, offsets, tract=None):
+    def _outputZeropoints(self, butler, dataRefDict, zptCat, visitCat, offsets,
+                          tract=None):
         """
         Output the zeropoints in fgcm_photoCalib format.
 
         Parameters
         ----------
-        butler: `lsst.daf.persistence.Butler`
+        butler: `lsst.daf.persistence.Butler` or
+                `lsst.pipe.base.ButlerQuantumContext`
         zptCat: `lsst.afw.table.BaseCatalog`
            FGCM zeropoint catalog from `FgcmFitCycleTask`
         visitCat: `lsst.afw.table.BaseCatalog`
@@ -800,18 +1004,19 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
             self.log.warn(f'No suitable photoCalib for {self.visitDataRefName} {allBadVisit}')
 
         # Get the mapping from filtername to dataId filter name, empirically
-        filterMapping = {}
-        nFound = 0
-        for rec in zptCat[selected_best]:
-            if rec['filtername'] in filterMapping:
-                continue
-            dataId = {self.visitDataRefName: int(rec['visit']),
-                      self.ccdDataRefName: int(rec['ccd'])}
-            dataRef = butler.dataRef('raw', dataId=dataId)
-            filterMapping[rec['filtername']] = dataRef.dataId['filter']
-            nFound += 1
-            if nFound == len(self.filterMap):
-                break
+        if not self.isGen3:
+            filterMapping = {}
+            nFound = 0
+            for rec in zptCat[selected_best]:
+                if rec['filtername'] in filterMapping:
+                    continue
+                dataId = {self.visitDataRefName: int(rec['visit']),
+                          self.ccdDataRefName: int(rec['ccd'])}
+                dataRef = butler.dataRef('raw', dataId=dataId)
+                filterMapping[rec['filtername']] = dataRef.dataId['filter']
+                nFound += 1
+                if nFound == len(self.filterMap):
+                    break
 
         # Get a mapping from filtername to the offsets
         offsetMapping = {}
@@ -821,7 +1026,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                 offsetMapping[f] = offsets[self.bands.index(self.filterMap[f])]
 
         # Get a mapping from "ccd" to the ccd index used for the scaling
-        camera = butler.get('camera')
+        camera = dataRefDict['camera']
         ccdMapping = {}
         for ccdIndex, detector in enumerate(camera):
             ccdMapping[detector.getId()] = ccdIndex
@@ -874,17 +1079,33 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                              calibration=fgcmField,
                                              isConstant=False)
 
-            if tract is None:
-                butler.put(photoCalib, datasetType,
-                           dataId={self.visitDataRefName: int(rec['visit']),
-                                   self.ccdDataRefName: int(rec['ccd']),
-                                   'filter': filterMapping[rec['filtername']]})
+            if not self.isGen3:
+                # Gen2 writing
+                if tract is None:
+                    butler.put(photoCalib, datasetType,
+                               dataId={self.visitDataRefName: int(rec['visit']),
+                                       self.ccdDataRefName: int(rec['ccd']),
+                                       'filter': filterMapping[rec['filtername']]})
+                else:
+                    butler.put(photoCalib, datasetType,
+                               dataId={self.visitDataRefName: int(rec['visit']),
+                                       self.ccdDataRefName: int(rec['ccd']),
+                                       'filter': filterMapping[rec['filtername']],
+                                       'tract': tract})
             else:
-                butler.put(photoCalib, datasetType,
-                           dataId={self.visitDataRefName: int(rec['visit']),
-                                   self.ccdDataRefName: int(rec['ccd']),
-                                   'filter': filterMapping[rec['filtername']],
-                                   'tract': tract})
+                # Gen3 writing
+                if tract is None:
+                    photoCalibRef = dataRefDict['fgcmPhotoCalibs'][(int(rec['visit']),
+                                                                    int(rec['ccd']))]
+                else:
+                    photoCalibRef = dataRefDict['fgcmPhotoCalibs'][(tract,
+                                                                    int(rec['visit']),
+                                                                    int(rec['ccd']))]
+                try:
+                    butler.put(photoCalib, photoCalibRef)
+                except TypeError:
+                    import IPython
+                    IPython.embed()
 
         self.log.info("Done outputting %s objects" % (datasetType))
 
@@ -922,13 +1143,14 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         return boundedField
 
-    def _outputAtmospheres(self, butler, atmCat, tract=None):
+    def _outputAtmospheres(self, butler, dataRefDict, atmCat, tract=None):
         """
         Output the atmospheres.
 
         Parameters
         ----------
-        butler: `lsst.daf.persistence.Butler`
+        butler: `lsst.daf.persistence.Butler` or
+                `lsst.pipe.base.ButlerQuantumContext`
         atmCat: `lsst.afw.table.BaseCatalog`
            FGCM atmosphere parameter catalog from fgcmFitCycleTask
         tract: `int`, optional
@@ -938,7 +1160,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         self.log.info("Outputting atmosphere transmissions")
 
         # First, we need to grab the look-up table and key info
-        lutCat = butler.get('fgcmLookUpTable')
+        lutCat = dataRefDict['fgcmLookUpTable'].get()
 
         atmosphereTableName = lutCat[0]['tablename']
         elevation = lutCat[0]['elevation']
@@ -995,12 +1217,23 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                                                             throughputAtMin=atmVals[0],
                                                             throughputAtMax=atmVals[-1])
 
-            if tract is None:
-                butler.put(curve, "transmission_atmosphere_fgcm",
-                           dataId={self.visitDataRefName: visit})
+            if not self.isGen3:
+                # Gen2
+                if tract is None:
+                    butler.put(curve, "transmission_atmosphere_fgcm",
+                               dataId={self.visitDataRefName: visit})
+                else:
+                    butler.put(curve, "transmission_atmosphere_fgcm_tract",
+                               dataId={self.visitDataRefName: visit,
+                                       'tract': tract})
             else:
-                butler.put(curve, "transmission_atmosphere_fgcm_tract",
-                           dataId={self.visitDataRefName: visit,
-                                   'tract': tract})
+                # Gen3
+                if tract is None:
+                    atmDataRef = dataRefDict['fgcmTransmissionAtmospheres'][visit]
+                else:
+                    atmDataRef = dataRefDict['fgcmTransmissionAtmospheres'][(tract,
+                                                                             visit)]
+
+                butler.put(curve, atmDataRef)
 
         self.log.info("Done outputting atmosphere transmissions")

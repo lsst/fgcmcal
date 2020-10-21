@@ -42,6 +42,7 @@ from lsst.meas.algorithms import ReferenceObjectLoader
 
 from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsRunner, FgcmBuildStarsBaseTask
 from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromDataRef
+from .utilities import lookupStaticCalibrations
 
 __all__ = ['FgcmBuildStarsTableConfig', 'FgcmBuildStarsTableTask']
 
@@ -53,7 +54,9 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         doc="Camera instrument",
         name="camera",
         storageClass="Camera",
-        dimensions=("instrument", "calibration_label",),
+        dimensions=("instrument",),
+        lookupFunction=lookupStaticCalibrations,
+        isCalibration=True,
     )
 
     fgcmLookUpTable = cT.PrerequisiteInput(
@@ -260,9 +263,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         groupedDataRefs = self.findAndGroupDataRefs(camera, dataRefs,
                                                     calexpDataRefDict=calexpDataRefDict)
 
-        # This may be...
-        # visitCatDataRef = outputRefs.fgcmVisitCatalog
-
         if self.config.doModelErrorsWithBackground:
             bkgRefs = butlerQC.get(inputRefs.background)
             bkgDataRefDict = {(bkgRef.dataId.byName()['visit'],
@@ -271,7 +271,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         else:
             bkgDataRefDict = None
 
-        # No internal saving at the moment...
+        # Gen3 does not currently allow "checkpoint" saving of datasets.
         visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs,
                                              bkgDataRefDict=bkgDataRefDict,
                                              visitCatDataRef=None,
@@ -385,7 +385,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         # To get the correct output schema, we use similar code as fgcmBuildStarsTask
         # We are not actually using this mapper, except to grab the outputSchema
-        # dataRef = groupedDataRefs[list(groupedDataRefs.keys())[0]][0]
         sourceSchema = srcSchemaDataRef.get().schema
         sourceMapper = self._makeSourceMapper(sourceSchema)
         outputSchema = sourceMapper.getOutputSchema()

@@ -49,6 +49,7 @@ from .utilities import extractReferenceMags
 from .utilities import computeCcdOffsets, makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat, makeStdSchema, makeStdCat
 from .sedterms import SedboundarytermDict, SedtermDict
+from .utilities import lookupStaticCalibrations
 
 import fgcm
 
@@ -63,7 +64,9 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         doc="Camera instrument",
         name="camera",
         storageClass="Camera",
-        dimensions=("instrument", "calibration_label",),
+        dimensions=("instrument",),
+        lookupFunction=lookupStaticCalibrations,
+        isCalibration=True,
     )
 
     fgcmLookUpTable = cT.PrerequisiteInput(
@@ -116,7 +119,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
     )
 
     fgcmFlaggedStarsInput = cT.PrerequisiteInput(
-        doc="FIXME",
+        doc="Catalog of flagged stars for fgcm calibration from previous fit cycle",
         name="fgcmFlaggedStars{previousCycleNumber}",
         storageClass="Catalog",
         dimensions=("instrument",),
@@ -124,7 +127,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
     )
 
     fgcmFitParametersInput = cT.PrerequisiteInput(
-        doc="FIXME",
+        doc="Catalog of fgcm fit parameters from previous fit cycle",
         name="fgcmFitParameters{previousCycleNumber}",
         storageClass="Catalog",
         dimensions=("instrument",),
@@ -132,37 +135,37 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
     )
 
     fgcmFitParameters = cT.Output(
-        doc="FIXME",
+        doc="Catalog of fgcm fit parameters from current fit cycle",
         name="fgcmFitParameters{cycleNumber}",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
     fgcmFlaggedStars = cT.Output(
-        doc="FIXME",
+        doc="Catalog of flagged stars for fgcm calibration from current fit cycle",
         name="fgcmFlaggedStars{cycleNumber}",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
     fgcmZeropoints = cT.Output(
-        doc="FIXME",
+        doc="Catalog of fgcm zeropoint data from current fit cycle",
         name="fgcmZeropoints{cycleNumber}",
         storageClass="Catalog",
-        dimensions=("instrument"),
+        dimensions=("instrument",),
     )
 
     fgcmAtmosphereParameters = cT.Output(
-        doc="FIXME",
+        doc="Catalog of atmospheric fit parameters from current fit cycle",
         name="fgcmAtmosphereParameters{cycleNumber}",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
     fgcmStandardStars = cT.Output(
-        doc="FIXME",
+        doc="Catalog of standard star magnitudes from current fit cycle",
         name="fgcmStandardStars{cycleNumber}",
-        storageClass="Catalog",
+        storageClass="SimpleCatalog",
         dimensions=("instrument",),
     )
 
@@ -769,33 +772,10 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         optional=True,
     )
 
-    def setDefaults(self):
-        try:
-            # self.cycleNumber = int(self.connections.cycleNumber)
-            self.connections.cycleNumber = str(self.cycleNumber)
-        except AttributeError:
-            # No connections: Gen2
-            pass
-
     def validate(self):
         super().validate()
 
-        # print("I'm in config validate")
-        # import IPython
-        # IPython.embed()
-
-        # Need to validate that cycleNumber matches with config and connections if available
-        # try:
-        #     connectionCycleNumber = int(self.connections.cycleNumber)
-        # except AttributeError:
-            # No connections: Gen2
-        #     connectionCycleNumber = self.cycleNumber
-
-        # if connectionCycleNumber != self.cycleNumber:
-        #     msg = 'Connection cycleNumber must equal config cycleNumber'
-        #     raise pexConfig.FieldValidationError(FgcmFitCycleConfig.cycleNumber, self, msg)
-
-        # Force these to conform with cycleNumber
+        # Force the connections to conform with cycleNumber
         self.connections.previousCycleNumber = str(self.cycleNumber - 1)
         self.connections.cycleNumber = str(self.cycleNumber)
 
@@ -924,13 +904,6 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
     _DefaultName = "fgcmFitCycle"
 
     def __init__(self, butler=None, initInputs=None, **kwargs):
-        """
-        Instantiate an fgcmFitCycle.
-
-        Parameters
-        ----------
-        butler : `lsst.daf.persistence.Butler`
-        """
         super().__init__(**kwargs)
 
     # no saving of metadata for now
@@ -1056,13 +1029,32 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        camera : `camera` FIXME
+        camera : `lsst.afw.cameraGeom.Camera`
         dataRefDict : `dict`
-            Dictionary of dataRefs to load components
+            All dataRefs are `lsst.daf.persistence.ButlerDataRef` (gen2) or
+            `lsst.daf.butler.DeferredDatasetHandle` (gen3)
+            dataRef dictionary with keys:
+
+            ``"fgcmLookUpTable"``
+                dataRef for the FGCM look-up table.
+            ``"fgcmVisitCatalog"``
+                dataRef for visit summary catalog.
+            ``"fgcmStarObservations"``
+                dataRef for star observation catalog.
+            ``"fgcmStarIds"``
+                dataRef for star id catalog.
+            ``"fgcmStarIndices"``
+                dataRef for star index catalog.
+            ``"fgcmReferenceStars"``
+                dataRef for matched reference star catalog.
+            ``"fgcmFlaggedStars"``
+                dataRef for flagged star catalog.
+            ``"fgcmFitParameters"``
+                dataRef for fit parameter catalog.
 
         Returns
         -------
-        fgcmDatsetDict : `dict`
+        fgcmDatasetDict : `dict`
             Dictionary of datasets to persist.
         """
         # Set defaults on whether to output standards and zeropoints
@@ -1306,7 +1298,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        parDataRef : FIXME
+        parDataRef : `lsst.daf.persistence.ButlerDataRef` or `lsst.daf.butler.DeferredDatasetHandle`
+            dataRef for previous fit parameter catalog.
 
         Returns
         -------
@@ -1317,7 +1310,6 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         inSuperStar: `numpy.array`
            Superstar flat formatted for input to fgcm
         """
-
         # note that we already checked that this is available
         parCat = parDataRef.get()
 

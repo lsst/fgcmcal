@@ -37,13 +37,14 @@ import traceback
 
 import numpy as np
 
+from lsst.obs.base import Instrument
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.pipe.base.connectionTypes as cT
 import lsst.afw.table as afwTable
 import lsst.afw.cameraGeom as afwCameraGeom
 from lsst.afw.image import Filter
-from lsst.obs.base import Instrument
+from .utilities import lookupStaticCalibrations
 
 import fgcm
 
@@ -58,14 +59,18 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         doc="Camera instrument",
         name="camera",
         storageClass="Camera",
-        dimensions=("instrument", "calibration_label",),
+        dimensions=("instrument",),
+        lookupFunction=lookupStaticCalibrations,
+        isCalibration=True,
     )
 
     transmission_optics = cT.PrerequisiteInput(
         doc="Optics transmission curve information",
         name="transmission_optics",
         storageClass="TransmissionCurve",
-        dimensions=("instrument", "calibration_label",),
+        dimensions=("instrument",),
+        lookupFunction=lookupStaticCalibrations,
+        isCalibration=True,
         deferLoad=True,
     )
 
@@ -73,7 +78,9 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         doc="Sensor transmission curve information",
         name="transmission_sensor",
         storageClass="TransmissionCurve",
-        dimensions=("instrument", "detector", "calibration_label",),
+        dimensions=("instrument", "detector",),
+        lookupFunction=lookupStaticCalibrations,
+        isCalibration=True,
         deferLoad=True,
         multiple=True,
     )
@@ -82,7 +89,9 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         doc="Filter transmission curve information",
         name="transmission_filter",
         storageClass="TransmissionCurve",
-        dimensions=("instrument", "physical_filter", "calibration_label",),
+        dimensions=("band", "instrument", "physical_filter",),
+        lookupFunction=lookupStaticCalibrations,
+        isCalibration=True,
         deferLoad=True,
         multiple=True,
     )
@@ -263,15 +272,7 @@ class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
         self._fields['filterNames'].validate(self)
         self._fields['stdFilterNames'].validate(self)
 
-        # check if we have an atmosphereTableName, and if valid
-        if self.atmosphereTableName is not None:
-            try:
-                pass
-                # fgcm.FgcmAtmosphereTable.initWithTableName(self.atmosphereTableName)
-            except IOError:
-                raise RuntimeError("Could not find atmosphereTableName: %s" %
-                                   (self.atmosphereTableName))
-        else:
+        if self.atmosphereTableName is None:
             # Validate the parameters
             self._fields['parameters'].validate(self)
 
@@ -359,14 +360,6 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
     _DefaultName = "fgcmMakeLut"
 
     def __init__(self, butler=None, initInputs=None, **kwargs):
-        """
-        Instantiate an fgcmMakeLutTask.
-
-        Parameters
-        ----------
-        butler : `lsst.daf.persistence.Butler`
-        initInputs : `????`
-        """
         super().__init__(**kwargs)
 
     # no saving of metadata for now

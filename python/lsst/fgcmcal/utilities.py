@@ -34,6 +34,8 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom as geom
 from lsst.obs.base import createInitialSkyWcs
+from lsst.obs.base import Instrument
+
 
 import fgcm
 
@@ -919,3 +921,12 @@ def extractReferenceMags(refStars, bands, filterMap):
         refMagErr = refStars['refMagErr'][:, :]
 
     return refMag, refMagErr
+
+
+def lookupStaticCalibrations(datasetType, registry, quantumDataId, collections):
+    instrument = Instrument.fromName(quantumDataId["instrument"], registry)
+    unboundedCollection = instrument.makeUnboundedCalibrationRunName()
+
+    return registry.queryDatasets(datasetType,
+                                  dataId=quantumDataId,
+                                  collections=[unboundedCollection])
