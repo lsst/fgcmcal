@@ -34,6 +34,7 @@ import time
 import numpy as np
 import collections
 
+import lsst.daf.persistence as dafPersist
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.pipe.base.connectionTypes as cT
@@ -221,8 +222,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
     canMultiprocess = False
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
-        self.isGen3 = True
-
         dataRefs = butlerQC.get(inputRefs.sourceTable_visit)
 
         self.log.info("Running with %d sourceTable_visit dataRefs" % (len(dataRefs)))
@@ -428,11 +427,11 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
             dataRef = groupedDataRefs[visit['visit']][-1]
 
-            if self.isGen3:
-                df = dataRef.get(parameters={'columns': columns})
-            else:
+            if isinstance(dataRef, dafPersist.ButlerDataRef):
                 srcTable = dataRef.get()
                 df = srcTable.toDataFrame(columns)
+            else:
+                df = dataRef.get(parameters={'columns': columns})
 
             goodSrc = self.sourceSelector.selectSources(df)
 
@@ -452,8 +451,10 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             tempCat['dec'][:] = np.deg2rad(df['decl'].values[use])
             tempCat['x'][:] = df['x'].values[use]
             tempCat['y'][:] = df['y'].values[use]
-            tempCat[visitKey][:] = df[self.config.visitDataRefName].values[use]
-            tempCat[ccdKey][:] = df[self.config.ccdDataRefName].values[use]
+            # These "visit" and "ccd" names in the parquet tables are
+            # hard-coded.
+            tempCat[visitKey][:] = df['visit'].values[use]
+            tempCat[ccdKey][:] = df['ccd'].values[use]
             tempCat['psf_candidate'] = df['Calib_psf_candidate'].values[use]
 
             if self.config.doSubtractLocalBackground:
@@ -540,7 +541,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         columns : `list`
            List of columns to read from sourceTable_visit
         """
-        columns = [self.config.visitDataRefName, self.config.ccdDataRefName,
+        # These "visit" and "ccd" names in the parquet tables are hard-coded.
+        columns = ['visit', 'ccd',
                    'ra', 'decl', 'x', 'y', self.config.psfCandidateName,
                    self.config.instFluxField, self.config.instFluxField + 'Err',
                    self.config.apertureInnerInstFluxField, self.config.apertureInnerInstFluxField + 'Err',

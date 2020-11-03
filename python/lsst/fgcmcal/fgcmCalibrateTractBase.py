@@ -28,6 +28,7 @@ import abc
 
 import numpy as np
 
+import lsst.daf.persistence as dafPersist
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 
@@ -207,8 +208,6 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
            doSubtractLocalBackground is True and aperture radius cannot be
            determined.
         """
-        self.isGen3 = False
-
         datasetType = dataRefs[0].butlerSubset.datasetType
         self.log.info("Running with %d %s dataRefs" % (len(dataRefs), datasetType))
 
@@ -236,7 +235,8 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
 
         return self.run(dataRefDict, tract, butler=butler)
 
-    def run(self, dataRefDict, tract, butler=None):
+    def run(self, dataRefDict, tract,
+            buildStarsRefObjLoader=None, butler=None):
         """Run the calibrations for a single tract with fgcm.
 
         Parameters
@@ -264,7 +264,9 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
                 Key is (tract, visit). (Gen3 only)
         tract : `int`
             Tract number
-        butler : `lsst.daf.persistance.Butler` or `lsst.daf.butler.Butler`
+        buildStarsRefObjLoader : `lsst.meas.algorithms.ReferenceObjectLoader`, optional
+            Reference object loader object for fgcmBuildStars.
+        butler : `lsst.daf.persistance.Butler` or `lsst.daf.butler.Butler`, optional
             Data butler for persisting photoCalibs.
 
         Returns
@@ -278,9 +280,6 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
                 Raw fgcm repeatability for bright stars, per band.
         """
         self.log.info("Running on tract %d" % (tract))
-
-        self.fgcmBuildStars.isGen3 = self.isGen3
-        self.fgcmOutputProducts.isGen3 = self.isGen3
 
         # Compute the aperture radius if necessary.  This is useful to do now before
         # any heavy lifting has happened (fail early).
@@ -298,15 +297,17 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         # Run the build stars tasks
 
         # Note that we will need visitCat at the end of the procedure for the outputs
-        if self.isGen3:
+        if isinstance(butler, dafPersist.Butler):
+            # Gen2
+            groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(dataRefDict['camera'],
+                                                                       dataRefDict['source_catalogs'],
+                                                                       butler=butler)
+        else:
+            # Gen3
             cdrd = dataRefDict['calexps']
             groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(dataRefDict['camera'],
                                                                        dataRefDict['source_catalogs'],
                                                                        calexpDataRefDict=cdrd)
-        else:
-            groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(dataRefDict['camera'],
-                                                                       dataRefDict['source_catalogs'],
-                                                                       butler=butler)
         visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(dataRefDict['camera'], groupedDataRefs)
         rad = calibFluxApertureRadius
         fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedDataRefs,
@@ -317,9 +318,9 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
 
         if self.fgcmBuildStars.config.doReferenceMatches:
             lutDataRef = dataRefDict['fgcmLookUpTable']
-            if self.isGen3:
+            if buildStarsRefObjLoader is not None:
                 self.fgcmBuildStars.makeSubtask("fgcmLoadReferenceCatalog",
-                                                refObjLoader=self.buildStarsRefObjLoader)
+                                                refObjLoader=buildStarsRefObjLoader)
             else:
                 self.fgcmBuildStars.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
         else:

@@ -911,8 +911,6 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         return None
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
-        self.isGen3 = True
-
         camera = butlerQC.get(inputRefs.camera)
 
         dataRefDict = {}
@@ -947,8 +945,6 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         ----------
         butler:  `lsst.daf.persistence.Butler`
         """
-        self.isGen3 = False
-
         self._checkDatasetsExist(butler)
 
         dataRefDict = {}
@@ -1226,9 +1222,9 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                          freezeStdAtmosphere=False,
                          expGrayPhotometricCutDict=updatedPhotometricCutDict,
                          expGrayHighCutDict=updatedHighCutDict)
-        if self.isGen3:
-            outConfig.connections.update(previousCycleNumber=str(self.config.cycleNumber),
-                                         cycleNumber=str(self.config.cycleNumber + 1))
+
+        outConfig.connections.update(previousCycleNumber=str(self.config.cycleNumber),
+                                     cycleNumber=str(self.config.cycleNumber + 1))
 
         configFileName = '%s_cycle%02d_config.py' % (outConfig.outfileBase,
                                                      outConfig.cycleNumber)

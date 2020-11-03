@@ -28,6 +28,7 @@ import abc
 
 import numpy as np
 
+import lsst.daf.persistence as dafPersist
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 import lsst.afw.table as afwTable
@@ -297,8 +298,6 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
            an fgcmLookUpTable is not available, or if computeFluxApertureRadius()
            fails if the calibFlux is not a CircularAperture flux.
         """
-        self.isGen3 = False
-
         datasetType = dataRefs[0].butlerSubset.datasetType
         self.log.info("Running with %d %s dataRefs", len(dataRefs), datasetType)
 
@@ -523,7 +522,6 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
         bkgDataRefDict: `dict`, optional
            Dictionary of gen3 dataRefHandles for background info. FIXME
         """
-
         bbox = geom.BoxI(geom.PointI(0, 0), geom.PointI(1, 1))
 
         for i, visit in enumerate(groupedDataRefs):
@@ -547,16 +545,15 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
 
             # The first dataRef in the group will be the reference ccd (if available)
             dataRef = groupedDataRefs[visit][0]
-
-            if self.isGen3:
-                visitInfo = dataRef.get(component='visitInfo')
-                f = dataRef.get(component='filter')
-                psf = dataRef.get(component='psf')
-            else:
+            if isinstance(dataRef, dafPersist.ButlerDataRef):
                 exp = dataRef.get(datasetType='calexp_sub', bbox=bbox)
                 visitInfo = exp.getInfo().getVisitInfo()
                 f = exp.getFilter()
                 psf = exp.getPsf()
+            else:
+                visitInfo = dataRef.get(component='visitInfo')
+                f = dataRef.get(component='filter')
+                psf = dataRef.get(component='psf')
 
             rec = visitCat[i]
             rec['visit'] = visit
@@ -585,7 +582,12 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
 
             if self.config.doModelErrorsWithBackground:
                 foundBkg = False
-                if self.isGen3:
+                if isinstance(dataRef, dafPersist.ButlerDataRef):
+                    det = dataRef.dataId[self.config.ccdDataRefName]
+                    if dataRef.datasetExists(datasetType='calexpBackground'):
+                        bgList = dataRef.get(datasetType='calexpBackground')
+                        foundBkg = True
+                else:
                     det = dataRef.dataId.byName()['detector']
                     try:
                         bkgRef = bkgDataRefDict[(visit, det)]
@@ -593,11 +595,6 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                         foundBkg = True
                     except KeyError:
                         pass
-                else:
-                    det = dataRef.dataId[self.config.ccdDataRefName]
-                    if dataRef.datasetExists(datasetType='calexpBackground'):
-                        bgList = dataRef.get(datasetType='calexpBackground')
-                        foundBkg = True
 
                 if foundBkg:
                     bgStats = (bg[0].getStatsImage().getImage().array

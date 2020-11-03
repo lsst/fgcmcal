@@ -22,11 +22,12 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """Class for running fgcmcal on a single tract using sourceTable_visit tables.
 """
+import numpy as np
 
 import lsst.pipe.base as pipeBase
-import lsst.pipe.base.connectionTypes as cT
-
+from lsst.pipe.base import connectionTypes
 from lsst.meas.algorithms import ReferenceObjectLoader
+import lsst.afw.table as afwTable
 
 from .dataIds import TractCheckDataIdContainer
 from .fgcmBuildStarsTable import FgcmBuildStarsTableTask
@@ -41,7 +42,7 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
                                          dimensions=("instrument",
                                                      "tract",),
                                          defaultTemplates={}):
-    camera = cT.PrerequisiteInput(
+    camera = connectionTypes.PrerequisiteInput(
         doc="Camera instrument",
         name="camera",
         storageClass="Camera",
@@ -50,7 +51,7 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         isCalibration=True,
     )
 
-    fgcmLookUpTable = cT.PrerequisiteInput(
+    fgcmLookUpTable = connectionTypes.PrerequisiteInput(
         doc=("Atmosphere + instrument look-up-table for FGCM throughput and "
              "chromatic corrections."),
         name="fgcmLookUpTable",
@@ -59,14 +60,14 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    srcSchema = cT.PrerequisiteInput(
+    srcSchema = connectionTypes.PrerequisiteInput(
         doc="Schema for source catalogs",
         name="src_schema",
         storageClass="SourceCatalog",
         deferLoad=True,
     )
 
-    refCat = cT.PrerequisiteInput(
+    refCat = connectionTypes.PrerequisiteInput(
         doc="Reference catalog to use for photometric calibration",
         name="cal_ref_cat",
         storageClass="SimpleCatalog",
@@ -75,7 +76,7 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    sourceTable_visit = cT.Input(
+    sourceTable_visit = connectionTypes.Input(
         doc="Source table in parquet format, per visit",
         name="sourceTable_visit",
         storageClass="DataFrame",
@@ -84,7 +85,7 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    calexp = cT.Input(
+    calexp = connectionTypes.Input(
         doc="Calibrated exposures used for psf and metadata",
         name="calexp",
         storageClass="ExposureF",
@@ -93,7 +94,7 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    background = cT.Input(
+    background = connectionTypes.Input(
         doc="Calexp background model",
         name="calexpBackground",
         storageClass="Background",
@@ -102,20 +103,28 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    fgcmPhotoCalib = cT.Output(
-        doc="Per-detector photoCalib files produced from fgcm calibration",
-        name="fgcm_photoCalib",
+    fgcmPhotoCalib = connectionTypes.Output(
+        doc="Per-detector per-tract photoCalib files produced from fgcm calibration",
+        name="fgcm_tract_photoCalib",
         storageClass="PhotoCalib",
-        dimensions=("instrument", "visit", "detector",),
+        dimensions=("instrument", "tract", "visit", "detector",),
         multiple=True,
     )
 
-    fgcmTransmissionAtmosphere = cT.Output(
+    fgcmTransmissionAtmosphere = connectionTypes.Output(
         doc="Per-visit atmosphere transmission files produced from fgcm calibration",
-        name="transmission_atmosphere_fgcm",
+        name="transmission_atmosphere_fgcm_tract",
         storageClass="TransmissionCurve",
-        dimensions=("instrument", "visit",),
+        dimensions=("instrument", "tract", "visit",),
         multiple=True,
+    )
+
+    fgcmRepeatability = connectionTypes.Output(
+        doc="Per-band raw repeatability numbers in the fgcm tract calibration",
+        name="fgcmRawRepeatability",
+        storageClass="Catalog",
+        dimensions=("instrument", "tract",),
+        multiple=False,
     )
 
     def __init__(self, *, config=None):
@@ -167,8 +176,6 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
     canMultiprocess = False
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
-        self.isGen3 = True
-
         dataRefs = butlerQC.get(inputRefs.sourceTable_visit)
 
         self.log.info("Running with %d sourceTable_visit dataRefs" % (len(dataRefs)))
@@ -194,14 +201,15 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
 
         # And the outputs
         if self.config.fgcmOutputProducts.doZeropointOutput:
-            photoCalibRefDict = {(tract,
+            photoCalibRefDict = {(photoCalibRef.dataId.byName()['tract'],
                                   photoCalibRef.dataId.byName()['visit'],
                                   photoCalibRef.dataId.byName()['detector']): photoCalibRef for
                                  photoCalibRef in outputRefs.fgcmPhotoCalib}
             dataRefDict['fgcmPhotoCalibs'] = photoCalibRefDict
 
         if self.config.fgcmOutputProducts.doAtmosphereOutput:
-            atmRefDict = {(tract, atmRef.dataId.byName()['visit']): atmRef for
+            atmRefDict = {(atmRef.dataId.byName()['tract'],
+                           atmRef.dataId.byName()['visit']): atmRef for
                           atmRef in outputRefs.fgcmTransmissionAtmosphere}
             dataRefDict['fgcmTransmissionAtmospheres'] = atmRefDict
 
@@ -212,7 +220,9 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
                                            refCats=butlerQC.get(inputRefs.refCat),
                                            config=refConfig,
                                            log=self.log)
-            self.buildStarsRefObjLoader = loader
+            buildStarsRefObjLoader = loader
+        else:
+            buildStarsRefObjLoader = None
 
         if self.config.fgcmOutputProducts.doReferenceCalibration:
             refConfig = self.config.fgcmOutputProducts.refObjLoader
@@ -223,7 +233,20 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
                                            log=self.log)
             self.fgcmOutputProducts.refObjLoader = loader
 
-        return self.run(dataRefDict, tract, butler=butlerQC)
+        struct = self.run(dataRefDict, tract,
+                          buildStarsRefObjLoader=buildStarsRefObjLoader, butler=butlerQC)
+
+        # Turn raw repeatability into simple catalog for persistence
+        schema = afwTable.Schema()
+        schema.addField('rawRepeatability', type=np.float64,
+                        doc="Per-band raw repeatability in FGCM calibration.")
+        repeatabilityCat = afwTable.BaseCatalog(schema)
+        repeatabilityCat.resize(len(struct.repeatability))
+        repeatabilityCat['rawRepeatability'][:] = struct.repeatability
+
+        butlerQC.put(repeatabilityCat, outputRefs.fgcmRepeatability)
+
+        return
 
     @classmethod
     def _makeArgumentParser(cls):

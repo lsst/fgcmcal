@@ -40,6 +40,10 @@ from lsst.obs.base import Instrument
 import fgcm
 
 
+FGCM_EXP_FIELD = 'VISIT'
+FGCM_CCD_FIELD = 'DETECTOR'
+
+
 def makeConfigDict(config, log, camera, maxIter,
                    resetFitParameters, outputZeropoints, tract=None):
     """
@@ -101,8 +105,8 @@ def makeConfigDict(config, log, camera, maxIter,
                   'mirrorArea': mirrorArea,
                   'cameraGain': cameraGain,
                   'ccdStartIndex': camera[0].getId(),
-                  'expField': 'VISIT',
-                  'ccdField': 'CCD',
+                  'expField': FGCM_EXP_FIELD,
+                  'ccdField': FGCM_CCD_FIELD,
                   'seeingField': 'DELTA_APER',
                   'fwhmField': 'PSFSIGMA',
                   'skyBrightnessField': 'SKYBACKGROUND',
@@ -542,7 +546,7 @@ def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
     zptSchema = afwTable.Schema()
 
     zptSchema.addField('visit', type=np.int32, doc='Visit number')
-    zptSchema.addField('ccd', type=np.int32, doc='CCD number')
+    zptSchema.addField('detector', type=np.int32, doc='Detector ID number')
     zptSchema.addField('fgcmFlag', type=np.int32, doc=('FGCM flag value: '
                                                        '1: Photometric, used in fit; '
                                                        '2: Photometric, not used in fit; '
@@ -633,8 +637,8 @@ def makeZptCat(zptSchema, zpStruct):
         rec = zptCat.addNew()
         rec['filtername'] = filterName.decode('utf-8')
 
-    zptCat['visit'][:] = zpStruct['VISIT']
-    zptCat['ccd'][:] = zpStruct['CCD']
+    zptCat['visit'][:] = zpStruct[FGCM_EXP_FIELD]
+    zptCat['detector'][:] = zpStruct[FGCM_CCD_FIELD]
     zptCat['fgcmFlag'][:] = zpStruct['FGCM_FLAG']
     zptCat['fgcmZpt'][:] = zpStruct['FGCM_ZPT']
     zptCat['fgcmZptErr'][:] = zpStruct['FGCM_ZPTERR']
