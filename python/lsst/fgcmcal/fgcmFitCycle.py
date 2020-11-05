@@ -41,7 +41,7 @@ import numpy as np
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.pipe.base.connectionTypes as cT
+from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
 
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
@@ -60,7 +60,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                               dimensions=("instrument",),
                               defaultTemplates={"previousCycleNumber": "-1",
                                                 "cycleNumber": "0"}):
-    camera = cT.PrerequisiteInput(
+    camera = connectionTypes.PrerequisiteInput(
         doc="Camera instrument",
         name="camera",
         storageClass="Camera",
@@ -69,7 +69,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         isCalibration=True,
     )
 
-    fgcmLookUpTable = cT.PrerequisiteInput(
+    fgcmLookUpTable = connectionTypes.PrerequisiteInput(
         doc=("Atmosphere + instrument look-up-table for FGCM throughput and "
              "chromatic corrections."),
         name="fgcmLookUpTable",
@@ -78,7 +78,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmVisitCatalog = cT.PrerequisiteInput(
+    fgcmVisitCatalog = connectionTypes.PrerequisiteInput(
         doc="Catalog of visit information for fgcm",
         name="fgcmVisitCatalog",
         storageClass="Catalog",
@@ -86,7 +86,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmStarObservations = cT.PrerequisiteInput(
+    fgcmStarObservations = connectionTypes.PrerequisiteInput(
         doc="Catalog of star observations for fgcm",
         name="fgcmStarObservations",
         storageClass="Catalog",
@@ -94,7 +94,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmStarIds = cT.PrerequisiteInput(
+    fgcmStarIds = connectionTypes.PrerequisiteInput(
         doc="Catalog of fgcm calibration star IDs",
         name="fgcmStarIds",
         storageClass="Catalog",
@@ -102,7 +102,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmStarIndices = cT.PrerequisiteInput(
+    fgcmStarIndices = connectionTypes.PrerequisiteInput(
         doc="Catalog of fgcm calibration star indices",
         name="fgcmStarIndices",
         storageClass="Catalog",
@@ -110,7 +110,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmReferenceStars = cT.PrerequisiteInput(
+    fgcmReferenceStars = connectionTypes.PrerequisiteInput(
         doc="Catalog of fgcm-matched reference stars",
         name="fgcmReferenceStars",
         storageClass="Catalog",
@@ -118,7 +118,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmFlaggedStarsInput = cT.PrerequisiteInput(
+    fgcmFlaggedStarsInput = connectionTypes.PrerequisiteInput(
         doc="Catalog of flagged stars for fgcm calibration from previous fit cycle",
         name="fgcmFlaggedStars{previousCycleNumber}",
         storageClass="Catalog",
@@ -126,7 +126,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmFitParametersInput = cT.PrerequisiteInput(
+    fgcmFitParametersInput = connectionTypes.PrerequisiteInput(
         doc="Catalog of fgcm fit parameters from previous fit cycle",
         name="fgcmFitParameters{previousCycleNumber}",
         storageClass="Catalog",
@@ -134,35 +134,35 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmFitParameters = cT.Output(
+    fgcmFitParameters = connectionTypes.Output(
         doc="Catalog of fgcm fit parameters from current fit cycle",
         name="fgcmFitParameters{cycleNumber}",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
-    fgcmFlaggedStars = cT.Output(
+    fgcmFlaggedStars = connectionTypes.Output(
         doc="Catalog of flagged stars for fgcm calibration from current fit cycle",
         name="fgcmFlaggedStars{cycleNumber}",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
-    fgcmZeropoints = cT.Output(
+    fgcmZeropoints = connectionTypes.Output(
         doc="Catalog of fgcm zeropoint data from current fit cycle",
         name="fgcmZeropoints{cycleNumber}",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
-    fgcmAtmosphereParameters = cT.Output(
+    fgcmAtmosphereParameters = connectionTypes.Output(
         doc="Catalog of atmospheric fit parameters from current fit cycle",
         name="fgcmAtmosphereParameters{cycleNumber}",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
-    fgcmStandardStars = cT.Output(
+    fgcmStandardStars = connectionTypes.Output(
         doc="Catalog of standard star magnitudes from current fit cycle",
         name="fgcmStandardStars{cycleNumber}",
         storageClass="SimpleCatalog",

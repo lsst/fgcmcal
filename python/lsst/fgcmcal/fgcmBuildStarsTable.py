@@ -37,7 +37,7 @@ import collections
 import lsst.daf.persistence as dafPersist
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.pipe.base.connectionTypes as cT
+from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
 from lsst.meas.algorithms import ReferenceObjectLoader
 
@@ -51,7 +51,7 @@ __all__ = ['FgcmBuildStarsTableConfig', 'FgcmBuildStarsTableTask']
 class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
                                      dimensions=("instrument",),
                                      defaultTemplates={}):
-    camera = cT.PrerequisiteInput(
+    camera = connectionTypes.PrerequisiteInput(
         doc="Camera instrument",
         name="camera",
         storageClass="Camera",
@@ -60,7 +60,7 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         isCalibration=True,
     )
 
-    fgcmLookUpTable = cT.PrerequisiteInput(
+    fgcmLookUpTable = connectionTypes.PrerequisiteInput(
         doc=("Atmosphere + instrument look-up-table for FGCM throughput and "
              "chromatic corrections."),
         name="fgcmLookUpTable",
@@ -69,14 +69,14 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    srcSchema = cT.PrerequisiteInput(
+    srcSchema = connectionTypes.PrerequisiteInput(
         doc="Schema for source catalogs",
         name="src_schema",
         storageClass="SourceCatalog",
         deferLoad=True,
     )
 
-    refCat = cT.PrerequisiteInput(
+    refCat = connectionTypes.PrerequisiteInput(
         doc="Reference catalog to use for photometric calibration",
         name="cal_ref_cat",
         storageClass="SimpleCatalog",
@@ -85,7 +85,7 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    sourceTable_visit = cT.Input(
+    sourceTable_visit = connectionTypes.Input(
         doc="Source table in parquet format, per visit",
         name="sourceTable_visit",
         storageClass="DataFrame",
@@ -94,7 +94,7 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    calexp = cT.Input(
+    calexp = connectionTypes.Input(
         doc="Calibrated exposures used for psf and metadata",
         name="calexp",
         storageClass="ExposureF",
@@ -103,7 +103,7 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    background = cT.Input(
+    background = connectionTypes.Input(
         doc="Calexp background model",
         name="calexpBackground",
         storageClass="Background",
@@ -112,35 +112,35 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    fgcmVisitCatalog = cT.Output(
+    fgcmVisitCatalog = connectionTypes.Output(
         doc="Catalog of visit information for fgcm",
         name="fgcmVisitCatalog",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
-    fgcmStarObservations = cT.Output(
+    fgcmStarObservations = connectionTypes.Output(
         doc="Catalog of star observations for fgcm",
         name="fgcmStarObservations",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
-    fgcmStarIds = cT.Output(
+    fgcmStarIds = connectionTypes.Output(
         doc="Catalog of fgcm calibration star IDs",
         name="fgcmStarIds",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
-    fgcmStarIndices = cT.Output(
+    fgcmStarIndices = connectionTypes.Output(
         doc="Catalog of fgcm calibration star indices",
         name="fgcmStarIndices",
         storageClass="Catalog",
         dimensions=("instrument",),
     )
 
-    fgcmReferenceStars = cT.Output(
+    fgcmReferenceStars = connectionTypes.Output(
         doc="Catalog of fgcm-matched reference stars",
         name="fgcmReferenceStars",
         storageClass="Catalog",

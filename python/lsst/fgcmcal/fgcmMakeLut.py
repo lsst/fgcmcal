@@ -40,7 +40,7 @@ import numpy as np
 from lsst.obs.base import Instrument
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-import lsst.pipe.base.connectionTypes as cT
+from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
 import lsst.afw.cameraGeom as afwCameraGeom
 from lsst.afw.image import Filter
@@ -55,7 +55,7 @@ __all__ = ['FgcmMakeLutParametersConfig', 'FgcmMakeLutConfig', 'FgcmMakeLutTask'
 class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
                              dimensions=('instrument',),
                              defaultTemplates={}):
-    camera = cT.PrerequisiteInput(
+    camera = connectionTypes.PrerequisiteInput(
         doc="Camera instrument",
         name="camera",
         storageClass="Camera",
@@ -64,7 +64,7 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         isCalibration=True,
     )
 
-    transmission_optics = cT.PrerequisiteInput(
+    transmission_optics = connectionTypes.PrerequisiteInput(
         doc="Optics transmission curve information",
         name="transmission_optics",
         storageClass="TransmissionCurve",
@@ -74,7 +74,7 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    transmission_sensor = cT.PrerequisiteInput(
+    transmission_sensor = connectionTypes.PrerequisiteInput(
         doc="Sensor transmission curve information",
         name="transmission_sensor",
         storageClass="TransmissionCurve",
@@ -85,7 +85,7 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    transmission_filter = cT.PrerequisiteInput(
+    transmission_filter = connectionTypes.PrerequisiteInput(
         doc="Filter transmission curve information",
         name="transmission_filter",
         storageClass="TransmissionCurve",
@@ -96,7 +96,7 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    fgcmLookUpTable = cT.Output(
+    fgcmLookUpTable = connectionTypes.Output(
         doc=("Atmosphere + instrument look-up-table for FGCM throughput and "
              "chromatic corrections."),
         name="fgcmLookUpTable",
