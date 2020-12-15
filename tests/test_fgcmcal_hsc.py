@@ -122,7 +122,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
         tract = 9697
 
-        self._testFgcmCalibrateTract('HSC', visits, tract,
+        self._testFgcmCalibrateTract('HSC', visits, tract, 'hsc_rings_v1',
                                      rawRepeatability, filterNCalibMap)
 
 
