@@ -313,6 +313,12 @@ class FgcmcalTestBase(object):
         cwd = os.getcwd()
         os.chdir(self.testDir)
 
+        configOptions = ['fgcmFitCycle:cycleNumber=%d' % (cycleNumber),
+                         'fgcmFitCycle:connections.previousCycleNumber=%d' %
+                         (cycleNumber - 1),
+                         'fgcmFitCycle:connections.cycleNumber=%d' %
+                         (cycleNumber)]
+
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
                                        'pipelines',
@@ -320,7 +326,7 @@ class FgcmcalTestBase(object):
                           configFiles=configFiles,
                           inputCollections=inputCollections,
                           outputCollection=outputCollection,
-                          configOptions=['fgcmFitCycle:cycleNumber=%d' % (cycleNumber)],
+                          configOptions=configOptions,
                           registerDatasetTypes=True)
 
         os.chdir(cwd)
@@ -423,18 +429,21 @@ class FgcmcalTestBase(object):
 
         # Read in all the calibrations, these should all be there
         # This test is simply to ensure that all the photoCalib files exist
+        visits = np.unique(zptCat['visit'])
+        photoCalibDict = {}
+        for visit in visits:
+            expCat = butler.get('fgcmPhotoCalibCatalog',
+                                visit=visit,
+                                collections=[outputCollection], instrument=instName)
+            for row in expCat:
+                if row['visit'] == visit:
+                    photoCalibDict[(visit, row['detector_id'])] = row.getPhotoCalib()
+
         for rec in zptCat[selected]:
-            testCal = butler.get('fgcm_photoCalib',
-                                 visit=rec['visit'],
-                                 detector=rec['detector'],
-                                 collections=[outputCollection], instrument=instName)
-            self.assertIsNotNone(testCal)
+            self.assertTrue((rec['visit'], rec['detector']) in photoCalibDict)
 
         # We do round-trip value checking on just the final one (chosen arbitrarily)
-        testCal = butler.get('fgcm_photoCalib',
-                             visit=int(testVisit), detector=int(testCcd),
-                             collections=[outputCollection], instrument=instName)
-        self.assertIsNotNone(testCal)
+        testCal = photoCalibDict[(testVisit, testCcd)]
 
         src = butler.get('src', visit=int(testVisit), detector=int(testCcd),
                          collections=[outputCollection], instrument=instName)
@@ -498,19 +507,11 @@ class FgcmcalTestBase(object):
                                                 collections='%s/testdata' % (instName),
                                                 where=whereClause,
                                                 findFirst=True)
-        photoCalibRefs = []
+        photoCals = []
         for srcRef in srcRefs:
-            whereClause = "instrument='%s' and visit=%d and detector=%d" % (instName,
-                                                                            testVisit,
-                                                                            srcRef.dataId['detector'])
-            refs = butler.registry.queryDatasets('fgcm_photoCalib',
-                                                 dimensions=['visit', 'detector'],
-                                                 collections=outputCollection,
-                                                 where=whereClause,
-                                                 findFirst=True)
-            photoCalibRefs.append(list(refs)[0])
+            photoCals.append(photoCalibDict[(testVisit, srcRef.dataId['detector'])])
 
-        matchMag, matchDelta = self._getMatchedVisitCat(butler, srcRefs, photoCalibRefs,
+        matchMag, matchDelta = self._getMatchedVisitCat(butler, srcRefs, photoCals,
                                                         rawStars, testBandIndex, offsets)
 
         st = np.argsort(matchMag)
@@ -560,7 +561,7 @@ class FgcmcalTestBase(object):
         ratio = np.median(testResp/testResp2)
         self.assertFloatsAlmostEqual(testResp/ratio, testResp2, atol=0.04)
 
-    def _getMatchedVisitCat(self, butler, srcRefs, photoCalibRefs,
+    def _getMatchedVisitCat(self, butler, srcRefs, photoCals,
                             rawStars, bandIndex, offsets):
         """
         Get a list of matched magnitudes and deltas from calibrated src catalogs.
@@ -572,6 +573,8 @@ class FgcmcalTestBase(object):
            dataRefs of source catalogs
         photoCalibRefs : `list`
            dataRefs of photoCalib files, matched to srcRefs.
+        photoCals : `list`
+           photoCalib objects, matched to srcRefs.
         rawStars : `lsst.afw.table.SourceCatalog`
            Fgcm standard stars
         bandIndex : `int`
@@ -591,10 +594,8 @@ class FgcmcalTestBase(object):
 
         matchDelta = None
         # for dataRef in dataRefs:
-        for srcRef, photoCalibRef in zip(srcRefs, photoCalibRefs):
+        for srcRef, photoCal in zip(srcRefs, photoCals):
             src = butler.getDirect(srcRef)
-            photoCal = butler.getDirect(photoCalibRef)
-
             src = photoCal.calibrateCatalog(src)
 
             gdSrc, = np.where(np.nan_to_num(src['slot_CalibFlux_flux']) > 0.0)
@@ -683,11 +684,19 @@ class FgcmcalTestBase(object):
                                                                       tract,
                                                                       filterName,
                                                                       skymapName)
-            refs = butler.registry.queryDatasets('fgcm_tract_photoCalib',
+
+            refs = butler.registry.queryDatasets('fgcmPhotoCalibTractCatalog',
                                                  dimensions=['tract', 'physical_filter'],
                                                  collections=outputCollection,
                                                  where=whereClause)
-            self.assertEqual(len(set(refs)), filterNCalibMap[filterName])
+
+            count = 0
+            for ref in set(refs):
+                expCat = butler.getDirect(ref)
+                test, = np.where(expCat['visit'] > 0)
+                count += test.size
+
+            self.assertEqual(count, filterNCalibMap[filterName])
 
         # Check that every visit got a transmission
         for visit in visits:

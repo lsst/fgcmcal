@@ -273,6 +273,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
     """
     def __init__(self, butler=None, initInputs=None, **kwargs):
         super().__init__(**kwargs)
+
         self.makeSubtask("sourceSelector")
         # Only log warning and fatal errors from the sourceSelector
         self.sourceSelector.log.setLevel(self.sourceSelector.log.WARN)
@@ -302,6 +303,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
         self.log.info("Running with %d %s dataRefs", len(dataRefs), datasetType)
 
         if self.config.doReferenceMatches:
+            self.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
             # Ensure that we have a LUT
             if not butler.datasetExists('fgcmLookUpTable'):
                 raise RuntimeError("Must have fgcmLookUpTable if using config.doReferenceMatches")
@@ -318,7 +320,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                                    (self.config.instFluxField)) from e
 
         camera = butler.get('camera')
-        groupedDataRefs = self.findAndGroupDataRefs(camera, dataRefs, butler=butler)
+        groupedDataRefs = self._findAndGroupDataRefs(camera, dataRefs, butler=butler)
 
         # Make the visit catalog if necessary
         # First check if the visit catalog is in the _current_ path
@@ -351,10 +353,10 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             inStarObsCat = None
 
         rad = calibFluxApertureRadius
-        srcSchemaDataRef = butler.dataRef('src_schema')
+        sourceSchemaDataRef = butler.dataRef('src_schema')
         fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                   visitCat,
-                                                                  srcSchemaDataRef,
+                                                                  sourceSchemaDataRef,
                                                                   camera,
                                                                   calibFluxApertureRadius=rad,
                                                                   starObsDataRef=starObsDataRef,
@@ -366,7 +368,6 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
         # Always do the matching.
         if self.config.doReferenceMatches:
             lutDataRef = butler.dataRef('fgcmLookUpTable')
-            self.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
         else:
             lutDataRef = None
         fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = self.fgcmMatchStars(visitCat,
@@ -380,10 +381,10 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             butler.put(fgcmRefCat, 'fgcmReferenceStars')
 
     @abc.abstractmethod
-    def findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
+    def _findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
         """
         Find and group dataRefs (by visit).  For Gen2 usage, set butler, and for
-        Gen3, use dataRefDict
+        Gen3, use calexpDataRefDict
 
         Parameters
         ----------
@@ -408,11 +409,11 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
         ------
         RuntimeError : Raised if neither or both of butler and dataRefDict are set.
         """
-        raise NotImplementedError("findAndGroupDataRefs not implemented.")
+        raise NotImplementedError("_findAndGroupDataRefs not implemented.")
 
     @abc.abstractmethod
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
-                                    srcSchemaDataRef,
+                                    sourceSchemaDataRef,
                                     camera,
                                     calibFluxApertureRadius=None,
                                     visitCatDataRef=None,
@@ -425,14 +426,14 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
         Parameters
         ----------
         groupedDataRefs: `dict` of `list`s
-           Lists of `lsst.daf.persistence.ButlerDataRef` or
-           `lsst.daf.butler.DeferredDatasetHandle`, grouped by visit.
+           Lists of ~`lsst.daf.persistence.ButlerDataRef` or
+           ~`lsst.daf.butler.DeferredDatasetHandle`, grouped by visit.
         visitCat: `afw.table.BaseCatalog`
            Catalog with visit data for FGCM
-        srcSchemaDataRef: `lsst.daf.persistence.ButlerDataRef` or
-                          `lsst.daf.butler.DeferredDatasetHandle`
+        sourceSchemaDataRef: `lsst.daf.persistence.ButlerDataRef` or
+                             `lsst.daf.butler.DeferredDatasetHandle`
            DataRef for the schema of the src catalogs.
-        camera: FIXME
+        camera: `lsst.afw.cameraGeom.Camera`
         calibFluxApertureRadius: `float`, optional
            Aperture radius for calibration flux.
         visitCatDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
@@ -467,12 +468,12 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
         groupedDataRefs: `dict`
            Dictionary with visit keys, and `list`s of
            `lsst.daf.persistence.ButlerDataRef`
+        bkgDataRefDict: `dict`, optional
+           Dictionary of gen3 dataRefHandles for background info.
         visitCatDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
            Dataref to write visitCat for checkpoints
         inVisitCat: `afw.table.BaseCatalog`, optional
            Input (possibly incomplete) visit catalog
-        bkgDataRefDict: `dict`, optional
-           Dictionary of gen3 dataRefHandles for background info. FIXME
 
         Returns
         -------
@@ -667,7 +668,6 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
 
         Parameters
         ----------
-        butler: `lsst.daf.persistence.Butler`
         visitCat: `afw.table.BaseCatalog`
            Catalog with visit data for fgcm
         obsCat: `afw.table.BaseCatalog`

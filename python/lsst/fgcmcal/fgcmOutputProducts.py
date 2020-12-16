@@ -132,20 +132,11 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         storageClass="Config",
     )
 
-    calexp = connectionTypes.Input(
-        doc="Calibrated exposures used to match fgcmBuildStars input",
-        name="calexp",
-        storageClass="ExposureF",
-        dimensions=("instrument", "visit", "detector",),
-        deferLoad=True,
-        multiple=True,
-    )
-
     fgcmPhotoCalib = connectionTypes.Output(
-        doc="Per-detector photoCalib files produced from fgcm calibration",
-        name="fgcm_photoCalib",
-        storageClass="PhotoCalib",
-        dimensions=("instrument", "visit", "detector",),
+        doc="Per-visit photoCalib exposure catalogs produced from fgcm calibration",
+        name="fgcmPhotoCalibCatalog",
+        storageClass="ExposureCatalog",
+        dimensions=("instrument", "visit",),
         multiple=True,
     )
 
@@ -399,9 +390,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         if self.config.doZeropointOutput:
             dataRefDict['fgcmZeropoints'] = butlerQC.get(inputRefs.fgcmZeropoints)
-            photoCalibRefDict = {(photoCalibRef.dataId.byName()['visit'],
-                                  photoCalibRef.dataId.byName()['detector']): photoCalibRef for
-                                 photoCalibRef in outputRefs.fgcmPhotoCalib}
+            photoCalibRefDict = {photoCalibRef.dataId.byName()['visit']:
+                                 photoCalibRef for photoCalibRef in outputRefs.fgcmPhotoCalib}
             dataRefDict['fgcmPhotoCalibs'] = photoCalibRefDict
 
         if self.config.doAtmosphereOutput:
@@ -1099,6 +1089,10 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         if self.config.doComposeWcsJacobian:
             approxPixelAreaFields = computeApproxPixelAreaFields(camera)
 
+        # The zptCat is sorted by visit, which is useful
+        lastVisit = -1
+        zptCounter = 0
+        zptVisitCatalog = None
         for rec in zptCat[selected]:
 
             # Retrieve overall scaling
@@ -1154,20 +1148,68 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                                        'tract': tract})
             else:
                 # Gen3 writing
-                if tract is None:
-                    photoCalibRef = dataRefDict['fgcmPhotoCalibs'][(int(rec['visit']),
-                                                                    int(rec['detector']))]
-                else:
-                    photoCalibRef = dataRefDict['fgcmPhotoCalibs'][(tract,
-                                                                    int(rec['visit']),
-                                                                    int(rec['detector']))]
-                try:
-                    butler.put(photoCalib, photoCalibRef)
-                except TypeError:
-                    import IPython
-                    IPython.embed()
+                if rec['visit'] != lastVisit:
+                    # This is a new visit.  If the last visit was not -1, write out
+                    # the ExposureCatalog
+                    if lastVisit > -1:
+                        self._outputZptVisitCatalog(butler,
+                                                    dataRefDict['fgcmPhotoCalibs'],
+                                                    zptVisitCatalog,
+                                                    lastVisit,
+                                                    tract=tract)
+                    else:
+                        # We need to create a new schema
+                        zptExpCatSchema = afwTable.ExposureTable.makeMinimalSchema()
+                        zptExpCatSchema.addField('visit', type='I', doc='Visit number')
+                        zptExpCatSchema.addField('detector_id', type='I', doc='Detector number')
+
+                    # And start a new one
+                    zptVisitCatalog = afwTable.ExposureCatalog(zptExpCatSchema)
+                    zptVisitCatalog.resize(len(camera))
+
+                    # Reset the counter
+                    zptCounter = 0
+
+                    lastVisit = int(rec['visit'])
+
+                zptVisitCatalog[zptCounter].setPhotoCalib(photoCalib)
+                zptVisitCatalog[zptCounter]['visit'] = int(rec['visit'])
+                zptVisitCatalog[zptCounter]['detector_id'] = int(rec['detector'])
+
+                zptCounter += 1
+
+        # Final output of last exposure catalog (Gen3)
+        if isGen3:
+            self._outputZptVisitCatalog(butler,
+                                        dataRefDict['fgcmPhotoCalibs'],
+                                        zptVisitCatalog,
+                                        lastVisit,
+                                        tract=tract)
 
         self.log.info("Done outputting %s objects" % (datasetType))
+
+    def _outputZptVisitCatalog(self, butler, photoCalibRefDict, zptVisitCatalog, visit,
+                               tract=None):
+        """
+        Output a zeropoint photoCalib exposure catalog (Gen3 only).
+
+        Parameters
+        ----------
+        butler : `lsst.pipe.base.ButlerQuantumContext`
+        photoCalibRefDict : `dict`
+            Dictionary with photoCalib catalog refs.
+        zptVisitCatalog : `lsst.afw.table.ExposureCatalog`
+            Exposure catalog with photoCalibs set.
+        visit : `int`
+            Visit id
+        tract : `int`, optional
+            Tract number (if tract mode).
+        """
+        if tract is None:
+            photoCalibRef = photoCalibRefDict[visit]
+        else:
+            photoCalibRef = photoCalibRefDict[(tract, visit)]
+        butler.put(zptVisitCatalog, photoCalibRef)
 
     def _getChebyshevBoundedField(self, coefficients, xyMax, offset=0.0, scaling=1.0):
         """

@@ -32,7 +32,6 @@ the input catalog as possible.
 import time
 
 import numpy as np
-import collections
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -105,10 +104,11 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
 
         return parser
 
-    def findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
-        if butler is None or calexpDataRefDict is not None:
-            raise RuntimeError("Running findAndGroupDataRefs with FgcmBuildStarsTask must "
-                               "be run with a butler and only supports Gen2.")
+    def _findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
+        if butler is None:
+            raise RuntimeError("Gen2 _findAndGroupDataRefs must be called with a butler.")
+        if calexpDataRefDict is not None:
+            self.log.warn("Ignoring calexpDataRefDict in gen2 _findAndGroupDataRefs")
 
         self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
 
@@ -180,7 +180,7 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
                 groupedDataRefs[visit] = sorted(groupedDataRefs[visit], key=ccdSorter)
 
         # This should be sorted by visit (the key)
-        return collections.OrderedDict(sorted(groupedDataRefs.items()))
+        return dict(sorted(groupedDataRefs.items()))
 
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
                                     srcSchemaDataRef,

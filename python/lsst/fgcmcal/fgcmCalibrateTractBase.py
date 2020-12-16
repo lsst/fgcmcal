@@ -182,6 +182,8 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         butler : `lsst.daf.persistence.Butler`, optional
         """
         super().__init__(**kwargs)
+        self.makeSubtask("fgcmBuildStars", butler=butler)
+        self.makeSubtask("fgcmOutputProducts", butler=butler)
 
     # no saving of metadata for now
     def _getMetadataName(self):
@@ -221,16 +223,13 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
                 raise RuntimeError("Cannot run FgcmCalibrateTract with "
                                    "fgcmBuildStars.checkAllCcds set to True")
 
-        self.makeSubtask("fgcmBuildStars", butler=butler)
-        self.makeSubtask("fgcmOutputProducts", butler=butler)
-
         tract = int(dataRefs[0].dataId['tract'])
         camera = butler.get('camera')
 
         dataRefDict = {}
         dataRefDict['camera'] = camera
         dataRefDict['source_catalogs'] = dataRefs
-        dataRefDict['src_schema'] = butler.dataRef('src_schema')
+        dataRefDict['sourceSchema'] = butler.dataRef('src_schema')
         dataRefDict['fgcmLookUpTable'] = butler.dataRef('fgcmLookUpTable')
 
         return self.run(dataRefDict, tract, butler=butler)
@@ -244,13 +243,14 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         dataRefDict : `dict`
             All dataRefs are `lsst.daf.persistence.ButlerDataRef` (gen2) or
             `lsst.daf.butler.DeferredDatasetHandle` (gen3)
-            dataRef dictionary with keys:
+            dataRef dictionary with the following keys.  Note that all
+            keys need not be set based on config parameters.
 
             ``"camera"``
                 Camera object (`lsst.afw.cameraGeom.Camera`)
             ``"source_catalogs"``
                 `list` of dataRefs for input source catalogs.
-            ``"src_schema"``
+            ``"sourceSchema"``
                 Schema for the source catalogs.
             ``"fgcmLookUpTable"``
                 dataRef for the FGCM look-up table.
@@ -259,9 +259,11 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
             ``"fgcmPhotoCalibs"``
                 `dict` of output photoCalib dataRefs.  Key is
                 (tract, visit, detector). (Gen3 only)
+                Present if doZeropointOutput is True.
             ``"fgcmTransmissionAtmospheres"``
                 `dict` of output atmosphere transmission dataRefs.
                 Key is (tract, visit). (Gen3 only)
+                Present if doAtmosphereOutput is True.
         tract : `int`
             Tract number
         buildStarsRefObjLoader : `lsst.meas.algorithms.ReferenceObjectLoader`, optional
@@ -279,7 +281,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
             repeatability : `np.ndarray`
                 Raw fgcm repeatability for bright stars, per band.
         """
-        self.log.info("Running on tract %d" % (tract))
+        self.log.info("Running on tract %d", (tract))
 
         # Compute the aperture radius if necessary.  This is useful to do now before
         # any heavy lifting has happened (fail early).
@@ -299,20 +301,20 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         # Note that we will need visitCat at the end of the procedure for the outputs
         if isinstance(butler, dafPersist.Butler):
             # Gen2
-            groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(dataRefDict['camera'],
-                                                                       dataRefDict['source_catalogs'],
-                                                                       butler=butler)
+            groupedDataRefs = self.fgcmBuildStars._findAndGroupDataRefs(dataRefDict['camera'],
+                                                                        dataRefDict['source_catalogs'],
+                                                                        butler=butler)
         else:
             # Gen3
             cdrd = dataRefDict['calexps']
-            groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(dataRefDict['camera'],
-                                                                       dataRefDict['source_catalogs'],
-                                                                       calexpDataRefDict=cdrd)
+            groupedDataRefs = self.fgcmBuildStars._findAndGroupDataRefs(dataRefDict['camera'],
+                                                                        dataRefDict['source_catalogs'],
+                                                                        calexpDataRefDict=cdrd)
         visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(dataRefDict['camera'], groupedDataRefs)
         rad = calibFluxApertureRadius
         fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                                  visitCat,
-                                                                                 dataRefDict['src_schema'],
+                                                                                 dataRefDict['sourceSchema'],
                                                                                  dataRefDict['camera'],
                                                                                  calibFluxApertureRadius=rad)
 

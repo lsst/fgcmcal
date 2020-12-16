@@ -40,8 +40,7 @@ __all__ = ['FgcmCalibrateTractTableConfig', 'FgcmCalibrateTractTableTask']
 
 class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
                                          dimensions=("instrument",
-                                                     "tract",),
-                                         defaultTemplates={}):
+                                                     "tract",)):
     camera = connectionTypes.PrerequisiteInput(
         doc="Camera instrument",
         name="camera",
@@ -60,7 +59,7 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    srcSchema = connectionTypes.PrerequisiteInput(
+    sourceSchema = connectionTypes.PrerequisiteInput(
         doc="Schema for source catalogs",
         name="src_schema",
         storageClass="SourceCatalog",
@@ -76,7 +75,7 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    sourceTable_visit = connectionTypes.Input(
+    source_catalogs = connectionTypes.Input(
         doc="Source table in parquet format, per visit",
         name="sourceTable_visit",
         storageClass="DataFrame",
@@ -104,10 +103,10 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
     )
 
     fgcmPhotoCalib = connectionTypes.Output(
-        doc="Per-detector per-tract photoCalib files produced from fgcm calibration",
-        name="fgcm_tract_photoCalib",
-        storageClass="PhotoCalib",
-        dimensions=("instrument", "tract", "visit", "detector",),
+        doc="Per-tract, per-visit photoCalib exposure catalogs produced from fgcm calibration",
+        name="fgcmPhotoCalibTractCatalog",
+        storageClass="ExposureCatalog",
+        dimensions=("instrument", "tract", "visit",),
         multiple=True,
     )
 
@@ -130,6 +129,7 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
     def __init__(self, *, config=None):
         super().__init__(config=config)
 
+        # The ref_dataset_name will be deprecated with Gen2
         loaderName = config.fgcmBuildStars.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name
         if config.connections.refCat != loaderName:
             raise ValueError("connections.refCat must be the same as "
@@ -166,7 +166,7 @@ class FgcmCalibrateTractTableConfig(FgcmCalibrateTractConfigBase, pipeBase.Pipel
 
 class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
     """
-    Calibrate a single tract using fgcmcal, using sourceTable_visit
+    Calibrate a single tract using fgcmcal, using sourceTable_visit (parquet)
     input catalogs.
     """
     ConfigClass = FgcmCalibrateTractTableConfig
@@ -176,24 +176,14 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
     canMultiprocess = False
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
-        dataRefs = butlerQC.get(inputRefs.sourceTable_visit)
+        dataRefDict = butlerQC.get(inputRefs)
 
-        self.log.info("Running with %d sourceTable_visit dataRefs" % (len(dataRefs)))
+        self.log.info("Running with %d sourceTable_visit dataRefs", (len(dataRefDict['source_catalogs'])))
 
         # Run the build stars tasks
-        self.makeSubtask("fgcmBuildStars")
-        self.makeSubtask("fgcmOutputProducts")
-
         tract = butlerQC.quantum.dataId['tract']
-        camera = butlerQC.get(inputRefs.camera)
 
-        dataRefDict = {}
-        dataRefDict['camera'] = camera
-        dataRefDict['source_catalogs'] = dataRefs
-        dataRefDict['src_schema'] = butlerQC.get(inputRefs.srcSchema)
-        dataRefDict['fgcmLookUpTable'] = butlerQC.get(inputRefs.fgcmLookUpTable)
-
-        calexpRefs = butlerQC.get(inputRefs.calexp)
+        calexpRefs = dataRefDict['calexp']
         calexpRefDict = {(calexpRef.dataId.byName()['visit'],
                           calexpRef.dataId.byName()['detector']):
                          calexpRef for calexpRef in calexpRefs}
@@ -202,9 +192,8 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
         # And the outputs
         if self.config.fgcmOutputProducts.doZeropointOutput:
             photoCalibRefDict = {(photoCalibRef.dataId.byName()['tract'],
-                                  photoCalibRef.dataId.byName()['visit'],
-                                  photoCalibRef.dataId.byName()['detector']): photoCalibRef for
-                                 photoCalibRef in outputRefs.fgcmPhotoCalib}
+                                  photoCalibRef.dataId.byName()['visit']):
+                                 photoCalibRef for photoCalibRef in outputRefs.fgcmPhotoCalib}
             dataRefDict['fgcmPhotoCalibs'] = photoCalibRefDict
 
         if self.config.fgcmOutputProducts.doAtmosphereOutput:

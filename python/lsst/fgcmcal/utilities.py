@@ -28,6 +28,7 @@ import numpy as np
 import re
 
 from lsst.daf.base import PropertyList
+import lsst.daf.persistence as dafPersist
 import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
@@ -818,10 +819,10 @@ def computeApertureRadiusFromDataRef(dataRef, fluxField):
        or associated slot.
     """
     # TODO: Move this method to more general stack method in DM-25775
-    try:
+    if isinstance(dataRef, dafPersist.ButlerDataRef):
         # Gen2 dataRef
         datasetType = dataRef.butlerSubset.datasetType
-    except AttributeError:
+    else:
         # Gen3 dataRef
         datasetType = dataRef.ref.datasetType.name
 

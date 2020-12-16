@@ -775,9 +775,12 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
     def validate(self):
         super().validate()
 
-        # Force the connections to conform with cycleNumber
-        self.connections.previousCycleNumber = str(self.cycleNumber - 1)
-        self.connections.cycleNumber = str(self.cycleNumber)
+        if self.connections.previousCycleNumber != str(self.cycleNumber - 1):
+            msg = "cycleNumber in template must be connections.previousCycleNumber + 1"
+            raise RuntimeError(msg)
+        if self.connections.cycleNumber != str(self.cycleNumber):
+            msg = "cycleNumber in template must be equal to connections.cycleNumber"
+            raise RuntimeError(msg)
 
         for band in self.fitBands:
             if band not in self.bands:

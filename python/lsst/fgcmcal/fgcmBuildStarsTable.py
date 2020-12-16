@@ -69,7 +69,7 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    srcSchema = connectionTypes.PrerequisiteInput(
+    sourceSchema = connectionTypes.PrerequisiteInput(
         doc="Schema for source catalogs",
         name="src_schema",
         storageClass="SourceCatalog",
@@ -222,13 +222,15 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
     canMultiprocess = False
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
-        dataRefs = butlerQC.get(inputRefs.sourceTable_visit)
+        inputRefDict = butlerQC.get(inputRefs)
 
-        self.log.info("Running with %d sourceTable_visit dataRefs" % (len(dataRefs)))
+        dataRefs = inputRefDict['sourceTable_visit']
+
+        self.log.info("Running with %d sourceTable_visit dataRefs", (len(dataRefs)))
 
         if self.config.doReferenceMatches:
             # Get the LUT dataRef
-            lutDataRef = butlerQC.get(inputRefs.fgcmLookUpTable)
+            lutDataRef = inputRefDict['fgcmLookUpTable']
 
             # Prepare the refCat loader
             refConfig = self.config.fgcmLoadReferenceCatalog.refObjLoader
@@ -253,34 +255,35 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                                    "Cannot use doSubtractLocalBackground." %
                                    (self.config.instFluxField)) from e
 
-        calexpRefs = butlerQC.get(inputRefs.calexp)
+        calexpRefs = inputRefDict['calexp']
         calexpDataRefDict = {(calexpRef.dataId.byName()['visit'],
                               calexpRef.dataId.byName()['detector']): calexpRef for
                              calexpRef in calexpRefs}
 
-        camera = butlerQC.get(inputRefs.camera)
-        groupedDataRefs = self.findAndGroupDataRefs(camera, dataRefs,
-                                                    calexpDataRefDict=calexpDataRefDict)
+        camera = inputRefDict['camera']
+        groupedDataRefs = self._findAndGroupDataRefs(camera, dataRefs,
+                                                     calexpDataRefDict=calexpDataRefDict)
 
         if self.config.doModelErrorsWithBackground:
-            bkgRefs = butlerQC.get(inputRefs.background)
+            bkgRefs = inputRefDict['background']
             bkgDataRefDict = {(bkgRef.dataId.byName()['visit'],
                                bkgRef.dataId.byName()['detector']): bkgRef for
                               bkgRef in bkgRefs}
         else:
             bkgDataRefDict = None
 
-        # Gen3 does not currently allow "checkpoint" saving of datasets.
+        # Gen3 does not currently allow "checkpoint" saving of datasets,
+        # so we need to have this all in one go.
         visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs,
                                              bkgDataRefDict=bkgDataRefDict,
                                              visitCatDataRef=None,
                                              inVisitCat=None)
 
         rad = calibFluxApertureRadius
-        srcSchemaDataRef = butlerQC.get(inputRefs.srcSchema)
+        sourceSchemaDataRef = inputRefDict['sourceSchema']
         fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                   visitCat,
-                                                                  srcSchemaDataRef,
+                                                                  sourceSchemaDataRef,
                                                                   camera,
                                                                   calibFluxApertureRadius=rad,
                                                                   starObsDataRef=None,
@@ -307,12 +310,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         return parser
 
-    def findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
+    def _findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
         if (butler is None and calexpDataRefDict is None) or \
                 (butler is not None and calexpDataRefDict is not None):
             raise RuntimeError("Must either set butler (Gen2) or dataRefDict (Gen3)")
 
-        self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
+        self.log.info("Grouping dataRefs by %s", (self.config.visitDataRefName))
 
         ccdIds = []
         for detector in camera:
@@ -344,10 +347,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                         continue
                 else:
                     # Gen3 mode
-                    try:
-                        calexpRef = calexpDataRefDict[(visit, ccdId)]
-                    except KeyError:
-                        # Not found
+                    calexpRef = calexpDataRefDict.get((visit, ccdId))
+                    if calexpRef is None:
                         continue
 
                 # It was found.  Add and quit out, since we only
@@ -359,10 +360,10 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             groupedDataRefs[visit].append(dataRef)
 
         # This should be sorted by visit (the key)
-        return collections.OrderedDict(sorted(groupedDataRefs.items()))
+        return dict(sorted(groupedDataRefs.items()))
 
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
-                                    srcSchemaDataRef,
+                                    sourceSchemaDataRef,
                                     camera,
                                     calibFluxApertureRadius=None,
                                     visitCatDataRef=None,
@@ -384,7 +385,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         # To get the correct output schema, we use similar code as fgcmBuildStarsTask
         # We are not actually using this mapper, except to grab the outputSchema
-        sourceSchema = srcSchemaDataRef.get().schema
+        sourceSchema = sourceSchemaDataRef.get().schema
         sourceMapper = self._makeSourceMapper(sourceSchema)
         outputSchema = sourceMapper.getOutputSchema()
 

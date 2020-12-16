@@ -126,6 +126,8 @@ class FgcmcalTestHSCGen2(fgcmcalTestBaseGen2.FgcmcalTestBaseGen2, lsst.utils.tes
         # Test the second fit cycle -- need to copy to unfreeze config
         newConfig = copy.copy(self.config)
         newConfig.update(cycleNumber=1)
+        newConfig.connections.update(cycleNumber='1',
+                                     previousCycleNumber='0')
         self.config = newConfig
 
         newConfigFile = os.path.join(self.testDir,
@@ -140,6 +142,8 @@ class FgcmcalTestHSCGen2(fgcmcalTestBaseGen2.FgcmcalTestBaseGen2, lsst.utils.tes
         newConfig.update(cycleNumber=2,
                          ccdGraySubCcdDict={'g': True, 'r': True, 'i': True},
                          isFinalCycle=True)
+        newConfig.connections.update(cycleNumber='2',
+                                     previousCycleNumber='1')
         self.config = newConfig
 
         newConfigFile = os.path.join(self.testDir,
