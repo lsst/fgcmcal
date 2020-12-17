@@ -52,7 +52,7 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
     """
     ConfigClass = FgcmCalibrateTractTableConfig
     RunnerClass = FgcmCalibrateTractRunner
-    _DefaultName = "fgcmCalibrateTract"
+    _DefaultName = "fgcmCalibrateTractTable"
 
     @classmethod
     def _makeArgumentParser(cls):
