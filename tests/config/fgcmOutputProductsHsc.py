@@ -11,6 +11,5 @@ config.photoCal.applyColorTerms = True
 config.photoCal.photoCatName = 'ps1_pv3_3pi_20170110'
 config.photoCal.colorterms.load(os.path.join(getPackageDir('obs_subaru'),
                                              'config',
-                                             'hsc',
                                              'colorterms.py'))
 config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'

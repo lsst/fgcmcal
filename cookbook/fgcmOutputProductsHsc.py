@@ -27,7 +27,7 @@ config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
 
 # Photometric calibration information
 config.photoCal.photoCatName = 'ps1'
-hscConfigDir = os.path.join(getPackageDir("obs_subaru"), "config", "hsc")
+hscConfigDir = os.path.join(getPackageDir("obs_subaru"), "config")
 config.photoCal.colorterms.load(os.path.join(hscConfigDir, 'colorterms.py'))
 
 
