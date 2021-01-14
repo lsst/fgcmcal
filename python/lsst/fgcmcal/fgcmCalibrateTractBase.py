@@ -232,10 +232,44 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         dataRefDict['sourceSchema'] = butler.dataRef('src_schema')
         dataRefDict['fgcmLookUpTable'] = butler.dataRef('fgcmLookUpTable')
 
-        return self.run(dataRefDict, tract, butler=butler)
+        struct = self.run(dataRefDict, tract, butler=butler, returnCatalogs=False)
+
+        visitDataRefName = self.config.fgcmBuildStars.visitDataRefName
+        ccdDataRefName = self.config.fgcmBuildStars.ccdDataRefName
+
+        if struct.photoCalibs is not None:
+            self.log.info("Outputting photoCalib files.")
+
+            filterMapping = {}
+            for visit, detector, filtername, photoCalib in struct.photoCalibs:
+                if filtername not in filterMapping:
+                    # We need to find the mapping from encoded filter to dataid filter,
+                    # and this trick allows us to do that.
+                    dataId = {visitDataRefName: visit,
+                              ccdDataRefName: detector}
+                    dataRef = butler.dataRef('raw', dataId=dataId)
+                    filterMapping[filtername] = dataRef.dataId['filter']
+
+                butler.put(photoCalib, 'fgcm_tract_photoCalib',
+                           dataId={visitDataRefName: visit,
+                                   ccdDataRefName: detector,
+                                   'filter': filterMapping[filtername],
+                                   'tract': tract})
+
+            self.log.info("Done outputting photoCalib files.")
+
+        if struct.atmospheres is not None:
+            self.log.info("Outputting atmosphere files.")
+            for visit, atm in struct.atmospheres:
+                butler.put(atm, "transmission_atmosphere_fgcm_tract",
+                           dataId={visitDataRefName: visit,
+                                   'tract': tract})
+            self.log.info("Done outputting atmosphere transmissions.")
+
+        return pipeBase.Struct(repeatability=struct.repeatability)
 
     def run(self, dataRefDict, tract,
-            buildStarsRefObjLoader=None, butler=None):
+            buildStarsRefObjLoader=None, returnCatalogs=True, butler=None):
         """Run the calibrations for a single tract with fgcm.
 
         Parameters
@@ -268,8 +302,10 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
             Tract number
         buildStarsRefObjLoader : `lsst.meas.algorithms.ReferenceObjectLoader`, optional
             Reference object loader object for fgcmBuildStars.
-        butler : `lsst.daf.persistance.Butler` or `lsst.daf.butler.Butler`, optional
-            Data butler for persisting photoCalibs.
+        returnCatalogs : `bool`, optional
+            Return photoCalibs as per-visit exposure catalogs.
+        butler : `lsst.daf.persistence.Butler`, optional
+            Gen2 butler used for reference star outputs
 
         Returns
         -------
@@ -280,6 +316,14 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
                 Final reference offsets, per band.
             repeatability : `np.ndarray`
                 Raw fgcm repeatability for bright stars, per band.
+            atmospheres : `generator` [(`int`, `lsst.afw.image.TransmissionCurve`)]
+                Generator that returns (visit, transmissionCurve) tuples.
+            photoCalibs : `generator` [(`int`, `int`, `str`, `lsst.afw.image.PhotoCalib`)]
+                Generator that returns (visit, ccd, filtername, photoCalib) tuples.
+                (returned if returnCatalogs is False).
+            photoCalibCatalogs : `generator` [(`int`, `lsst.afw.table.ExposureCatalog`)]
+                Generator that returns (visit, exposureCatalog) tuples.
+                (returned if returnCatalogs is True).
         """
         self.log.info("Running on tract %d", (tract))
 
@@ -529,12 +573,14 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         stdSchema = makeStdSchema(len(goodBands))
         stdCat = makeStdCat(stdSchema, stdStruct, goodBands)
 
-        outStruct = self.fgcmOutputProducts.generateTractOutputProducts(butler,
-                                                                        dataRefDict,
+        outStruct = self.fgcmOutputProducts.generateTractOutputProducts(dataRefDict,
                                                                         tract,
                                                                         visitCat,
                                                                         zptCat, atmCat, stdCat,
-                                                                        self.config.fgcmBuildStars)
+                                                                        self.config.fgcmBuildStars,
+                                                                        returnCatalogs=returnCatalogs,
+                                                                        butler=butler)
+
         outStruct.repeatability = fgcmFitCycle.fgcmPars.compReservedRawRepeatability
 
         return outStruct

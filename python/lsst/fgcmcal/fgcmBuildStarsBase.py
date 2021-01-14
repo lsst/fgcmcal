@@ -426,21 +426,21 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
         Parameters
         ----------
         groupedDataRefs: `dict` of `list`s
-           Lists of ~`lsst.daf.persistence.ButlerDataRef` or
-           ~`lsst.daf.butler.DeferredDatasetHandle`, grouped by visit.
-        visitCat: `afw.table.BaseCatalog`
+           Lists of `~lsst.daf.persistence.ButlerDataRef` or
+           `~lsst.daf.butler.DeferredDatasetHandle`, grouped by visit.
+        visitCat: `~afw.table.BaseCatalog`
            Catalog with visit data for FGCM
-        sourceSchemaDataRef: `lsst.daf.persistence.ButlerDataRef` or
-                             `lsst.daf.butler.DeferredDatasetHandle`
+        sourceSchemaDataRef: `~lsst.daf.persistence.ButlerDataRef` or
+                             `~lsst.daf.butler.DeferredDatasetHandle`
            DataRef for the schema of the src catalogs.
-        camera: `lsst.afw.cameraGeom.Camera`
+        camera: `~lsst.afw.cameraGeom.Camera`
         calibFluxApertureRadius: `float`, optional
            Aperture radius for calibration flux.
-        visitCatDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
+        visitCatDataRef: `~lsst.daf.persistence.ButlerDataRef`, optional
            Dataref to write visitCat for checkpoints
-        starObsDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
+        starObsDataRef: `~lsst.daf.persistence.ButlerDataRef`, optional
            Dataref to write the star observation catalog for checkpoints.
-        inStarObsCat: `afw.table.BaseCatalog`
+        inStarObsCat: `~afw.table.BaseCatalog`
            Input observation catalog.  If this is incomplete, observations
            will be appended from when it was cut off.
 

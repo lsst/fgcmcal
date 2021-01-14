@@ -191,14 +191,12 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
 
         # And the outputs
         if self.config.fgcmOutputProducts.doZeropointOutput:
-            photoCalibRefDict = {(photoCalibRef.dataId.byName()['tract'],
-                                  photoCalibRef.dataId.byName()['visit']):
+            photoCalibRefDict = {photoCalibRef.dataId.byName()['visit']:
                                  photoCalibRef for photoCalibRef in outputRefs.fgcmPhotoCalib}
             dataRefDict['fgcmPhotoCalibs'] = photoCalibRefDict
 
         if self.config.fgcmOutputProducts.doAtmosphereOutput:
-            atmRefDict = {(atmRef.dataId.byName()['tract'],
-                           atmRef.dataId.byName()['visit']): atmRef for
+            atmRefDict = {atmRef.dataId.byName()['visit']: atmRef for
                           atmRef in outputRefs.fgcmTransmissionAtmosphere}
             dataRefDict['fgcmTransmissionAtmospheres'] = atmRefDict
 
@@ -224,6 +222,18 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
 
         struct = self.run(dataRefDict, tract,
                           buildStarsRefObjLoader=buildStarsRefObjLoader, butler=butlerQC)
+
+        if struct.photoCalibCatalogs is not None:
+            self.log.info("Outputting photoCalib catalogs.")
+            for visit, expCatalog in struct.photoCalibCatalogs:
+                butlerQC.put(expCatalog, photoCalibRefDict[visit])
+            self.log.info("Done outputting photoCalib catalogs.")
+
+        if struct.atmospheres is not None:
+            self.log.info("Outputting atmosphere transmission files.")
+            for visit, atm in struct.atmospheres:
+                butlerQC.put(atm, atmRefDict[visit])
+            self.log.info("Done outputting atmosphere files.")
 
         # Turn raw repeatability into simple catalog for persistence
         schema = afwTable.Schema()

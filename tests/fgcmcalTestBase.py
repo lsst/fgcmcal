@@ -502,7 +502,7 @@ class FgcmcalTestBase(object):
 
         # For decent statistics, we are matching all the sources from one visit
         # (multiple ccds)
-        whereClause = "instrument='%s' and visit=%d" % (instName, testVisit)
+        whereClause = f"instrument='{instName:s}' and visit={testVisit:d}"
         srcRefs = butler.registry.queryDatasets('src', dimensions=['visit'],
                                                 collections='%s/testdata' % (instName),
                                                 where=whereClause,
@@ -649,12 +649,12 @@ class FgcmcalTestBase(object):
         inputCollections = '%s/testfgcmcal/lut,refcats' % (instName)
         configOption = 'fgcmCalibrateTractTable:fgcmOutputProducts.doRefcatOutput=False'
 
-        queryString = "tract=%d and skymap='%s'" % (tract, skymapName)
+        queryString = f"tract={tract:d} and skymap='{skymapName:s}'"
 
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
                                        'pipelines',
-                                       'fgcmCalibrateTractTable%s.yaml' % (instCamel)),
+                                       f'fgcmCalibrateTractTable{instCamel:s}.yaml'),
                           queryString=queryString,
                           configFiles=configFiles,
                           inputCollections=inputCollections,
@@ -664,9 +664,7 @@ class FgcmcalTestBase(object):
 
         butler = dafButler.Butler(self.repo)
 
-        whereClause = "instrument='%s' and tract=%d and skymap='%s'" % (instName,
-                                                                        tract,
-                                                                        skymapName)
+        whereClause = f"instrument='{instName:s}' and tract={tract:d} and skymap='{skymapName:s}'"
 
         repRefs = butler.registry.queryDatasets('fgcmRawRepeatability',
                                                 dimensions=['tract'],
@@ -679,11 +677,8 @@ class FgcmcalTestBase(object):
 
         # Check that the number of photoCalib objects in each filter are what we expect
         for filterName in filterNCalibMap.keys():
-            whereClause = ("instrument='%s' and tract=%d and "
-                           "physical_filter='%s' and skymap='%s'") % (instName,
-                                                                      tract,
-                                                                      filterName,
-                                                                      skymapName)
+            whereClause = (f"instrument='{instName:s}' and tract={tract:d} and "
+                           f"physical_filter='{filterName:s}' and skymap='{skymapName:s}'")
 
             refs = butler.registry.queryDatasets('fgcmPhotoCalibTractCatalog',
                                                  dimensions=['tract', 'physical_filter'],
@@ -700,11 +695,8 @@ class FgcmcalTestBase(object):
 
         # Check that every visit got a transmission
         for visit in visits:
-            whereClause = ("instrument='%s' and tract=%d and visit=%d and "
-                           "skymap='%s'") % (instName,
-                                             tract,
-                                             visit,
-                                             skymapName)
+            whereClause = (f"instrument='{instName:s}' and tract={tract:d} and "
+                           f"visit={visit:d} and skymap='{skymapName:s}'")
             refs = butler.registry.queryDatasets('transmission_atmosphere_fgcm_tract',
                                                  dimensions=['tract', 'visit'],
                                                  collections=outputCollection,

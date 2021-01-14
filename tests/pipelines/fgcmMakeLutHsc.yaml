@@ -1,5 +1,4 @@
 description: Make fgcmcal look-up table
 instrument: lsst.obs.subaru.HyperSuprimeCam
 tasks:
-  fgcmMakeLut:
-    class: lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask
+  fgcmMakeLut: lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask
