@@ -161,8 +161,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         # want to store checkpoint files.  If both are set, we will
         # do checkpoint files.  And if only one is set, this is potentially
         # unintentional and we will warn.
-        if (visitCatDataRef is not None and starObsDataRef is None or
-           visitCatDataRef is None and starObsDataRef is not None):
+        if (visitCatDataRef is not None and starObsDataRef is None
+           or visitCatDataRef is None and starObsDataRef is not None):
             self.log.warn("Only one of visitCatDataRef and starObsDataRef are set, so "
                           "no checkpoint files will be persisted.")
 
@@ -225,8 +225,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # if necessary
             if self.config.doSubtractLocalBackground:
                 localBackground = localBackgroundArea*df[self.config.localBackgroundFluxField].values
-                use, = np.where((goodSrc.selected) &
-                                ((df[self.config.instFluxField].values - localBackground) > 0.0))
+                use, = np.where((goodSrc.selected)
+                                & ((df[self.config.instFluxField].values - localBackground) > 0.0))
             else:
                 use, = np.where(goodSrc.selected)
 
@@ -255,8 +255,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
                 # This is the difference between the mag with local background correction
                 # and the mag without local background correction.
-                tempCat['deltaMagBkg'] = (-2.5*np.log10(df[self.config.instFluxField].values[use] -
-                                                        localBackground[use]) -
+                tempCat['deltaMagBkg'] = (-2.5*np.log10(df[self.config.instFluxField].values[use]
+                                                        - localBackground[use]) -
                                           -2.5*np.log10(df[self.config.instFluxField].values[use]))
             else:
                 tempCat['deltaMagBkg'][:] = 0.0
@@ -268,14 +268,14 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                 use2 = (tempCat[ccdKey] == ccdId)
                 tempCat['jacobian'][use2] = approxPixelAreaFields[ccdId].evaluate(tempCat['x'][use2],
                                                                                   tempCat['y'][use2])
-                scaledInstFlux = (df[self.config.instFluxField].values[use[use2]] *
-                                  visit['scaling'][ccdMapping[ccdId]])
+                scaledInstFlux = (df[self.config.instFluxField].values[use[use2]]
+                                  * visit['scaling'][ccdMapping[ccdId]])
                 tempCat[instMagKey][use2] = (-2.5*np.log10(scaledInstFlux) + 2.5*np.log10(expTime))
 
             # Compute instMagErr from instFluxErr/instFlux, any scaling
             # will cancel out.
-            tempCat[instMagErrKey][:] = k*(df[self.config.instFluxField + 'Err'].values[use] /
-                                           df[self.config.instFluxField].values[use])
+            tempCat[instMagErrKey][:] = k*(df[self.config.instFluxField + 'Err'].values[use]
+                                           / df[self.config.instFluxField].values[use])
 
             # Apply the jacobian if configured
             if self.config.doApplyWcsJacobian:
@@ -289,14 +289,14 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                 np.warnings.simplefilter("ignore")
 
                 instMagIn = -2.5*np.log10(df[self.config.apertureInnerInstFluxField].values[use])
-                instMagErrIn = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values[use] /
-                                  df[self.config.apertureInnerInstFluxField].values[use])
+                instMagErrIn = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values[use]
+                                  / df[self.config.apertureInnerInstFluxField].values[use])
                 instMagOut = -2.5*np.log10(df[self.config.apertureOuterInstFluxField].values[use])
-                instMagErrOut = k*(df[self.config.apertureOuterInstFluxField + 'Err'].values[use] /
-                                   df[self.config.apertureOuterInstFluxField].values[use])
+                instMagErrOut = k*(df[self.config.apertureOuterInstFluxField + 'Err'].values[use]
+                                   / df[self.config.apertureOuterInstFluxField].values[use])
 
-            ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn) &
-                  np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
+            ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn)
+                  & np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
             visit['deltaAper'] = np.median(instMagIn[ok] - instMagOut[ok])
             visit['sources_read'] = True
@@ -304,8 +304,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             self.log.info("  Found %d good stars in visit %d (deltaAper = %0.3f)",
                           use.size, visit['visit'], visit['deltaAper'])
 
-            if ((counter % self.config.nVisitsPerCheckpoint) == 0 and
-               starObsDataRef is not None and visitCatDataRef is not None):
+            if ((counter % self.config.nVisitsPerCheckpoint) == 0
+               and starObsDataRef is not None and visitCatDataRef is not None):
                 # We need to persist both the stars and the visit catalog which gets
                 # additional metadata from each visit.
                 starObsDataRef.put(fullCatalog)

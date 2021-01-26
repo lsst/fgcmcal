@@ -823,9 +823,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
             if not self.config.compare(oldConfig, shortcut=False, output=logConfigMismatch):
                 raise pipeBase.TaskError(
-                    ("Config does not match existing task config %r on disk; tasks configurations " +
-                     "must be consistent within the same output repo (override with --clobber-config)") %
-                    (configName,))
+                    f"Config does not match existing task config {configName!r} on disk; tasks configurations"
+                    " must be consistent within the same output repo (override with --clobber-config)")
         else:
             butler.put(self.config, configName, fgcmcycle=self.config.cycleNumber)
 

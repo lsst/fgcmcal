@@ -259,9 +259,9 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
                 # magnitudes that both filter out nans and are not very large (corresponding
                 # to very small fluxes), as "99" is a common sentinel for illegal magnitudes.
 
-                good, = np.where((np.nan_to_num(refMag[selected]) < 90.0) &
-                                 (np.nan_to_num(refMagErr[selected]) < 90.0) &
-                                 (np.nan_to_num(refMagErr[selected]) > 0.0))
+                good, = np.where((np.nan_to_num(refMag[selected]) < 90.0)
+                                 & (np.nan_to_num(refMagErr[selected]) < 90.0)
+                                 & (np.nan_to_num(refMagErr[selected]) > 0.0))
 
                 fgcmRefCat['refMag'][good, i] = refMag[selected][good]
                 fgcmRefCat['refMagErr'][good, i] = refMagErr[selected][good]
@@ -274,8 +274,8 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
             for i, (filterName, fluxField) in enumerate(zip(self._fluxFilters, self._fluxFields)):
                 # nan_to_num replaces nans with zeros, and this ensures that we select
                 # fluxes that both filter out nans and are positive.
-                good, = np.where((np.nan_to_num(refCat[fluxField][selected]) > 0.0) &
-                                 (np.nan_to_num(refCat[fluxField+'Err'][selected]) > 0.0))
+                good, = np.where((np.nan_to_num(refCat[fluxField][selected]) > 0.0)
+                                 & (np.nan_to_num(refCat[fluxField+'Err'][selected]) > 0.0))
                 refMag = (refCat[fluxField][selected][good] * units.Jy).to_value(units.ABmag)
                 refMagErr = abMagErrFromFluxErr(refCat[fluxField+'Err'][selected][good],
                                                 refCat[fluxField][selected][good])

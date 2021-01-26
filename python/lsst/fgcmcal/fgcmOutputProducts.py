@@ -330,7 +330,7 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
 
         # Make sure that the fit config exists, to retrieve bands and other info
         if not butler.datasetExists('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber):
-            raise RuntimeError("Cannot find fgcmFitCycle_config from cycle %d " % (self.config.cycleNumber) +
+            raise RuntimeError(f"Cannot find fgcmFitCycle_config from cycle {self.config.cycleNumber} "
                                "which is required for fgcmOutputProducts.")
 
         fitCycleConfig = butler.get('fgcmFitCycle_config', fgcmcycle=self.config.cycleNumber)
@@ -341,19 +341,18 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
                           "fitCycleConfig.doReferenceCalibration")
 
         # And make sure that the atmosphere was output properly
-        if (self.config.doAtmosphereOutput and
-                not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)):
-            raise RuntimeError("Atmosphere parameters are missing for cycle %d." %
-                               (self.config.cycleNumber))
+        if (self.config.doAtmosphereOutput
+                and not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)):
+            raise RuntimeError(f"Atmosphere parameters are missing for cycle {self.config.cycleNumber}.")
 
-        if ((self.config.doReferenceCalibration or self.config.doRefcatOutput) and
-                (not butler.datasetExists('fgcmStandardStars',
+        if ((self.config.doReferenceCalibration or self.config.doRefcatOutput)
+            and (not butler.datasetExists('fgcmStandardStars',
                                           fgcmcycle=self.config.cycleNumber))):
             raise RuntimeError("Standard stars are missing for cycle %d." %
                                (self.config.cycleNumber))
 
-        if (self.config.doZeropointOutput and
-                (not butler.datasetExists('fgcmZeropoints', fgcmcycle=self.config.cycleNumber))):
+        if (self.config.doZeropointOutput
+                and (not butler.datasetExists('fgcmZeropoints', fgcmcycle=self.config.cycleNumber))):
             raise RuntimeError("Zeropoints are missing for cycle %d." %
                                (self.config.cycleNumber))
 
@@ -613,8 +612,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         sourceCat.reserve(selected.sum())
         sourceCat.extend(stdCat[selected], mapper=sourceMapper)
         sourceCat['instFlux'] = 10.**(stdCat['mag_std_noabs'][selected, b]/(-2.5))
-        sourceCat['instFluxErr'] = (np.log(10.)/2.5)*(stdCat['magErr_std'][selected, b] *
-                                                      sourceCat['instFlux'])
+        sourceCat['instFluxErr'] = (np.log(10.)/2.5)*(stdCat['magErr_std'][selected, b]
+                                                      * sourceCat['instFlux'])
         # Make sure we only use stars that have valid measurements
         # (This is perhaps redundant with requirements above that the
         # stars be observed in all bands, but it can't hurt)
@@ -784,13 +783,13 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         # ccds.
         cannot_compute = fgcm.fgcmUtilities.zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
         too_few_stars = fgcm.fgcmUtilities.zpFlagDict['TOO_FEW_STARS_ON_CCD']
-        selected = (((zptCat['fgcmFlag'] & cannot_compute) == 0) &
-                    (zptCat['fgcmZptVar'] > 0.0))
+        selected = (((zptCat['fgcmFlag'] & cannot_compute) == 0)
+                    & (zptCat['fgcmZptVar'] > 0.0))
 
         # We also select the "best" calibrations, avoiding interpolation.  These
         # are only used for mapping filternames
-        selected_best = (((zptCat['fgcmFlag'] & (cannot_compute | too_few_stars)) == 0) &
-                         (zptCat['fgcmZptVar'] > 0.0))
+        selected_best = (((zptCat['fgcmFlag'] & (cannot_compute | too_few_stars)) == 0)
+                         & (zptCat['fgcmZptVar'] > 0.0))
 
         # Log warnings for any visit which has no valid zeropoints
         badVisits = np.unique(zptCat['visit'][~selected])
@@ -915,8 +914,8 @@ class FgcmOutputProductsTask(pipeBase.CmdLineTask):
         bbox = lsst.geom.Box2I(lsst.geom.Point2I(0.0, 0.0),
                                lsst.geom.Point2I(*xyMax))
 
-        pars[:, :] = (coefficients.reshape(orderPlus1, orderPlus1) *
-                      (10.**(offset/-2.5))*scaling)
+        pars[:, :] = (coefficients.reshape(orderPlus1, orderPlus1)
+                      * (10.**(offset/-2.5))*scaling)
 
         boundedField = afwMath.ChebyshevBoundedField(bbox, pars)
 
