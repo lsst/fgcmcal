@@ -28,16 +28,16 @@ equivalent.  The fgcm chebyshev polynomial code
 `lsst.afw.math.ChebyshevBoundedField`, so as to avoid dependencies.
 """
 
-import matplotlib
-matplotlib.use("Agg")  # noqa E402
-
 import unittest
 import numpy as np
 
 import lsst.afw.math as afwMath
 import lsst.geom
 
-import fgcm
+import matplotlib
+matplotlib.use("Agg")
+
+import fgcm  # noqa: E402
 
 
 class FgcmChebyshevTest(lsst.utils.tests.TestCase):

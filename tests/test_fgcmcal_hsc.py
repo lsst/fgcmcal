@@ -25,21 +25,21 @@
 Run test suite on fgcmcal using HSC data from testdata_jointcal.
 """
 
-import matplotlib
-matplotlib.use("Agg")  # noqa E402
-
 import unittest
 import os
 import copy
 import tempfile
 import numpy as np
 
-import lsst.utils
-import lsst.pipe.tasks
+import matplotlib
+matplotlib.use("Agg")
 
-import fgcmcalTestBase
+import lsst.utils  # noqa: E402
+import lsst.pipe.tasks  # noqa: E402
 
-import lsst.fgcmcal as fgcmcal
+import fgcmcalTestBase  # noqa: E402
+
+import lsst.fgcmcal as fgcmcal  # noqa: E402
 
 ROOT = os.path.abspath(os.path.dirname(__file__))
 
