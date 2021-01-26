@@ -253,9 +253,9 @@ class FgcmcalTestBaseGen2(object):
             return
 
         # Check that the expected number of plots are there.
-        plots = glob.glob(os.path.join(self.testDir, self.config.outfileBase +
-                                       '_cycle%02d_plots/' % (self.config.cycleNumber) +
-                                       '*.png'))
+        plots = glob.glob(os.path.join(self.testDir, self.config.outfileBase
+                                       + '_cycle%02d_plots/' % (self.config.cycleNumber)
+                                       + '*.png'))
         self.assertEqual(len(plots), nPlots)
 
         butler = dafPersist.butler.Butler(self.testDir)
@@ -353,8 +353,8 @@ class FgcmcalTestBaseGen2(object):
         self.assertFloatsAlmostEqual(fluxErrs[0], refStruct.refCat['r_fluxErr'][test[0]])
 
         # Test the psf candidate counting, ratio should be between 0.0 and 1.0
-        candRatio = (refStruct.refCat['r_nPsfCandidate'].astype(np.float64) /
-                     refStruct.refCat['r_nTotal'].astype(np.float64))
+        candRatio = (refStruct.refCat['r_nPsfCandidate'].astype(np.float64)
+                     / refStruct.refCat['r_nTotal'].astype(np.float64))
         self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
         self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
 
@@ -387,10 +387,10 @@ class FgcmcalTestBaseGen2(object):
 
         # We need to apply the calibration offset to the fgcmzpt (which is internal
         # and doesn't know about that yet)
-        testZpInd, = np.where((zptCat['visit'] == testVisit) &
-                              (zptCat['detector'] == testCcd))
-        fgcmZpt = (zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex] +
-                   zptCat['fgcmDeltaChrom'][testZpInd])
+        testZpInd, = np.where((zptCat['visit'] == testVisit)
+                              & (zptCat['detector'] == testCcd))
+        fgcmZpt = (zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex]
+                   + zptCat['fgcmDeltaChrom'][testZpInd])
         fgcmZptGrayErr = np.sqrt(zptCat['fgcmZptVar'][testZpInd])
 
         if self.config.doComposeWcsJacobian:
@@ -554,8 +554,8 @@ class FgcmcalTestBaseGen2(object):
         refStruct = task.loadSkyCircle(coord, 5.0*geom.degrees, filterName='r')
 
         # Test the psf candidate counting, ratio should be between 0.0 and 1.0
-        candRatio = (refStruct.refCat['r_nPsfCandidate'].astype(np.float64) /
-                     refStruct.refCat['r_nTotal'].astype(np.float64))
+        candRatio = (refStruct.refCat['r_nPsfCandidate'].astype(np.float64)
+                     / refStruct.refCat['r_nTotal'].astype(np.float64))
         self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
         self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
 

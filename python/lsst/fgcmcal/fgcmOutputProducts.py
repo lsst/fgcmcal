@@ -31,7 +31,6 @@ to put the fgcm standard stars in units of Jansky.  This is accomplished
 by matching stars in a sample of healpix pixels, and applying the median
 offset per band.
 """
-
 import sys
 import traceback
 import copy
@@ -507,18 +506,17 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
 
         # And make sure that the atmosphere was output properly
-        if (self.config.doAtmosphereOutput and
-                not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)):
-            raise RuntimeError("Atmosphere parameters are missing for cycle %d." %
-                               (self.config.cycleNumber))
+        if (self.config.doAtmosphereOutput
+                and not butler.datasetExists('fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)):
+            raise RuntimeError(f"Atmosphere parameters are missing for cycle {self.config.cycleNumber}.")
 
         if not butler.datasetExists('fgcmStandardStars',
                                     fgcmcycle=self.config.cycleNumber):
             raise RuntimeError("Standard stars are missing for cycle %d." %
                                (self.config.cycleNumber))
 
-        if (self.config.doZeropointOutput and
-                (not butler.datasetExists('fgcmZeropoints', fgcmcycle=self.config.cycleNumber))):
+        if (self.config.doZeropointOutput
+                and (not butler.datasetExists('fgcmZeropoints', fgcmcycle=self.config.cycleNumber))):
             raise RuntimeError("Zeropoints are missing for cycle %d." %
                                (self.config.cycleNumber))
 
@@ -900,8 +898,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         sourceCat.reserve(selected.sum())
         sourceCat.extend(stdCat[selected], mapper=sourceMapper)
         sourceCat['instFlux'] = 10.**(stdCat['mag_std_noabs'][selected, b]/(-2.5))
-        sourceCat['instFluxErr'] = (np.log(10.)/2.5)*(stdCat['magErr_std'][selected, b] *
-                                                      sourceCat['instFlux'])
+        sourceCat['instFluxErr'] = (np.log(10.)/2.5)*(stdCat['magErr_std'][selected, b]
+                                                      * sourceCat['instFlux'])
         # Make sure we only use stars that have valid measurements
         # (This is perhaps redundant with requirements above that the
         # stars be observed in all bands, but it can't hurt)
@@ -1087,8 +1085,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         # This includes ccds where we were able to interpolate from neighboring
         # ccds.
         cannot_compute = fgcm.fgcmUtilities.zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
-        selected = (((zptCat['fgcmFlag'] & cannot_compute) == 0) &
-                    (zptCat['fgcmZptVar'] > 0.0))
+        selected = (((zptCat['fgcmFlag'] & cannot_compute) == 0)
+                    & (zptCat['fgcmZptVar'] > 0.0))
 
         # Log warnings for any visit which has no valid zeropoints
         badVisits = np.unique(zptCat['visit'][~selected])
@@ -1223,8 +1221,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         bbox = lsst.geom.Box2I(lsst.geom.Point2I(0.0, 0.0),
                                lsst.geom.Point2I(*xyMax))
 
-        pars[:, :] = (coefficients.reshape(orderPlus1, orderPlus1) *
-                      (10.**(offset/-2.5))*scaling)
+        pars[:, :] = (coefficients.reshape(orderPlus1, orderPlus1)
+                      * (10.**(offset/-2.5))*scaling)
 
         boundedField = afwMath.ChebyshevBoundedField(bbox, pars)
 

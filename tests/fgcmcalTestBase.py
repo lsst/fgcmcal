@@ -339,9 +339,9 @@ class FgcmcalTestBase(object):
         config = butler.get('fgcmFitCycle_config', collections=[outputCollection])
 
         # Check that the expected number of plots are there.
-        plots = glob.glob(os.path.join(self.testDir, config.outfileBase +
-                                       '_cycle%02d_plots/' % (cycleNumber) +
-                                       '*.png'))
+        plots = glob.glob(os.path.join(self.testDir, config.outfileBase
+                                       + '_cycle%02d_plots/' % (cycleNumber)
+                                       + '*.png'))
         self.assertEqual(len(plots), nPlots)
 
         zps = butler.get('fgcmZeropoints%d' % (cycleNumber),
@@ -417,8 +417,8 @@ class FgcmcalTestBase(object):
         rawStars = butler.get('fgcmStandardStars' + config.connections.cycleNumber,
                               collections=[inputCollection], instrument=instName)
 
-        candRatio = (rawStars['npsfcand'][:, 0].astype(np.float64) /
-                     rawStars['ntotal'][:, 0].astype(np.float64))
+        candRatio = (rawStars['npsfcand'][:, 0].astype(np.float64)
+                     / rawStars['ntotal'][:, 0].astype(np.float64))
         self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
         self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
 
@@ -453,10 +453,10 @@ class FgcmcalTestBase(object):
 
         # We need to apply the calibration offset to the fgcmzpt (which is internal
         # and doesn't know about that yet)
-        testZpInd, = np.where((zptCat['visit'] == testVisit) &
-                              (zptCat['detector'] == testCcd))
-        fgcmZpt = (zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex] +
-                   zptCat['fgcmDeltaChrom'][testZpInd])
+        testZpInd, = np.where((zptCat['visit'] == testVisit)
+                              & (zptCat['detector'] == testCcd))
+        fgcmZpt = (zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex]
+                   + zptCat['fgcmDeltaChrom'][testZpInd])
         fgcmZptGrayErr = np.sqrt(zptCat['fgcmZptVar'][testZpInd])
 
         if config.doComposeWcsJacobian:

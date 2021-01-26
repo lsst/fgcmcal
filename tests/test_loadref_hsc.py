@@ -97,8 +97,8 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         self.assertLess(np.max(refCat['refMag'][:, 1]), 99.1)
         self.assertLess(np.max(refCat['refMagErr'][:, 0]), 99.1)
         self.assertLess(np.max(refCat['refMagErr'][:, 1]), 99.1)
-        test, = np.where((refCat['refMag'][:, 0] < 30.0) &
-                         (refCat['refMag'][:, 1] < 30.0))
+        test, = np.where((refCat['refMag'][:, 0] < 30.0)
+                         & (refCat['refMag'][:, 1] < 30.0))
         self.assertGreater(test.size, 0)
 
         # Check the separations from the center
@@ -152,8 +152,8 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
 
         self.assertEqual(len(filterList), refCat['refMag'].shape[1])
         self.assertEqual(len(filterList), refCat['refMagErr'].shape[1])
-        test, = np.where((refCat['refMag'][:, 0] < 30.0) &
-                         (refCat['refMag'][:, 1] < 30.0))
+        test, = np.where((refCat['refMag'][:, 0] < 30.0)
+                         & (refCat['refMag'][:, 1] < 30.0))
         self.assertGreater(test.size, 0)
 
 
