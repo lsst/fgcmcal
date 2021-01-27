@@ -24,8 +24,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import matplotlib
-matplotlib.use("Agg")  # noqa E402
+matplotlib.use("Agg")
 
-from lsst.fgcmcal.fgcmFitCycle import FgcmFitCycleTask
+from lsst.fgcmcal.fgcmFitCycle import FgcmFitCycleTask  # noqa: E402
 
 FgcmFitCycleTask.parseAndRun()

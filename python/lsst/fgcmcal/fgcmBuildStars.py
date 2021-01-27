@@ -104,10 +104,13 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
 
         return parser
 
-    def findAndGroupDataRefs(self, butler, dataRefs):
-        self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
+    def _findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
+        if butler is None:
+            raise RuntimeError("Gen2 _findAndGroupDataRefs must be called with a butler.")
+        if calexpDataRefDict is not None:
+            self.log.warn("Ignoring calexpDataRefDict in gen2 _findAndGroupDataRefs")
 
-        camera = butler.get('camera')
+        self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
 
         ccdIds = []
         for detector in camera:
@@ -176,9 +179,12 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
             for visit in groupedDataRefs:
                 groupedDataRefs[visit] = sorted(groupedDataRefs[visit], key=ccdSorter)
 
-        return groupedDataRefs
+        # This should be sorted by visit (the key)
+        return dict(sorted(groupedDataRefs.items()))
 
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
+                                    srcSchemaDataRef,
+                                    camera,
                                     calibFluxApertureRadius=None,
                                     visitCatDataRef=None,
                                     starObsDataRef=None,
@@ -189,8 +195,8 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
         # want to store checkpoint files.  If both are set, we will
         # do checkpoint files.  And if only one is set, this is potentially
         # unintentional and we will warn.
-        if (visitCatDataRef is not None and starObsDataRef is None or
-           visitCatDataRef is None and starObsDataRef is not None):
+        if (visitCatDataRef is not None and starObsDataRef is None
+           or visitCatDataRef is None and starObsDataRef is not None):
             self.log.warn("Only one of visitCatDataRef and starObsDataRef are set, so "
                           "no checkpoint files will be persisted.")
 
@@ -202,7 +208,6 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
         sourceSchema = dataRef.get('src_schema', immediate=True).schema
 
         # Construct a mapping from ccd number to index
-        camera = dataRef.get('camera')
         ccdMapping = {}
         for ccdIndex, detector in enumerate(camera):
             ccdMapping[detector.getId()] = ccdIndex
@@ -287,8 +292,8 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
                 tempCat[ccdKey][:] = ccdId
 
                 # Compute "instrumental magnitude" by scaling flux with exposure time.
-                scaledInstFlux = (sources[instFluxKey][goodSrc.selected] *
-                                  visit['scaling'][ccdMapping[ccdId]])
+                scaledInstFlux = (sources[instFluxKey][goodSrc.selected]
+                                  * visit['scaling'][ccdMapping[ccdId]])
                 tempCat[instMagKey][:] = (-2.5*np.log10(scaledInstFlux) + 2.5*np.log10(expTime))
 
                 # Compute the change in magnitude from the background offset
@@ -306,8 +311,8 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
 
                     # This is the difference between the mag with background correction
                     # and the mag without background correction.
-                    tempCat[deltaMagBkgKey][:] = (-2.5*np.log10(sources[instFluxKey][goodSrc.selected] -
-                                                                localBackground[goodSrc.selected]) -
+                    tempCat[deltaMagBkgKey][:] = (-2.5*np.log10(sources[instFluxKey][goodSrc.selected]
+                                                                - localBackground[goodSrc.selected]) -
                                                   -2.5*np.log10(sources[instFluxKey][goodSrc.selected]))
                 else:
                     tempCat[deltaMagBkgKey][:] = 0.0
@@ -315,8 +320,8 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
                 # Compute instMagErr from instFluxErr/instFlux, any scaling
                 # will cancel out.
 
-                tempCat[instMagErrKey][:] = k*(sources[instFluxErrKey][goodSrc.selected] /
-                                               sources[instFluxKey][goodSrc.selected])
+                tempCat[instMagErrKey][:] = k*(sources[instFluxErrKey][goodSrc.selected]
+                                               / sources[instFluxKey][goodSrc.selected])
 
                 # Compute the jacobian from an approximate PixelAreaBoundedField
                 tempCat['jacobian'] = approxPixelAreaFields[ccdId].evaluate(tempCat['x'],
@@ -342,13 +347,13 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
                     tempAperCat[instMagInKey][:] = -2.5*np.log10(
                         sources[instFluxAperInKey][goodSrc.selected])
                     tempAperCat[instMagErrInKey][:] = k*(
-                        sources[instFluxErrAperInKey][goodSrc.selected] /
-                        sources[instFluxAperInKey][goodSrc.selected])
+                        sources[instFluxErrAperInKey][goodSrc.selected]
+                        / sources[instFluxAperInKey][goodSrc.selected])
                     tempAperCat[instMagOutKey][:] = -2.5*np.log10(
                         sources[instFluxAperOutKey][goodSrc.selected])
                     tempAperCat[instMagErrOutKey][:] = k*(
-                        sources[instFluxErrAperOutKey][goodSrc.selected] /
-                        sources[instFluxAperOutKey][goodSrc.selected])
+                        sources[instFluxErrAperOutKey][goodSrc.selected]
+                        / sources[instFluxAperOutKey][goodSrc.selected])
 
                 aperVisitCatalog.extend(tempAperCat)
 
@@ -363,8 +368,8 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
             instMagOut = aperVisitCatalog[instMagOutKey]
             instMagErrOut = aperVisitCatalog[instMagErrOutKey]
 
-            ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn) &
-                  np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
+            ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn)
+                  & np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
             visit['deltaAper'] = np.median(instMagIn[ok] - instMagOut[ok])
             visit['sources_read'] = True
@@ -372,8 +377,8 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
             self.log.info("  Found %d good stars in visit %d (deltaAper = %.3f)" %
                           (nStarInVisit, visit['visit'], visit['deltaAper']))
 
-            if ((ctr % self.config.nVisitsPerCheckpoint) == 0 and
-               starObsDataRef is not None and visitCatDataRef is not None):
+            if ((ctr % self.config.nVisitsPerCheckpoint) == 0
+               and starObsDataRef is not None and visitCatDataRef is not None):
                 # We need to persist both the stars and the visit catalog which gets
                 # additional metadata from each visit.
                 starObsDataRef.put(fullCatalog)

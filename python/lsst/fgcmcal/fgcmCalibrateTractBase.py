@@ -24,9 +24,11 @@ or sourceTable_visit tables.
 
 import sys
 import traceback
+import abc
 
 import numpy as np
 
+import lsst.daf.persistence as dafPersist
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 
@@ -168,9 +170,8 @@ class FgcmCalibrateTractRunner(pipeBase.ButlerInitializedTaskRunner):
         return resultList
 
 
-class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
-    """
-    Base class to calibrate a single tract using fgcmcal
+class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.ABC):
+    """Base class to calibrate a single tract using fgcmcal
     """
     def __init__(self, butler=None, **kwargs):
         """
@@ -178,10 +179,11 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
 
         Parameters
         ----------
-        butler : `lsst.daf.persistence.Butler`
+        butler : `lsst.daf.persistence.Butler`, optional
         """
-
-        pipeBase.CmdLineTask.__init__(self, **kwargs)
+        super().__init__(**kwargs)
+        self.makeSubtask("fgcmBuildStars", butler=butler)
+        self.makeSubtask("fgcmOutputProducts", butler=butler)
 
     # no saving of metadata for now
     def _getMetadataName(self):
@@ -221,8 +223,109 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
                 raise RuntimeError("Cannot run FgcmCalibrateTract with "
                                    "fgcmBuildStars.checkAllCcds set to True")
 
-        self.makeSubtask("fgcmBuildStars", butler=butler)
-        self.makeSubtask("fgcmOutputProducts", butler=butler)
+        tract = int(dataRefs[0].dataId['tract'])
+        camera = butler.get('camera')
+
+        dataRefDict = {}
+        dataRefDict['camera'] = camera
+        dataRefDict['source_catalogs'] = dataRefs
+        dataRefDict['sourceSchema'] = butler.dataRef('src_schema')
+        dataRefDict['fgcmLookUpTable'] = butler.dataRef('fgcmLookUpTable')
+
+        struct = self.run(dataRefDict, tract, butler=butler, returnCatalogs=False)
+
+        visitDataRefName = self.config.fgcmBuildStars.visitDataRefName
+        ccdDataRefName = self.config.fgcmBuildStars.ccdDataRefName
+
+        if struct.photoCalibs is not None:
+            self.log.info("Outputting photoCalib files.")
+
+            filterMapping = {}
+            for visit, detector, filtername, photoCalib in struct.photoCalibs:
+                if filtername not in filterMapping:
+                    # We need to find the mapping from encoded filter to dataid filter,
+                    # and this trick allows us to do that.
+                    dataId = {visitDataRefName: visit,
+                              ccdDataRefName: detector}
+                    dataRef = butler.dataRef('raw', dataId=dataId)
+                    filterMapping[filtername] = dataRef.dataId['filter']
+
+                butler.put(photoCalib, 'fgcm_tract_photoCalib',
+                           dataId={visitDataRefName: visit,
+                                   ccdDataRefName: detector,
+                                   'filter': filterMapping[filtername],
+                                   'tract': tract})
+
+            self.log.info("Done outputting photoCalib files.")
+
+        if struct.atmospheres is not None:
+            self.log.info("Outputting atmosphere files.")
+            for visit, atm in struct.atmospheres:
+                butler.put(atm, "transmission_atmosphere_fgcm_tract",
+                           dataId={visitDataRefName: visit,
+                                   'tract': tract})
+            self.log.info("Done outputting atmosphere transmissions.")
+
+        return pipeBase.Struct(repeatability=struct.repeatability)
+
+    def run(self, dataRefDict, tract,
+            buildStarsRefObjLoader=None, returnCatalogs=True, butler=None):
+        """Run the calibrations for a single tract with fgcm.
+
+        Parameters
+        ----------
+        dataRefDict : `dict`
+            All dataRefs are `lsst.daf.persistence.ButlerDataRef` (gen2) or
+            `lsst.daf.butler.DeferredDatasetHandle` (gen3)
+            dataRef dictionary with the following keys.  Note that all
+            keys need not be set based on config parameters.
+
+            ``"camera"``
+                Camera object (`lsst.afw.cameraGeom.Camera`)
+            ``"source_catalogs"``
+                `list` of dataRefs for input source catalogs.
+            ``"sourceSchema"``
+                Schema for the source catalogs.
+            ``"fgcmLookUpTable"``
+                dataRef for the FGCM look-up table.
+            ``"calexps"``
+                `list` of dataRefs for the input calexps (Gen3 only)
+            ``"fgcmPhotoCalibs"``
+                `dict` of output photoCalib dataRefs.  Key is
+                (tract, visit, detector). (Gen3 only)
+                Present if doZeropointOutput is True.
+            ``"fgcmTransmissionAtmospheres"``
+                `dict` of output atmosphere transmission dataRefs.
+                Key is (tract, visit). (Gen3 only)
+                Present if doAtmosphereOutput is True.
+        tract : `int`
+            Tract number
+        buildStarsRefObjLoader : `lsst.meas.algorithms.ReferenceObjectLoader`, optional
+            Reference object loader object for fgcmBuildStars.
+        returnCatalogs : `bool`, optional
+            Return photoCalibs as per-visit exposure catalogs.
+        butler : `lsst.daf.persistence.Butler`, optional
+            Gen2 butler used for reference star outputs
+
+        Returns
+        -------
+        outstruct : `lsst.pipe.base.Struct`
+            Output structure with keys:
+
+            offsets : `np.ndarray`
+                Final reference offsets, per band.
+            repeatability : `np.ndarray`
+                Raw fgcm repeatability for bright stars, per band.
+            atmospheres : `generator` [(`int`, `lsst.afw.image.TransmissionCurve`)]
+                Generator that returns (visit, transmissionCurve) tuples.
+            photoCalibs : `generator` [(`int`, `int`, `str`, `lsst.afw.image.PhotoCalib`)]
+                Generator that returns (visit, ccd, filtername, photoCalib) tuples.
+                (returned if returnCatalogs is False).
+            photoCalibCatalogs : `generator` [(`int`, `lsst.afw.table.ExposureCatalog`)]
+                Generator that returns (visit, exposureCatalog) tuples.
+                (returned if returnCatalogs is True).
+        """
+        self.log.info("Running on tract %d", (tract))
 
         # Compute the aperture radius if necessary.  This is useful to do now before
         # any heavy lifting has happened (fail early).
@@ -230,7 +333,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
         if self.config.fgcmBuildStars.doSubtractLocalBackground:
             try:
                 field = self.config.fgcmBuildStars.instFluxField
-                calibFluxApertureRadius = computeApertureRadiusFromDataRef(dataRefs[0],
+                calibFluxApertureRadius = computeApertureRadiusFromDataRef(dataRefDict['source_catalogs'][0],
                                                                            field)
             except RuntimeError:
                 raise RuntimeError("Could not determine aperture radius from %s. "
@@ -238,25 +341,44 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
                                    (field))
 
         # Run the build stars tasks
-        tract = int(dataRefs[0].dataId['tract'])
-        self.log.info("Running on tract %d" % (tract))
 
         # Note that we will need visitCat at the end of the procedure for the outputs
-        groupedDataRefs = self.fgcmBuildStars.findAndGroupDataRefs(butler, dataRefs)
-        camera = butler.get('camera')
-        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(camera, groupedDataRefs)
+        if isinstance(butler, dafPersist.Butler):
+            # Gen2
+            groupedDataRefs = self.fgcmBuildStars._findAndGroupDataRefs(dataRefDict['camera'],
+                                                                        dataRefDict['source_catalogs'],
+                                                                        butler=butler)
+        else:
+            # Gen3
+            cdrd = dataRefDict['calexps']
+            groupedDataRefs = self.fgcmBuildStars._findAndGroupDataRefs(dataRefDict['camera'],
+                                                                        dataRefDict['source_catalogs'],
+                                                                        calexpDataRefDict=cdrd)
+        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(dataRefDict['camera'], groupedDataRefs)
         rad = calibFluxApertureRadius
         fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                                  visitCat,
+                                                                                 dataRefDict['sourceSchema'],
+                                                                                 dataRefDict['camera'],
                                                                                  calibFluxApertureRadius=rad)
 
+        if self.fgcmBuildStars.config.doReferenceMatches:
+            lutDataRef = dataRefDict['fgcmLookUpTable']
+            if buildStarsRefObjLoader is not None:
+                self.fgcmBuildStars.makeSubtask("fgcmLoadReferenceCatalog",
+                                                refObjLoader=buildStarsRefObjLoader)
+            else:
+                self.fgcmBuildStars.makeSubtask("fgcmLoadReferenceCatalog", butler=butler)
+        else:
+            lutDataRef = None
+
         fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = \
-            self.fgcmBuildStars.fgcmMatchStars(butler,
-                                               visitCat,
-                                               fgcmStarObservationCat)
+            self.fgcmBuildStars.fgcmMatchStars(visitCat,
+                                               fgcmStarObservationCat,
+                                               lutDataRef=lutDataRef)
 
         # Load the LUT
-        lutCat = butler.get('fgcmLookUpTable')
+        lutCat = dataRefDict['fgcmLookUpTable'].get()
         fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat,
                                                          dict(self.config.fgcmFitCycle.filterMap))
         del lutCat
@@ -264,8 +386,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
         # Translate the visit catalog into fgcm format
         fgcmExpInfo = translateVisitCatalog(visitCat)
 
-        camera = butler.get('camera')
-        configDict = makeConfigDict(self.config.fgcmFitCycle, self.log, camera,
+        configDict = makeConfigDict(self.config.fgcmFitCycle, self.log, dataRefDict['camera'],
                                     self.config.fgcmFitCycle.maxIterBeforeFinalCycle,
                                     True, False, tract=tract)
         # Turn off plotting in tract mode
@@ -273,8 +394,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
 
         # Use the first orientation.
         # TODO: DM-21215 will generalize to arbitrary camera orientations
-        ccdOffsets = computeCcdOffsets(camera, fgcmExpInfo['TELROT'][0])
-        del camera
+        ccdOffsets = computeCcdOffsets(dataRefDict['camera'], fgcmExpInfo['TELROT'][0])
 
         # Set up the fit cycle task
 
@@ -384,9 +504,9 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
                 self.log.info("  Band %s, repeatability: %.2f mmag" % (band, rep))
 
             # Check for convergence
-            if np.alltrue((previousReservedRawRepeatability -
-                           fgcmFitCycle.fgcmPars.compReservedRawRepeatability) <
-                          self.config.convergenceTolerance):
+            if np.alltrue((previousReservedRawRepeatability
+                           - fgcmFitCycle.fgcmPars.compReservedRawRepeatability)
+                          < self.config.convergenceTolerance):
                 self.log.info("Raw repeatability has converged after cycle number %d." % (cycleNumber))
                 converged = True
             else:
@@ -453,11 +573,14 @@ class FgcmCalibrateTractBaseTask(pipeBase.CmdLineTask):
         stdSchema = makeStdSchema(len(goodBands))
         stdCat = makeStdCat(stdSchema, stdStruct, goodBands)
 
-        outStruct = self.fgcmOutputProducts.generateTractOutputProducts(butler, tract,
+        outStruct = self.fgcmOutputProducts.generateTractOutputProducts(dataRefDict,
+                                                                        tract,
                                                                         visitCat,
                                                                         zptCat, atmCat, stdCat,
                                                                         self.config.fgcmBuildStars,
-                                                                        self.config.fgcmFitCycle)
+                                                                        returnCatalogs=returnCatalogs,
+                                                                        butler=butler)
+
         outStruct.repeatability = fgcmFitCycle.fgcmPars.compReservedRawRepeatability
 
         return outStruct

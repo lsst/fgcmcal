@@ -41,6 +41,7 @@ import numpy as np
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
 
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
@@ -48,13 +49,153 @@ from .utilities import extractReferenceMags
 from .utilities import computeCcdOffsets, makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat, makeStdSchema, makeStdCat
 from .sedterms import SedboundarytermDict, SedtermDict
+from .utilities import lookupStaticCalibrations
 
 import fgcm
 
 __all__ = ['FgcmFitCycleConfig', 'FgcmFitCycleTask', 'FgcmFitCycleRunner']
 
 
-class FgcmFitCycleConfig(pexConfig.Config):
+class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
+                              dimensions=("instrument",),
+                              defaultTemplates={"previousCycleNumber": "-1",
+                                                "cycleNumber": "0"}):
+    camera = connectionTypes.PrerequisiteInput(
+        doc="Camera instrument",
+        name="camera",
+        storageClass="Camera",
+        dimensions=("instrument",),
+        lookupFunction=lookupStaticCalibrations,
+        isCalibration=True,
+    )
+
+    fgcmLookUpTable = connectionTypes.PrerequisiteInput(
+        doc=("Atmosphere + instrument look-up-table for FGCM throughput and "
+             "chromatic corrections."),
+        name="fgcmLookUpTable",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmVisitCatalog = connectionTypes.PrerequisiteInput(
+        doc="Catalog of visit information for fgcm",
+        name="fgcmVisitCatalog",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmStarObservations = connectionTypes.PrerequisiteInput(
+        doc="Catalog of star observations for fgcm",
+        name="fgcmStarObservations",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmStarIds = connectionTypes.PrerequisiteInput(
+        doc="Catalog of fgcm calibration star IDs",
+        name="fgcmStarIds",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmStarIndices = connectionTypes.PrerequisiteInput(
+        doc="Catalog of fgcm calibration star indices",
+        name="fgcmStarIndices",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmReferenceStars = connectionTypes.PrerequisiteInput(
+        doc="Catalog of fgcm-matched reference stars",
+        name="fgcmReferenceStars",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmFlaggedStarsInput = connectionTypes.PrerequisiteInput(
+        doc="Catalog of flagged stars for fgcm calibration from previous fit cycle",
+        name="fgcmFlaggedStars{previousCycleNumber}",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmFitParametersInput = connectionTypes.PrerequisiteInput(
+        doc="Catalog of fgcm fit parameters from previous fit cycle",
+        name="fgcmFitParameters{previousCycleNumber}",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmFitParameters = connectionTypes.Output(
+        doc="Catalog of fgcm fit parameters from current fit cycle",
+        name="fgcmFitParameters{cycleNumber}",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmFlaggedStars = connectionTypes.Output(
+        doc="Catalog of flagged stars for fgcm calibration from current fit cycle",
+        name="fgcmFlaggedStars{cycleNumber}",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmZeropoints = connectionTypes.Output(
+        doc="Catalog of fgcm zeropoint data from current fit cycle",
+        name="fgcmZeropoints{cycleNumber}",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmAtmosphereParameters = connectionTypes.Output(
+        doc="Catalog of atmospheric fit parameters from current fit cycle",
+        name="fgcmAtmosphereParameters{cycleNumber}",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmStandardStars = connectionTypes.Output(
+        doc="Catalog of standard star magnitudes from current fit cycle",
+        name="fgcmStandardStars{cycleNumber}",
+        storageClass="SimpleCatalog",
+        dimensions=("instrument",),
+    )
+
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+
+        if not config.doReferenceCalibration:
+            self.prerequisiteInputs.remove("fgcmReferenceStars")
+
+        if str(int(config.connections.cycleNumber)) != config.connections.cycleNumber:
+            raise ValueError("cycleNumber must be of integer format")
+        if str(int(config.connections.previousCycleNumber)) != config.connections.previousCycleNumber:
+            raise ValueError("previousCycleNumber must be of integer format")
+        if int(config.connections.previousCycleNumber) != (int(config.connections.cycleNumber) - 1):
+            raise ValueError("previousCycleNumber must be 1 less than cycleNumber")
+
+        if int(config.connections.cycleNumber) == 0:
+            self.prerequisiteInputs.remove("fgcmFlaggedStarsInput")
+            self.prerequisiteInputs.remove("fgcmFitParametersInput")
+
+        if not self.config.isFinalCycle and not self.config.outputStandardsBeforeFinalCycle:
+            self.outputs.remove("fgcmStandardStars")
+
+        if not self.config.isFinalCycle and not self.config.outputZeropointsBeforeFinalCycle:
+            self.outputs.remove("fgcmZeropoints")
+            self.outputs.remove("fgcmAtmosphereParameters")
+
+
+class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
+                         pipelineConnections=FgcmFitCycleConnections):
     """Config for FgcmFitCycle"""
 
     bands = pexConfig.ListField(
@@ -631,11 +772,15 @@ class FgcmFitCycleConfig(pexConfig.Config):
         optional=True,
     )
 
-    def setDefaults(self):
-        pass
-
     def validate(self):
         super().validate()
+
+        if self.connections.previousCycleNumber != str(self.cycleNumber - 1):
+            msg = "cycleNumber in template must be connections.previousCycleNumber + 1"
+            raise RuntimeError(msg)
+        if self.connections.cycleNumber != str(self.cycleNumber):
+            msg = "cycleNumber in template must be equal to connections.cycleNumber"
+            raise RuntimeError(msg)
 
         for band in self.fitBands:
             if band not in self.bands:
@@ -752,7 +897,7 @@ class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
         return resultList
 
 
-class FgcmFitCycleTask(pipeBase.CmdLineTask):
+class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
     """
     Run Single fit cycle for FGCM global calibration
     """
@@ -761,20 +906,38 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
     RunnerClass = FgcmFitCycleRunner
     _DefaultName = "fgcmFitCycle"
 
-    def __init__(self, butler=None, **kwargs):
-        """
-        Instantiate an fgcmFitCycle.
-
-        Parameters
-        ----------
-        butler : `lsst.daf.persistence.Butler`
-        """
-
-        pipeBase.CmdLineTask.__init__(self, **kwargs)
+    def __init__(self, butler=None, initInputs=None, **kwargs):
+        super().__init__(**kwargs)
 
     # no saving of metadata for now
     def _getMetadataName(self):
         return None
+
+    def runQuantum(self, butlerQC, inputRefs, outputRefs):
+        camera = butlerQC.get(inputRefs.camera)
+
+        dataRefDict = {}
+
+        dataRefDict['fgcmLookUpTable'] = butlerQC.get(inputRefs.fgcmLookUpTable)
+        dataRefDict['fgcmVisitCatalog'] = butlerQC.get(inputRefs.fgcmVisitCatalog)
+        dataRefDict['fgcmStarObservations'] = butlerQC.get(inputRefs.fgcmStarObservations)
+        dataRefDict['fgcmStarIds'] = butlerQC.get(inputRefs.fgcmStarIds)
+        dataRefDict['fgcmStarIndices'] = butlerQC.get(inputRefs.fgcmStarIndices)
+        if self.config.doReferenceCalibration:
+            dataRefDict['fgcmReferenceStars'] = butlerQC.get(inputRefs.fgcmReferenceStars)
+        if self.config.cycleNumber > 0:
+            dataRefDict['fgcmFlaggedStars'] = butlerQC.get(inputRefs.fgcmFlaggedStarsInput)
+            dataRefDict['fgcmFitParameters'] = butlerQC.get(inputRefs.fgcmFitParametersInput)
+
+        fgcmDatasetDict = self._fgcmFitCycle(camera, dataRefDict)
+
+        butlerQC.put(fgcmDatasetDict['fgcmFitParameters'], outputRefs.fgcmFitParameters)
+        butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'], outputRefs.fgcmFlaggedStars)
+        if self.outputZeropoints:
+            butlerQC.put(fgcmDatasetDict['fgcmZeropoints'], outputRefs.fgcmZeropoints)
+            butlerQC.put(fgcmDatasetDict['fgcmAtmosphereParameters'], outputRefs.fgcmAtmosphereParameters)
+        if self.outputStandards:
+            butlerQC.put(fgcmDatasetDict['fgcmStandardStars'], outputRefs.fgcmStandardStars)
 
     @pipeBase.timeMethod
     def runDataRef(self, butler):
@@ -785,8 +948,38 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         ----------
         butler:  `lsst.daf.persistence.Butler`
         """
+        self._checkDatasetsExist(butler)
 
-        self._fgcmFitCycle(butler)
+        dataRefDict = {}
+        dataRefDict['fgcmLookUpTable'] = butler.dataRef('fgcmLookUpTable')
+        dataRefDict['fgcmVisitCatalog'] = butler.dataRef('fgcmVisitCatalog')
+        dataRefDict['fgcmStarObservations'] = butler.dataRef('fgcmStarObservations')
+        dataRefDict['fgcmStarIds'] = butler.dataRef('fgcmStarIds')
+        dataRefDict['fgcmStarIndices'] = butler.dataRef('fgcmStarIndices')
+        if self.config.doReferenceCalibration:
+            dataRefDict['fgcmReferenceStars'] = butler.dataRef('fgcmReferenceStars')
+        if self.config.cycleNumber > 0:
+            lastCycle = self.config.cycleNumber - 1
+            dataRefDict['fgcmFlaggedStars'] = butler.dataRef('fgcmFlaggedStars',
+                                                             fgcmcycle=lastCycle)
+            dataRefDict['fgcmFitParameters'] = butler.dataRef('fgcmFitParameters',
+                                                              fgcmcycle=lastCycle)
+
+        camera = butler.get('camera')
+        fgcmDatasetDict = self._fgcmFitCycle(camera, dataRefDict)
+
+        butler.put(fgcmDatasetDict['fgcmFitParameters'], 'fgcmFitParameters',
+                   fgcmcycle=self.config.cycleNumber)
+        butler.put(fgcmDatasetDict['fgcmFlaggedStars'], 'fgcmFlaggedStars',
+                   fgcmcycle=self.config.cycleNumber)
+        if self.outputZeropoints:
+            butler.put(fgcmDatasetDict['fgcmZeropoints'], 'fgcmZeropoints',
+                       fgcmcycle=self.config.cycleNumber)
+            butler.put(fgcmDatasetDict['fgcmAtmosphereParameters'], 'fgcmAtmosphereParameters',
+                       fgcmcycle=self.config.cycleNumber)
+        if self.outputStandards:
+            butler.put(fgcmDatasetDict['fgcmStandardStars'], 'fgcmStandardStars',
+                       fgcmcycle=self.config.cycleNumber)
 
     def writeConfig(self, butler, clobber=False, doBackup=True):
         """Write the configuration used for processing the data, or check that an existing
@@ -823,23 +1016,45 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
             if not self.config.compare(oldConfig, shortcut=False, output=logConfigMismatch):
                 raise pipeBase.TaskError(
-                    ("Config does not match existing task config %r on disk; tasks configurations " +
-                     "must be consistent within the same output repo (override with --clobber-config)") %
-                    (configName,))
+                    f"Config does not match existing task config {configName!r} on disk; tasks configurations"
+                    " must be consistent within the same output repo (override with --clobber-config)")
         else:
             butler.put(self.config, configName, fgcmcycle=self.config.cycleNumber)
 
-    def _fgcmFitCycle(self, butler):
+    def _fgcmFitCycle(self, camera, dataRefDict):
         """
         Run the fit cycle
 
         Parameters
         ----------
-        butler: `lsst.daf.persistence.Butler`
+        camera : `lsst.afw.cameraGeom.Camera`
+        dataRefDict : `dict`
+            All dataRefs are `lsst.daf.persistence.ButlerDataRef` (gen2) or
+            `lsst.daf.butler.DeferredDatasetHandle` (gen3)
+            dataRef dictionary with keys:
+
+            ``"fgcmLookUpTable"``
+                dataRef for the FGCM look-up table.
+            ``"fgcmVisitCatalog"``
+                dataRef for visit summary catalog.
+            ``"fgcmStarObservations"``
+                dataRef for star observation catalog.
+            ``"fgcmStarIds"``
+                dataRef for star id catalog.
+            ``"fgcmStarIndices"``
+                dataRef for star index catalog.
+            ``"fgcmReferenceStars"``
+                dataRef for matched reference star catalog.
+            ``"fgcmFlaggedStars"``
+                dataRef for flagged star catalog.
+            ``"fgcmFitParameters"``
+                dataRef for fit parameter catalog.
+
+        Returns
+        -------
+        fgcmDatasetDict : `dict`
+            Dictionary of datasets to persist.
         """
-
-        self._checkDatasetsExist(butler)
-
         # Set defaults on whether to output standards and zeropoints
         self.maxIter = self.config.maxIterBeforeFinalCycle
         self.outputStandards = self.config.outputStandardsBeforeFinalCycle
@@ -855,19 +1070,16 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             self.outputZeropoints = True
             self.resetFitParameters = False
 
-        camera = butler.get('camera')
         configDict = makeConfigDict(self.config, self.log, camera,
                                     self.maxIter, self.resetFitParameters,
                                     self.outputZeropoints)
 
-        lutCat = butler.get('fgcmLookUpTable')
+        lutCat = dataRefDict['fgcmLookUpTable'].get()
         fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat, dict(self.config.filterMap))
         del lutCat
 
         # next we need the exposure/visit information
-
-        # fgcmExpInfo = self._loadVisitCatalog(butler)
-        visitCat = butler.get('fgcmVisitCatalog')
+        visitCat = dataRefDict['fgcmVisitCatalog'].get()
         fgcmExpInfo = translateVisitCatalog(visitCat)
         del visitCat
 
@@ -891,25 +1103,23 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                                              fgcmLut,
                                                              fgcmExpInfo)
         else:
-            inParInfo, inParams, inSuperStar = self._loadParameters(butler)
+            inParInfo, inParams, inSuperStar = self._loadParameters(dataRefDict['fgcmFitParameters'])
             fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                               fgcmExpInfo,
                                                               inParInfo,
                                                               inParams,
                                                               inSuperStar)
 
-        lastCycle = configDict['cycleNumber'] - 1
-
         # set up the stars...
         fgcmStars = fgcm.FgcmStars(fgcmFitCycle.fgcmConfig)
 
-        starObs = butler.get('fgcmStarObservations')
-        starIds = butler.get('fgcmStarIds')
-        starIndices = butler.get('fgcmStarIndices')
+        starObs = dataRefDict['fgcmStarObservations'].get()
+        starIds = dataRefDict['fgcmStarIds'].get()
+        starIndices = dataRefDict['fgcmStarIndices'].get()
 
         # grab the flagged stars if available
-        if butler.datasetExists('fgcmFlaggedStars', fgcmcycle=lastCycle):
-            flaggedStars = butler.get('fgcmFlaggedStars', fgcmcycle=lastCycle)
+        if 'fgcmFlaggedStars' in dataRefDict:
+            flaggedStars = dataRefDict['fgcmFlaggedStars'].get()
             flagId = flaggedStars['objId'][:]
             flagFlag = flaggedStars['objFlag'][:]
         else:
@@ -918,7 +1128,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             flagFlag = None
 
         if self.config.doReferenceCalibration:
-            refStars = butler.get('fgcmReferenceStars')
+            refStars = dataRefDict['fgcmReferenceStars'].get()
 
             refMag, refMagErr = extractReferenceMags(refStars,
                                                      self.config.bands,
@@ -998,7 +1208,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         # Persistance
         ##################
 
-        self._persistFgcmDatasets(butler, fgcmFitCycle)
+        fgcmDatasetDict = self._makeFgcmOutputDatasets(fgcmFitCycle)
 
         # Output the config for the next cycle
         # We need to make a copy since the input one has been frozen
@@ -1014,6 +1224,10 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                          freezeStdAtmosphere=False,
                          expGrayPhotometricCutDict=updatedPhotometricCutDict,
                          expGrayHighCutDict=updatedHighCutDict)
+
+        outConfig.connections.update(previousCycleNumber=str(self.config.cycleNumber),
+                                     cycleNumber=str(self.config.cycleNumber + 1))
+
         configFileName = '%s_cycle%02d_config.py' % (outConfig.outfileBase,
                                                      outConfig.cycleNumber)
         outConfig.save(configFileName)
@@ -1028,6 +1242,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             self.log.info("   config.expGrayHighCut")
             self.log.info("If you are satisfied with the fit, please set:")
             self.log.info("   config.isFinalCycle = True")
+
+        return fgcmDatasetDict
 
     def _checkDatasetsExist(self, butler):
         """
@@ -1074,13 +1290,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                 raise RuntimeError("Could not find fgcmReferenceStars in repo, and "
                                    "doReferenceCalibration is True.")
 
-    def _loadParameters(self, butler):
+    def _loadParameters(self, parDataRef):
         """
         Load FGCM parameters from a previous fit cycle
 
         Parameters
         ----------
-        butler:  `lsst.daf.persistence.Butler`
+        parDataRef : `lsst.daf.persistence.ButlerDataRef` or `lsst.daf.butler.DeferredDatasetHandle`
+            dataRef for previous fit parameter catalog.
 
         Returns
         -------
@@ -1091,9 +1308,8 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         inSuperStar: `numpy.array`
            Superstar flat formatted for input to fgcm
         """
-
         # note that we already checked that this is available
-        parCat = butler.get('fgcmFitParameters', fgcmcycle=self.config.cycleNumber-1)
+        parCat = parDataRef.get()
 
         parLutFilterNames = np.array(parCat[0]['lutFilterNames'].split(','))
         parFitBands = np.array(parCat[0]['fitBands'].split(','))
@@ -1237,16 +1453,16 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
 
         return (inParInfo, inParams, inSuperStar)
 
-    def _persistFgcmDatasets(self, butler, fgcmFitCycle):
+    def _makeFgcmOutputDatasets(self, fgcmFitCycle):
         """
         Persist FGCM datasets through the butler.
 
         Parameters
         ----------
-        butler: `lsst.daf.persistence.Butler`
         fgcmFitCycle: `lsst.fgcm.FgcmFitCycle`
            Fgcm Fit cycle object
         """
+        fgcmDatasetDict = {}
 
         # Save the parameters
         parInfo, pars = fgcmFitCycle.fgcmPars.parsToArrays()
@@ -1265,7 +1481,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
                                       fgcmFitCycle.fgcmPars.parSuperStarFlat,
                                       lutFilterNameString, fitBandString)
 
-        butler.put(parCat, 'fgcmFitParameters', fgcmcycle=self.config.cycleNumber)
+        fgcmDatasetDict['fgcmFitParameters'] = parCat
 
         # Save the indices of the flagged stars
         # (stars that have been (a) reserved from the fit for testing and
@@ -1274,7 +1490,7 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
         flagStarStruct = fgcmFitCycle.fgcmStars.getFlagStarIndices()
         flagStarCat = self._makeFlagStarCat(flagStarSchema, flagStarStruct)
 
-        butler.put(flagStarCat, 'fgcmFlaggedStars', fgcmcycle=self.config.cycleNumber)
+        fgcmDatasetDict['fgcmFlaggedStars'] = flagStarCat
 
         # Save the zeropoint information and atmospheres only if desired
         if self.outputZeropoints:
@@ -1284,14 +1500,14 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             zptSchema = makeZptSchema(superStarChebSize, zptChebSize)
             zptCat = makeZptCat(zptSchema, fgcmFitCycle.fgcmZpts.zpStruct)
 
-            butler.put(zptCat, 'fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
+            fgcmDatasetDict['fgcmZeropoints'] = zptCat
 
             # Save atmosphere values
             # These are generated by the same code that generates zeropoints
             atmSchema = makeAtmSchema()
             atmCat = makeAtmCat(atmSchema, fgcmFitCycle.fgcmZpts.atmStruct)
 
-            butler.put(atmCat, 'fgcmAtmosphereParameters', fgcmcycle=self.config.cycleNumber)
+            fgcmDatasetDict['fgcmAtmosphereParameters'] = atmCat
 
         # Save the standard stars (if configured)
         if self.outputStandards:
@@ -1299,7 +1515,9 @@ class FgcmFitCycleTask(pipeBase.CmdLineTask):
             stdSchema = makeStdSchema(len(goodBands))
             stdCat = makeStdCat(stdSchema, stdStruct, goodBands)
 
-            butler.put(stdCat, 'fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
+            fgcmDatasetDict['fgcmStandardStars'] = stdCat
+
+        return fgcmDatasetDict
 
     def _makeParSchema(self, parInfo, pars, parSuperStarFlat,
                        lutFilterNameString, fitBandString):

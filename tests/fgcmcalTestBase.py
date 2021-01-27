@@ -23,100 +23,172 @@
 """General fgcmcal testing class.
 
 This class is used as the basis for individual obs package tests using
-data from testdata_jointcal.
+data from testdata_jointcal for Gen3 repos.
 """
 
 import os
 import shutil
 import numpy as np
-import numpy.testing as testing
 import glob
 import esutil
 
-import lsst.daf.persistence as dafPersist
+import click.testing
+import lsst.ctrl.mpexec.cli.pipetask
+
+import lsst.daf.butler as dafButler
+import lsst.obs.base as obsBase
 import lsst.geom as geom
 import lsst.log
-from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask, LoadIndexedReferenceObjectsConfig
-from astropy import units
 
 import lsst.fgcmcal as fgcmcal
 
+ROOT = os.path.abspath(os.path.dirname(__file__))
+
 
 class FgcmcalTestBase(object):
-    """
-    Base class for fgcmcal tests, to genericize some test running and setup.
+    """Base class for gen3 fgcmcal tests, to genericize some test running and setup.
 
     Derive from this first, then from TestCase.
     """
-
-    def setUp_base(self, inputDir=None, testDir=None, logLevel=None, otherArgs=[]):
-        """
-        Call from your child class's setUp() to get variables built.
+    def setUp_base(self, testDir):
+        """Common routines to set up tests.
 
         Parameters
         ----------
-        inputDir: `str`, optional
-           Input directory
-        testDir: `str`, optional
-           Test directory
-        logLevel: `str`, optional
-           Override loglevel for command-line tasks
-        otherArgs: `list`, default=[]
-           List of additional arguments to send to command-line tasks
+        testDir : `str`
+            Temporary directory to run tests in.
         """
-
-        self.inputDir = inputDir
         self.testDir = testDir
-        self.logLevel = logLevel
-        self.otherArgs = otherArgs
 
-        self.config = None
-        self.configfiles = []
-
-        lsst.log.setLevel("daf.persistence.butler", lsst.log.FATAL)
-        lsst.log.setLevel("CameraMapper", lsst.log.FATAL)
-
-        if self.logLevel is not None:
-            self.otherArgs.extend(['--loglevel', 'fgcmcal=%s'%self.logLevel])
-
-    def _testFgcmMakeLut(self, nBand, i0Std, i0Recon, i10Std, i10Recon):
-        """
-        Test running of FgcmMakeLutTask
+    def _importRepository(self, instrument, exportPath, exportFile):
+        """Import a test repository into self.testDir
 
         Parameters
         ----------
-        nBand: `int`
-           Number of bands tested
-        i0Std: `np.array', size nBand
-           Values of i0Std to compare to
-        i10Std: `np.array`, size nBand
-           Values of i10Std to compare to
-        i0Recon: `np.array`, size nBand
-           Values of reconstructed i0 to compare to
-        i10Recon: `np.array`, size nBand
-           Values of reconsntructed i10 to compare to
+        instrument : `str`
+            Full string name for the instrument.
+        exportPath : `str`
+            Path to location of repository to export.
+        exportFile : `str`
+            Filename of export data.
         """
+        self.repo = os.path.join(self.testDir, 'testrepo')
 
-        args = [self.inputDir, '--output', self.testDir,
-                '--doraise']
-        if len(self.configfiles) > 0:
-            args.extend(['--configfile', *self.configfiles])
-        args.extend(self.otherArgs)
+        print('Importing %s into %s' % (exportFile, self.testDir))
 
-        result = fgcmcal.FgcmMakeLutTask.parseAndRun(args=args, config=self.config)
-        self._checkResult(result)
+        # Make the repo and retrieve a writeable Butler
+        _ = dafButler.Butler.makeRepo(self.repo)
+        butler = dafButler.Butler(self.repo, writeable=True)
+        # Register the instrument
+        instrInstance = obsBase.utils.getInstrument(instrument)
+        instrInstance.register(butler.registry)
+        # Import the exportFile
+        butler.import_(directory=exportPath, filename=exportFile,
+                       transfer='symlink',
+                       skip_dimensions={'instrument', 'detector', 'physical_filter'})
 
-        butler = dafPersist.butler.Butler(self.testDir)
-        tempTask = fgcmcal.FgcmFitCycleTask()
-        lutCat = butler.get('fgcmLookUpTable')
-        fgcmLut, lutIndexVals, lutStd = fgcmcal.utilities.translateFgcmLut(lutCat,
-                                                                           dict(tempTask.config.filterMap))
+    def _runPipeline(self, repo, pipelineFile, queryString=None,
+                     inputCollections=None, outputCollection=None,
+                     configFiles=None, configOptions=None,
+                     registerDatasetTypes=False):
+        """Run a pipeline via pipetask.
 
-        # Check that we got the requested number of bands...
+        Parameters
+        ----------
+        repo : `str`
+            Gen3 repository yaml file.
+        pipelineFile : `str`
+            Pipeline definition file.
+        queryString : `str`, optional
+            String to use for "-d" data query.
+        inputCollections : `str`, optional
+            String to use for "-i" input collections (comma delimited).
+        outputCollection : `str`, optional
+            String to use for "-o" output collection.
+        configFiles : `list` [`str`], optional
+            List of config files to use (with "-C").
+        configOptions : `list` [`str`], optional
+            List of individual config options to use (with "-c").
+        registerDatasetTypes : `bool`, optional
+            Set "--register-dataset-types".
+
+        Returns
+        -------
+        exit_code : `int`
+            Exit code for pipetask run.
+
+        Raises
+        ------
+        RuntimeError : Raised if the "pipetask" call fails.
+        """
+        pipelineArgs = ["run",
+                        "-b", repo,
+                        "-p", pipelineFile]
+
+        if queryString is not None:
+            pipelineArgs.extend(["-d", queryString])
+        if inputCollections is not None:
+            pipelineArgs.extend(["-i", inputCollections])
+        if outputCollection is not None:
+            pipelineArgs.extend(["-o", outputCollection])
+        if configFiles is not None:
+            for configFile in configFiles:
+                pipelineArgs.extend(["-C", configFile])
+        if configOptions is not None:
+            for configOption in configOptions:
+                pipelineArgs.extend(["-c", configOption])
+        if registerDatasetTypes:
+            pipelineArgs.extend(["--register-dataset-types"])
+
+        # CliRunner is an unsafe workaround for DM-26239
+        runner = click.testing.CliRunner()
+        results = runner.invoke(lsst.ctrl.mpexec.cli.pipetask.cli, pipelineArgs)
+        if results.exception:
+            raise RuntimeError("Pipeline %s failed." % (pipelineFile)) from results.exception
+        return results.exit_code
+
+    def _testFgcmMakeLut(self, instName, nBand, i0Std, i0Recon, i10Std, i10Recon):
+        """Test running of FgcmMakeLutTask
+
+        Parameters
+        ----------
+        instName : `str`
+            Short name of the instrument
+        nBand : `int`
+            Number of bands tested
+        i0Std : `np.ndarray'
+            Values of i0Std to compare to
+        i10Std : `np.ndarray`
+            Values of i10Std to compare to
+        i0Recon : `np.ndarray`
+            Values of reconstructed i0 to compare to
+        i10Recon : `np.ndarray`
+            Values of reconsntructed i10 to compare to
+        """
+        instCamel = instName.title()
+
+        configFile = 'fgcmMakeLut:' + os.path.join(ROOT,
+                                                   'config',
+                                                   'fgcmMakeLut%s.py' % (instCamel))
+        outputCollection = '%s/testfgcmcal/lut' % (instName)
+
+        self._runPipeline(self.repo,
+                          os.path.join(ROOT,
+                                       'pipelines',
+                                       'fgcmMakeLut%s.yaml' % (instCamel)),
+                          configFiles=[configFile],
+                          inputCollections='%s/calib,%s/testdata' % (instName, instName),
+                          outputCollection=outputCollection,
+                          registerDatasetTypes=True)
+
+        # Check output values
+        butler = dafButler.Butler(self.repo)
+        lutCat = butler.get('fgcmLookUpTable',
+                            collections=[outputCollection],
+                            instrument=instName)
+        fgcmLut, lutIndexVals, lutStd = fgcmcal.utilities.translateFgcmLut(lutCat, {})
+
         self.assertEqual(nBand, len(lutIndexVals[0]['FILTERNAMES']))
-
-        self.assertFloatsAlmostEqual(i0Std, lutStd[0]['I0STD'], msg='I0Std', rtol=1e-5)
-        self.assertFloatsAlmostEqual(i10Std, lutStd[0]['I10STD'], msg='I10Std', rtol=1e-5)
 
         indices = fgcmLut.getIndices(np.arange(nBand, dtype=np.int32),
                                      np.zeros(nBand) + np.log(lutStd[0]['PWVSTD']),
@@ -146,123 +218,135 @@ class FgcmcalTestBase(object):
 
         self.assertFloatsAlmostEqual(i10Recon, i1/i0, msg='i10Recon', rtol=1e-5)
 
-    def _testFgcmBuildStarsTable(self, visits, nStar, nObs):
-        """
-        Test running of FgcmBuildStarsTableTask
+    def _testFgcmBuildStarsTable(self, instName, queryString, visits, nStar, nObs):
+        """Test running of FgcmBuildStarsTableTask
 
         Parameters
         ----------
-        visits: `list`
-           List of visits to calibrate
-        nStar: `int`
-           Number of stars expected
-        nObs: `int`
-           Number of observations of stars expected
+        instName : `str`
+            Short name of the instrument
+        queryString : `str`
+            Query to send to the pipetask.
+        visits : `list`
+            List of visits to calibrate
+        nStar : `int`
+            Number of stars expected
+        nObs : `int`
+            Number of observations of stars expected
         """
+        instCamel = instName.title()
 
-        args = [self.inputDir, '--output', self.testDir,
-                '--id', 'visit='+'^'.join([str(visit) for visit in visits]),
-                '--doraise']
-        if len(self.configfiles) > 0:
-            args.extend(['--configfile', *self.configfiles])
-        args.extend(self.otherArgs)
+        configFile = 'fgcmBuildStarsTable:' + os.path.join(ROOT,
+                                                           'config',
+                                                           'fgcmBuildStarsTable%s.py' % (instCamel))
+        outputCollection = '%s/testfgcmcal/buildstars' % (instName)
 
-        result = fgcmcal.FgcmBuildStarsTableTask.parseAndRun(args=args, config=self.config)
-        self._checkResult(result)
+        self._runPipeline(self.repo,
+                          os.path.join(ROOT,
+                                       'pipelines',
+                                       'fgcmBuildStarsTable%s.yaml' % (instCamel)),
+                          configFiles=[configFile],
+                          inputCollections='%s/testfgcmcal/lut,refcats' % (instName),
+                          outputCollection=outputCollection,
+                          configOptions=['fgcmBuildStarsTable:ccdDataRefName=detector'],
+                          queryString=queryString,
+                          registerDatasetTypes=True)
 
-        butler = dafPersist.butler.Butler(self.testDir)
+        butler = dafButler.Butler(self.repo)
 
-        visitCat = butler.get('fgcmVisitCatalog')
+        visitCat = butler.get('fgcmVisitCatalog', collections=[outputCollection],
+                              instrument=instName)
         self.assertEqual(len(visits), len(visitCat))
 
-        starIds = butler.get('fgcmStarIds')
-        self.assertEqual(nStar, len(starIds))
+        starIds = butler.get('fgcmStarIds', collections=[outputCollection],
+                             instrument=instName)
+        self.assertEqual(len(starIds), nStar)
 
-        starObs = butler.get('fgcmStarObservations')
-        self.assertEqual(nObs, len(starObs))
+        starObs = butler.get('fgcmStarObservations', collections=[outputCollection],
+                             instrument=instName)
+        self.assertEqual(len(starObs), nObs)
 
-    def _testFgcmBuildStarsAndCompare(self, visits):
-        """
-        Test running of FgcmBuildStarsTask and compare to Table run
-
-        Parameters
-        ----------
-        visits: `list`
-           List of visits to calibrate
-        """
-        args = [self.testDir, '--output', os.path.join(self.testDir, 'rerun', 'src'),
-                '--id', 'visit='+'^'.join([str(visit) for visit in visits]),
-                '--doraise']
-        if len(self.configfiles) > 0:
-            args.extend(['--configfile', *self.configfiles])
-        args.extend(self.otherArgs)
-
-        result = fgcmcal.FgcmBuildStarsTask.parseAndRun(args=args, config=self.config)
-        self._checkResult(result)
-
-        butlerSrc = dafPersist.Butler(os.path.join(self.testDir, 'rerun', 'src'))
-        butlerTable = dafPersist.Butler(os.path.join(self.testDir))
-
-        # We compare the two catalogs to ensure they contain the same data.  They will
-        # not be identical in ordering because the input data was ingested in a different
-        # order (hence the stars are rearranged).
-        self._compareBuildStars(butlerSrc, butlerTable)
-
-    def _testFgcmFitCycle(self, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=False):
-        """
-        Test running of FgcmFitCycleTask
+    def _testFgcmFitCycle(self, instName, cycleNumber,
+                          nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
+                          skipChecks=False, extraConfig=None):
+        """Test running of FgcmFitCycleTask
 
         Parameters
         ----------
-        nZp: `int`
-           Number of zeropoints created by the task
-        nGoodZp: `int`
-           Number of good (photometric) zeropoints created
-        nOkZp: `int`
-           Number of constrained zeropoints (photometric or not)
-        nBadZp: `int`
-           Number of unconstrained (bad) zeropoints
-        nStdStars: `int`
-           Number of standard stars produced
-        nPlots: `int`
-           Number of plots produced
-        skipChecks: `bool`, optional
-           Skip number checks, when running less-than-final cycle.
-           Default is False.
+        instName : `str`
+            Short name of the instrument
+        cycleNumber : `int`
+            Fit cycle number.
+        nZp : `int`
+            Number of zeropoints created by the task
+        nGoodZp : `int`
+            Number of good (photometric) zeropoints created
+        nOkZp : `int`
+            Number of constrained zeropoints (photometric or not)
+        nBadZp : `int`
+            Number of unconstrained (bad) zeropoints
+        nStdStars : `int`
+            Number of standard stars produced
+        nPlots : `int`
+            Number of plots produced
+        skipChecks : `bool`, optional
+            Skip number checks, when running less-than-final cycle.
+        extraConfig : `str`, optional
+            Name of an extra config file to apply.
         """
+        instCamel = instName.title()
 
-        args = [self.inputDir, '--output', self.testDir,
-                '--doraise']
-        if len(self.configfiles) > 0:
-            args.extend(['--configfile', *self.configfiles])
-        args.extend(self.otherArgs)
+        configFiles = ['fgcmFitCycle:' + os.path.join(ROOT,
+                                                      'config',
+                                                      'fgcmFitCycle%s.py' % (instCamel))]
+        if extraConfig is not None:
+            configFiles.append('fgcmFitCycle:' + extraConfig)
 
-        # Move into the test directory so the plots will get cleaned in tearDown
-        # In the future, with Gen3, we will probably have a better way of managing
-        # non-data output such as plots.
+        outputCollection = '%s/testfgcmcal/fit' % (instName)
+
+        if cycleNumber == 0:
+            inputCollections = '%s/testfgcmcal/buildstars' % (instName)
+        else:
+            # We are reusing the outputCollection so we can't specify the input
+            inputCollections = None
+
         cwd = os.getcwd()
         os.chdir(self.testDir)
 
-        result = fgcmcal.FgcmFitCycleTask.parseAndRun(args=args, config=self.config)
-        self._checkResult(result)
+        configOptions = ['fgcmFitCycle:cycleNumber=%d' % (cycleNumber),
+                         'fgcmFitCycle:connections.previousCycleNumber=%d' %
+                         (cycleNumber - 1),
+                         'fgcmFitCycle:connections.cycleNumber=%d' %
+                         (cycleNumber)]
 
-        # Move back to the previous directory
+        self._runPipeline(self.repo,
+                          os.path.join(ROOT,
+                                       'pipelines',
+                                       'fgcmFitCycle%s.yaml' % (instCamel)),
+                          configFiles=configFiles,
+                          inputCollections=inputCollections,
+                          outputCollection=outputCollection,
+                          configOptions=configOptions,
+                          registerDatasetTypes=True)
+
         os.chdir(cwd)
 
         if skipChecks:
             return
 
+        butler = dafButler.Butler(self.repo)
+
+        config = butler.get('fgcmFitCycle_config', collections=[outputCollection])
+
         # Check that the expected number of plots are there.
-        plots = glob.glob(os.path.join(self.testDir, self.config.outfileBase +
-                                       '_cycle%02d_plots/' % (self.config.cycleNumber) +
-                                       '*.png'))
+        plots = glob.glob(os.path.join(self.testDir, config.outfileBase
+                                       + '_cycle%02d_plots/' % (cycleNumber)
+                                       + '*.png'))
         self.assertEqual(len(plots), nPlots)
 
-        butler = dafPersist.butler.Butler(self.testDir)
-
-        zps = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
-
-        # Check the numbers of zeropoints in all, good, okay, and bad
+        zps = butler.get('fgcmZeropoints%d' % (cycleNumber),
+                         collections=[outputCollection],
+                         instrument=instName)
         self.assertEqual(len(zps), nZp)
 
         gd, = np.where(zps['fgcmFlag'] == 1)
@@ -278,124 +362,108 @@ class FgcmcalTestBase(object):
         test, = np.where(zps['fgcmZpt'][gd] < -9000.0)
         self.assertEqual(len(test), 0)
 
-        stds = butler.get('fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
+        stds = butler.get('fgcmStandardStars%d' % (cycleNumber),
+                          collections=[outputCollection],
+                          instrument=instName)
 
         self.assertEqual(len(stds), nStdStars)
 
-    def _testFgcmOutputProducts(self, visitDataRefName, ccdDataRefName, filterMapping,
+    def _testFgcmOutputProducts(self, instName,
                                 zpOffsets, testVisit, testCcd, testFilter, testBandIndex):
-        """
-        Test running of FgcmOutputProductsTask
+        """Test running of FgcmOutputProductsTask.
 
         Parameters
         ----------
-        visitDataRefName: `str`
-           Name of column in dataRef to get the visit
-        ccdDataRefName: `str`
-           Name of column in dataRef to get the ccd
-        filterMapping: `dict`
-           Mapping of filterName to dataRef filter names
-        zpOffsets: `np.array`
-           Zeropoint offsets expected
-        testVisit: `int`
-           Visit id to check for round-trip computations
-        testCcd: `int`
-           Ccd id to check for round-trip computations
-        testFilter: `str`
-           Filtername for testVisit/testCcd
-        testBandIndex: `int`
-           Band index for testVisit/testCcd
+        instName : `str`
+            Short name of the instrument
+        zpOffsets : `np.ndarray`
+            Zeropoint offsets expected
+        testVisit : `int`
+            Visit id to check for round-trip computations
+        testCcd : `int`
+            Ccd id to check for round-trip computations
+        testFilter : `str`
+            Filtername for testVisit/testCcd
+        testBandIndex : `int`
+            Band index for testVisit/testCcd
         """
+        instCamel = instName.title()
 
-        args = [self.inputDir, '--output', self.testDir,
-                '--doraise']
-        if len(self.configfiles) > 0:
-            args.extend(['--configfile', *self.configfiles])
-        args.extend(self.otherArgs)
+        configFile = 'fgcmOutputProducts:' + os.path.join(ROOT,
+                                                          'config',
+                                                          'fgcmOutputProducts%s.py' % (instCamel))
+        inputCollection = '%s/testfgcmcal/fit' % (instName)
+        outputCollection = '%s/testfgcmcal/fit/output' % (instName)
 
-        result = fgcmcal.FgcmOutputProductsTask.parseAndRun(args=args, config=self.config,
-                                                            doReturnResults=True)
-        self._checkResult(result)
+        self._runPipeline(self.repo,
+                          os.path.join(ROOT,
+                                       'pipelines',
+                                       'fgcmOutputProducts%s.yaml' % (instCamel)),
+                          configFiles=[configFile],
+                          inputCollections=inputCollection,
+                          outputCollection=outputCollection,
+                          configOptions=['fgcmOutputProducts:doRefcatOutput=False'],
+                          registerDatasetTypes=True)
 
-        # Extract the offsets from the results
-        offsets = result.resultList[0].results.offsets
-
+        butler = dafButler.Butler(self.repo)
+        offsetCat = butler.get('fgcmReferenceCalibrationOffsets',
+                               collections=[outputCollection], instrument=instName)
+        offsets = offsetCat['offset'][:]
         self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-6)
 
-        butler = dafPersist.butler.Butler(self.testDir)
+        config = butler.get('fgcmOutputProducts_config',
+                            collections=[outputCollection], instrument=instName)
 
-        # Test the reference catalog stars
+        rawStars = butler.get('fgcmStandardStars' + config.connections.cycleNumber,
+                              collections=[inputCollection], instrument=instName)
 
-        # Read in the raw stars...
-        rawStars = butler.get('fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
-
-        # Read in the new reference catalog...
-        config = LoadIndexedReferenceObjectsConfig()
-        config.ref_dataset_name = 'fgcm_stars'
-        task = LoadIndexedReferenceObjectsTask(butler, config=config)
-
-        # Read in a giant radius to get them all
-        refStruct = task.loadSkyCircle(rawStars[0].getCoord(), 5.0*geom.degrees,
-                                       filterName='r')
-
-        # Make sure all the stars are there
-        self.assertEqual(len(rawStars), len(refStruct.refCat))
-
-        # And make sure the numbers are consistent
-        test, = np.where(rawStars['id'][0] == refStruct.refCat['id'])
-
-        # Perform math on numpy arrays to maintain datatypes
-        mags = rawStars['mag_std_noabs'][:, 0].astype(np.float64) + offsets[0]
-        fluxes = (mags*units.ABmag).to_value(units.nJy)
-        fluxErrs = (np.log(10.)/2.5)*fluxes*rawStars['magErr_std'][:, 0].astype(np.float64)
-        # Only check the first one
-        self.assertFloatsAlmostEqual(fluxes[0], refStruct.refCat['r_flux'][test[0]])
-        self.assertFloatsAlmostEqual(fluxErrs[0], refStruct.refCat['r_fluxErr'][test[0]])
-
-        # Test the psf candidate counting, ratio should be between 0.0 and 1.0
-        candRatio = (refStruct.refCat['r_nPsfCandidate'].astype(np.float64) /
-                     refStruct.refCat['r_nTotal'].astype(np.float64))
+        candRatio = (rawStars['npsfcand'][:, 0].astype(np.float64)
+                     / rawStars['ntotal'][:, 0].astype(np.float64))
         self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
         self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
 
         # Test the fgcm_photoCalib output
-
-        zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
+        zptCat = butler.get('fgcmZeropoints' + config.connections.cycleNumber,
+                            collections=[inputCollection], instrument=instName)
         selected = (zptCat['fgcmFlag'] < 16)
 
         # Read in all the calibrations, these should all be there
         # This test is simply to ensure that all the photoCalib files exist
+        visits = np.unique(zptCat['visit'])
+        photoCalibDict = {}
+        for visit in visits:
+            expCat = butler.get('fgcmPhotoCalibCatalog',
+                                visit=visit,
+                                collections=[outputCollection], instrument=instName)
+            for row in expCat:
+                if row['visit'] == visit:
+                    photoCalibDict[(visit, row['detector_id'])] = row.getPhotoCalib()
+
         for rec in zptCat[selected]:
-            testCal = butler.get('fgcm_photoCalib',
-                                 dataId={visitDataRefName: int(rec['visit']),
-                                         ccdDataRefName: int(rec['ccd']),
-                                         'filter': filterMapping[rec['filtername']]})
-            self.assertIsNotNone(testCal)
+            self.assertTrue((rec['visit'], rec['detector']) in photoCalibDict)
 
         # We do round-trip value checking on just the final one (chosen arbitrarily)
-        testCal = butler.get('fgcm_photoCalib',
-                             dataId={visitDataRefName: int(testVisit),
-                                     ccdDataRefName: int(testCcd),
-                                     'filter': filterMapping[testFilter]})
-        self.assertIsNotNone(testCal)
+        testCal = photoCalibDict[(testVisit, testCcd)]
 
-        src = butler.get('src', dataId={visitDataRefName: int(testVisit),
-                                        ccdDataRefName: int(testCcd)})
+        src = butler.get('src', visit=int(testVisit), detector=int(testCcd),
+                         collections=[outputCollection], instrument=instName)
 
         # Only test sources with positive flux
         gdSrc = (src['slot_CalibFlux_instFlux'] > 0.0)
 
         # We need to apply the calibration offset to the fgcmzpt (which is internal
         # and doesn't know about that yet)
-        testZpInd, = np.where((zptCat['visit'] == testVisit) &
-                              (zptCat['ccd'] == testCcd))
-        fgcmZpt = (zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex] +
-                   zptCat['fgcmDeltaChrom'][testZpInd])
+        testZpInd, = np.where((zptCat['visit'] == testVisit)
+                              & (zptCat['detector'] == testCcd))
+        fgcmZpt = (zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex]
+                   + zptCat['fgcmDeltaChrom'][testZpInd])
         fgcmZptGrayErr = np.sqrt(zptCat['fgcmZptVar'][testZpInd])
 
-        if self.config.doComposeWcsJacobian:
+        if config.doComposeWcsJacobian:
             # The raw zeropoint needs to be modified to know about the wcs jacobian
-            camera = butler.get('camera')
+            refs = butler.registry.queryDatasets('camera', dimensions=['instrument'],
+                                                 collections=...)
+            camera = butler.getDirect(list(refs)[0])
             approxPixelAreaFields = fgcmcal.utilities.computeApproxPixelAreaFields(camera)
             center = approxPixelAreaFields[testCcd].getBBox().getCenter()
             pixAreaCorr = approxPixelAreaFields[testCcd].evaluate(center)
@@ -434,10 +502,17 @@ class FgcmcalTestBase(object):
 
         # For decent statistics, we are matching all the sources from one visit
         # (multiple ccds)
+        whereClause = f"instrument='{instName:s}' and visit={testVisit:d}"
+        srcRefs = butler.registry.queryDatasets('src', dimensions=['visit'],
+                                                collections='%s/testdata' % (instName),
+                                                where=whereClause,
+                                                findFirst=True)
+        photoCals = []
+        for srcRef in srcRefs:
+            photoCals.append(photoCalibDict[(testVisit, srcRef.dataId['detector'])])
 
-        subset = butler.subset('src', dataId={visitDataRefName: int(testVisit)})
-
-        matchMag, matchDelta = self._getMatchedVisitCat(rawStars, subset, testBandIndex, offsets)
+        matchMag, matchDelta = self._getMatchedVisitCat(butler, srcRefs, photoCals,
+                                                        rawStars, testBandIndex, offsets)
 
         st = np.argsort(matchMag)
         # Compare the brightest 25% of stars.  No matter the setting of
@@ -451,12 +526,14 @@ class FgcmcalTestBase(object):
                                      (np.log(10.0)/2.5)*testCal.getCalibrationMean()*fgcmZptGrayErr)
 
         # Test the transmission output
-
-        visitCatalog = butler.get('fgcmVisitCatalog')
-        lutCat = butler.get('fgcmLookUpTable')
+        visitCatalog = butler.get('fgcmVisitCatalog', collections=[inputCollection],
+                                  instrument=instName)
+        lutCat = butler.get('fgcmLookUpTable', collections=[inputCollection],
+                            instrument=instName)
 
         testTrans = butler.get('transmission_atmosphere_fgcm',
-                               dataId={visitDataRefName: visitCatalog[0]['visit']})
+                               visit=visitCatalog[0]['visit'],
+                               collections=[outputCollection], instrument=instName)
         testResp = testTrans.sampleAt(position=geom.Point2D(0, 0),
                                       wavelengths=lutCat[0]['atmLambda'])
 
@@ -475,7 +552,8 @@ class FgcmcalTestBase(object):
         # The second should be close to the first, but there is the airmass
         # difference so they aren't identical.
         testTrans2 = butler.get('transmission_atmosphere_fgcm',
-                                dataId={visitDataRefName: visitCatalog[1]['visit']})
+                                visit=visitCatalog[1]['visit'],
+                                collections=[outputCollection], instrument=instName)
         testResp2 = testTrans2.sampleAt(position=geom.Point2D(0, 0),
                                         wavelengths=lutCat[0]['atmLambda'])
 
@@ -483,183 +561,22 @@ class FgcmcalTestBase(object):
         ratio = np.median(testResp/testResp2)
         self.assertFloatsAlmostEqual(testResp/ratio, testResp2, atol=0.04)
 
-    def _testFgcmCalibrateTract(self, visits, tract,
-                                rawRepeatability, filterNCalibMap):
-        """
-        Test running of FgcmCalibrateTractTask
-
-        Parameters
-        ----------
-        visits: `list`
-           List of visits to calibrate
-        tract: `int`
-           Tract number
-        rawRepeatability: `np.array`
-           Expected raw repeatability after convergence.
-           Length should be number of bands.
-        filterNCalibMap: `dict`
-           Mapping from filter name to number of photoCalibs created.
-        """
-
-        args = [self.inputDir, '--output', self.testDir,
-                '--id', 'visit='+'^'.join([str(visit) for visit in visits]),
-                'tract=%d' % (tract),
-                '--doraise']
-        if len(self.configfiles) > 0:
-            args.extend(['--configfile', *self.configfiles])
-        args.extend(self.otherArgs)
-
-        # Move into the test directory so the plots will get cleaned in tearDown
-        # In the future, with Gen3, we will probably have a better way of managing
-        # non-data output such as plots.
-        cwd = os.getcwd()
-        os.chdir(self.testDir)
-
-        result = fgcmcal.FgcmCalibrateTractTableTask.parseAndRun(args=args, config=self.config,
-                                                                 doReturnResults=True)
-        self._checkResult(result)
-
-        # Move back to the previous directory
-        os.chdir(cwd)
-
-        # Check that the converged repeatability is what we expect
-        repeatability = result.resultList[0].results.repeatability
-        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=4e-6)
-
-        butler = dafPersist.butler.Butler(self.testDir)
-
-        # Check that the number of photoCalib objects in each filter are what we expect
-        for filterName in filterNCalibMap.keys():
-            subset = butler.subset('fgcm_tract_photoCalib', tract=tract, filter=filterName)
-            tot = 0
-            for dataRef in subset:
-                if butler.datasetExists('fgcm_tract_photoCalib', dataId=dataRef.dataId):
-                    tot += 1
-            self.assertEqual(tot, filterNCalibMap[filterName])
-
-        # Check that every visit got a transmission
-        visits = butler.queryMetadata('fgcm_tract_photoCalib', ('visit'), tract=tract)
-        for visit in visits:
-            self.assertTrue(butler.datasetExists('transmission_atmosphere_fgcm_tract',
-                                                 tract=tract, visit=visit))
-
-        # Check that we got the reference catalog output.
-        # This will raise an exception if the catalog is not there.
-        config = LoadIndexedReferenceObjectsConfig()
-        config.ref_dataset_name = 'fgcm_stars_%d' % (tract)
-        task = LoadIndexedReferenceObjectsTask(butler, config=config)
-
-        coord = geom.SpherePoint(337.656174*geom.degrees, 0.823595*geom.degrees)
-
-        refStruct = task.loadSkyCircle(coord, 5.0*geom.degrees, filterName='r')
-
-        # Test the psf candidate counting, ratio should be between 0.0 and 1.0
-        candRatio = (refStruct.refCat['r_nPsfCandidate'].astype(np.float64) /
-                     refStruct.refCat['r_nTotal'].astype(np.float64))
-        self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
-        self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
-
-        # Test that temporary files aren't stored
-        self.assertFalse(butler.datasetExists('fgcmVisitCatalog'))
-        self.assertFalse(butler.datasetExists('fgcmStarObservations'))
-        self.assertFalse(butler.datasetExists('fgcmStarIndices'))
-        self.assertFalse(butler.datasetExists('fgcmReferenceStars'))
-
-    def _compareBuildStars(self, butler1, butler2):
-        """
-        Compare the full set of BuildStars outputs with files from two
-        repos.
-
-        Parameters
-        ----------
-        butler1, butler2 : `lsst.daf.persistence.Butler`
-        """
-        # Check the visit catalogs are identical
-        visitCat1 = butler1.get('fgcmVisitCatalog').asAstropy()
-        visitCat2 = butler2.get('fgcmVisitCatalog').asAstropy()
-
-        for col in visitCat1.columns:
-            if isinstance(visitCat1[col][0], str):
-                testing.assert_array_equal(visitCat1[col], visitCat2[col])
-            else:
-                testing.assert_array_almost_equal(visitCat1[col], visitCat2[col])
-
-        # Check that the observation catalogs have the same length
-        # Detailed comparisons of the contents are below.
-        starObs1 = butler1.get('fgcmStarObservations')
-        starObs2 = butler2.get('fgcmStarObservations')
-        self.assertEqual(len(starObs1), len(starObs2))
-
-        # Check that the number of stars is the same and all match.
-        starIds1 = butler1.get('fgcmStarIds')
-        starIds2 = butler2.get('fgcmStarIds')
-        self.assertEqual(len(starIds1), len(starIds2))
-        matcher = esutil.htm.Matcher(11, starIds1['ra'], starIds1['dec'])
-        matches = matcher.match(starIds2['ra'], starIds2['dec'], 1./3600., maxmatch=1)
-        self.assertEqual(len(matches[0]), len(starIds1))
-
-        # Check that the number of observations of each star is the same.
-        testing.assert_array_equal(starIds1['nObs'][matches[1]],
-                                   starIds2['nObs'][matches[0]])
-
-        # And to test the contents, we need to unravel the observations and make
-        # sure that they are matched individually, because the two catalogs
-        # are constructed in a different order.
-        starIndices1 = butler1.get('fgcmStarIndices')
-        starIndices2 = butler2.get('fgcmStarIndices')
-
-        test1 = np.zeros(len(starIndices1), dtype=[('ra', 'f8'),
-                                                   ('dec', 'f8'),
-                                                   ('x', 'f8'),
-                                                   ('y', 'f8'),
-                                                   ('psf_candidate', 'b1'),
-                                                   ('visit', 'i4'),
-                                                   ('ccd', 'i4'),
-                                                   ('instMag', 'f4'),
-                                                   ('instMagErr', 'f4'),
-                                                   ('jacobian', 'f4')])
-        test2 = np.zeros_like(test1)
-
-        # Fill the test1 numpy recarray with sorted and unpacked data from starObs1.
-        # Note that each star has a different number of observations, leading to
-        # a "ragged" array that is packed in here.
-        counter = 0
-        obsIndex = starIndices1['obsIndex']
-        for i in range(len(starIds1)):
-            ind = starIds1['obsArrIndex'][matches[1][i]]
-            nObs = starIds1['nObs'][matches[1][i]]
-            for name in test1.dtype.names:
-                test1[name][counter: counter + nObs] = starObs1[name][obsIndex][ind: ind + nObs]
-            counter += nObs
-
-        # Fill the test2 numpy recarray with sorted and unpacked data from starObs2.
-        # Note that we have to match these observations per star by matching "visit"
-        # (implicitly assuming each star is observed only once per visit) to ensure
-        # that the observations in test2 are in the same order as test1.
-        counter = 0
-        obsIndex = starIndices2['obsIndex']
-        for i in range(len(starIds2)):
-            ind = starIds2['obsArrIndex'][matches[0][i]]
-            nObs = starIds2['nObs'][matches[0][i]]
-            a, b = esutil.numpy_util.match(test1['visit'][counter: counter + nObs],
-                                           starObs2['visit'][obsIndex][ind: ind + nObs])
-            for name in test2.dtype.names:
-                test2[name][counter: counter + nObs][a] = starObs2[name][obsIndex][ind: ind + nObs][b]
-            counter += nObs
-
-        for name in test1.dtype.names:
-            testing.assert_array_almost_equal(test1[name], test2[name])
-
-    def _getMatchedVisitCat(self, rawStars, dataRefs, bandIndex, offsets):
+    def _getMatchedVisitCat(self, butler, srcRefs, photoCals,
+                            rawStars, bandIndex, offsets):
         """
         Get a list of matched magnitudes and deltas from calibrated src catalogs.
 
         Parameters
         ----------
+        butler : `lsst.daf.butler.Butler`
+        srcRefs : `list`
+           dataRefs of source catalogs
+        photoCalibRefs : `list`
+           dataRefs of photoCalib files, matched to srcRefs.
+        photoCals : `list`
+           photoCalib objects, matched to srcRefs.
         rawStars : `lsst.afw.table.SourceCatalog`
            Fgcm standard stars
-        dataRefs : `list` or `lsst.daf.persist.ButlerSubset`
-           Data references for source catalogs to match
         bandIndex : `int`
            Index of the band for the source catalogs
         offsets : `np.ndarray`
@@ -676,9 +593,9 @@ class FgcmcalTestBase(object):
                                      np.rad2deg(rawStars['coord_dec']))
 
         matchDelta = None
-        for dataRef in dataRefs:
-            src = dataRef.get()
-            photoCal = dataRef.get('fgcm_photoCalib')
+        # for dataRef in dataRefs:
+        for srcRef, photoCal in zip(srcRefs, photoCals):
+            src = butler.getDirect(srcRef)
             src = photoCal.calibrateCatalog(src)
 
             gdSrc, = np.where(np.nan_to_num(src['slot_CalibFlux_flux']) > 0.0)
@@ -700,25 +617,94 @@ class FgcmcalTestBase(object):
 
         return matchMag, matchDelta
 
-    def _checkResult(self, result):
-        """
-        Check the result output from the task
+    def _testFgcmCalibrateTract(self, instName, visits, tract, skymapName,
+                                rawRepeatability, filterNCalibMap):
+        """Test running of FgcmCalibrateTractTask
 
         Parameters
         ----------
-        result: `pipeBase.struct`
-           Result structure output from a task
+        instName : `str`
+            Short name of the instrument
+        visits : `list`
+            List of visits to calibrate
+        tract : `int`
+            Tract number
+        skymapName : `str`
+            Name of the sky map
+        rawRepeatability : `np.array`
+            Expected raw repeatability after convergence.
+            Length should be number of bands.
+        filterNCalibMap : `dict`
+            Mapping from filter name to number of photoCalibs created.
         """
+        instCamel = instName.title()
 
-        self.assertNotEqual(result.resultList, [], 'resultList should not be empty')
-        self.assertEqual(result.resultList[0].exitStatus, 0)
+        configFile = os.path.join(ROOT,
+                                  'config',
+                                  'fgcmCalibrateTractTable%s.py' % (instCamel))
+
+        configFiles = ['fgcmCalibrateTractTable:' + configFile]
+        outputCollection = '%s/testfgcmcal/tract' % (instName)
+
+        inputCollections = '%s/testfgcmcal/lut,refcats' % (instName)
+        configOption = 'fgcmCalibrateTractTable:fgcmOutputProducts.doRefcatOutput=False'
+
+        queryString = f"tract={tract:d} and skymap='{skymapName:s}'"
+
+        self._runPipeline(self.repo,
+                          os.path.join(ROOT,
+                                       'pipelines',
+                                       f'fgcmCalibrateTractTable{instCamel:s}.yaml'),
+                          queryString=queryString,
+                          configFiles=configFiles,
+                          inputCollections=inputCollections,
+                          outputCollection=outputCollection,
+                          configOptions=[configOption],
+                          registerDatasetTypes=True)
+
+        butler = dafButler.Butler(self.repo)
+
+        whereClause = f"instrument='{instName:s}' and tract={tract:d} and skymap='{skymapName:s}'"
+
+        repRefs = butler.registry.queryDatasets('fgcmRawRepeatability',
+                                                dimensions=['tract'],
+                                                collections=outputCollection,
+                                                where=whereClause)
+
+        repeatabilityCat = butler.getDirect(list(repRefs)[0])
+        repeatability = repeatabilityCat['rawRepeatability'][:]
+        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=4e-6)
+
+        # Check that the number of photoCalib objects in each filter are what we expect
+        for filterName in filterNCalibMap.keys():
+            whereClause = (f"instrument='{instName:s}' and tract={tract:d} and "
+                           f"physical_filter='{filterName:s}' and skymap='{skymapName:s}'")
+
+            refs = butler.registry.queryDatasets('fgcmPhotoCalibTractCatalog',
+                                                 dimensions=['tract', 'physical_filter'],
+                                                 collections=outputCollection,
+                                                 where=whereClause)
+
+            count = 0
+            for ref in set(refs):
+                expCat = butler.getDirect(ref)
+                test, = np.where(expCat['visit'] > 0)
+                count += test.size
+
+            self.assertEqual(count, filterNCalibMap[filterName])
+
+        # Check that every visit got a transmission
+        for visit in visits:
+            whereClause = (f"instrument='{instName:s}' and tract={tract:d} and "
+                           f"visit={visit:d} and skymap='{skymapName:s}'")
+            refs = butler.registry.queryDatasets('transmission_atmosphere_fgcm_tract',
+                                                 dimensions=['tract', 'visit'],
+                                                 collections=outputCollection,
+                                                 where=whereClause)
+            self.assertEqual(len(set(refs)), 1)
 
     def tearDown(self):
+        """Tear down and clear directories
         """
-        Tear down and clear directories
-        """
-
-        if getattr(self, 'config', None) is not None:
-            del self.config
         if os.path.exists(self.testDir):
             shutil.rmtree(self.testDir, True)

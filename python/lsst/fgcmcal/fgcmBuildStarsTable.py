@@ -34,17 +34,135 @@ import time
 import numpy as np
 import collections
 
+import lsst.daf.persistence as dafPersist
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
+from lsst.meas.algorithms import ReferenceObjectLoader
 
 from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsRunner, FgcmBuildStarsBaseTask
-from .utilities import computeApproxPixelAreaFields
+from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromDataRef
+from .utilities import lookupStaticCalibrations
 
 __all__ = ['FgcmBuildStarsTableConfig', 'FgcmBuildStarsTableTask']
 
 
-class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase):
+class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
+                                     dimensions=("instrument",),
+                                     defaultTemplates={}):
+    camera = connectionTypes.PrerequisiteInput(
+        doc="Camera instrument",
+        name="camera",
+        storageClass="Camera",
+        dimensions=("instrument",),
+        lookupFunction=lookupStaticCalibrations,
+        isCalibration=True,
+    )
+
+    fgcmLookUpTable = connectionTypes.PrerequisiteInput(
+        doc=("Atmosphere + instrument look-up-table for FGCM throughput and "
+             "chromatic corrections."),
+        name="fgcmLookUpTable",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    sourceSchema = connectionTypes.PrerequisiteInput(
+        doc="Schema for source catalogs",
+        name="src_schema",
+        storageClass="SourceCatalog",
+        deferLoad=True,
+    )
+
+    refCat = connectionTypes.PrerequisiteInput(
+        doc="Reference catalog to use for photometric calibration",
+        name="cal_ref_cat",
+        storageClass="SimpleCatalog",
+        dimensions=("skypix",),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    sourceTable_visit = connectionTypes.Input(
+        doc="Source table in parquet format, per visit",
+        name="sourceTable_visit",
+        storageClass="DataFrame",
+        dimensions=("instrument", "visit"),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    calexp = connectionTypes.Input(
+        doc="Calibrated exposures used for psf and metadata",
+        name="calexp",
+        storageClass="ExposureF",
+        dimensions=("instrument", "visit", "detector"),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    background = connectionTypes.Input(
+        doc="Calexp background model",
+        name="calexpBackground",
+        storageClass="Background",
+        dimensions=("instrument", "visit", "detector"),
+        deferLoad=True,
+        multiple=True,
+    )
+
+    fgcmVisitCatalog = connectionTypes.Output(
+        doc="Catalog of visit information for fgcm",
+        name="fgcmVisitCatalog",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmStarObservations = connectionTypes.Output(
+        doc="Catalog of star observations for fgcm",
+        name="fgcmStarObservations",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmStarIds = connectionTypes.Output(
+        doc="Catalog of fgcm calibration star IDs",
+        name="fgcmStarIds",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmStarIndices = connectionTypes.Output(
+        doc="Catalog of fgcm calibration star indices",
+        name="fgcmStarIndices",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    fgcmReferenceStars = connectionTypes.Output(
+        doc="Catalog of fgcm-matched reference stars",
+        name="fgcmReferenceStars",
+        storageClass="Catalog",
+        dimensions=("instrument",),
+    )
+
+    def __init__(self, *, config=None):
+        super().__init__(config=config)
+
+        if not config.doReferenceMatches:
+            self.prerequisiteInputs.remove("refCat")
+            self.prerequisiteInputs.remove("fgcmLookUpTable")
+
+        if not config.doModelErrorsWithBackground:
+            self.inputs.remove("background")
+
+        if not config.doReferenceMatches:
+            self.outputs.remove("fgcmReferenceStars")
+
+
+class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase, pipeBase.PipelineTaskConfig,
+                                pipelineConnections=FgcmBuildStarsTableConnections):
     """Config for FgcmBuildStarsTableTask"""
 
     referenceCCD = pexConfig.Field(
@@ -101,6 +219,89 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
     RunnerClass = FgcmBuildStarsRunner
     _DefaultName = "fgcmBuildStarsTable"
 
+    canMultiprocess = False
+
+    def runQuantum(self, butlerQC, inputRefs, outputRefs):
+        inputRefDict = butlerQC.get(inputRefs)
+
+        dataRefs = inputRefDict['sourceTable_visit']
+
+        self.log.info("Running with %d sourceTable_visit dataRefs", (len(dataRefs)))
+
+        if self.config.doReferenceMatches:
+            # Get the LUT dataRef
+            lutDataRef = inputRefDict['fgcmLookUpTable']
+
+            # Prepare the refCat loader
+            refConfig = self.config.fgcmLoadReferenceCatalog.refObjLoader
+            refObjLoader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
+                                                          for ref in inputRefs.refCat],
+                                                 refCats=butlerQC.get(inputRefs.refCat),
+                                                 config=refConfig,
+                                                 log=self.log)
+            self.makeSubtask('fgcmLoadReferenceCatalog', refObjLoader=refObjLoader)
+        else:
+            lutDataRef = None
+
+        # Compute aperture radius if necessary.  This is useful to do now before
+        # any heave lifting has happened (fail early).
+        calibFluxApertureRadius = None
+        if self.config.doSubtractLocalBackground:
+            try:
+                calibFluxApertureRadius = computeApertureRadiusFromDataRef(dataRefs[0],
+                                                                           self.config.instFluxField)
+            except RuntimeError as e:
+                raise RuntimeError("Could not determine aperture radius from %s. "
+                                   "Cannot use doSubtractLocalBackground." %
+                                   (self.config.instFluxField)) from e
+
+        calexpRefs = inputRefDict['calexp']
+        calexpDataRefDict = {(calexpRef.dataId.byName()['visit'],
+                              calexpRef.dataId.byName()['detector']): calexpRef for
+                             calexpRef in calexpRefs}
+
+        camera = inputRefDict['camera']
+        groupedDataRefs = self._findAndGroupDataRefs(camera, dataRefs,
+                                                     calexpDataRefDict=calexpDataRefDict)
+
+        if self.config.doModelErrorsWithBackground:
+            bkgRefs = inputRefDict['background']
+            bkgDataRefDict = {(bkgRef.dataId.byName()['visit'],
+                               bkgRef.dataId.byName()['detector']): bkgRef for
+                              bkgRef in bkgRefs}
+        else:
+            bkgDataRefDict = None
+
+        # Gen3 does not currently allow "checkpoint" saving of datasets,
+        # so we need to have this all in one go.
+        visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs,
+                                             bkgDataRefDict=bkgDataRefDict,
+                                             visitCatDataRef=None,
+                                             inVisitCat=None)
+
+        rad = calibFluxApertureRadius
+        sourceSchemaDataRef = inputRefDict['sourceSchema']
+        fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
+                                                                  visitCat,
+                                                                  sourceSchemaDataRef,
+                                                                  camera,
+                                                                  calibFluxApertureRadius=rad,
+                                                                  starObsDataRef=None,
+                                                                  visitCatDataRef=None,
+                                                                  inStarObsCat=None)
+
+        butlerQC.put(visitCat, outputRefs.fgcmVisitCatalog)
+        butlerQC.put(fgcmStarObservationCat, outputRefs.fgcmStarObservations)
+
+        fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = self.fgcmMatchStars(visitCat,
+                                                                            fgcmStarObservationCat,
+                                                                            lutDataRef=lutDataRef)
+
+        butlerQC.put(fgcmStarIdCat, outputRefs.fgcmStarIds)
+        butlerQC.put(fgcmStarIndicesCat, outputRefs.fgcmStarIndices)
+        if fgcmRefCat is not None:
+            butlerQC.put(fgcmRefCat, outputRefs.fgcmReferenceStars)
+
     @classmethod
     def _makeArgumentParser(cls):
         """Create an argument parser"""
@@ -109,10 +310,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         return parser
 
-    def findAndGroupDataRefs(self, butler, dataRefs):
-        self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
+    def _findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
+        if (butler is None and calexpDataRefDict is None) or \
+                (butler is not None and calexpDataRefDict is not None):
+            raise RuntimeError("Must either set butler (Gen2) or dataRefDict (Gen3)")
 
-        camera = butler.get('camera')
+        self.log.info("Grouping dataRefs by %s", (self.config.visitDataRefName))
 
         ccdIds = []
         for detector in camera:
@@ -134,12 +337,20 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # Find an existing calexp (we need for psf and metadata)
             # and make the relevant dataRef
             for ccdId in ccdIds:
-                try:
-                    calexpRef = butler.dataRef('calexp', dataId={self.config.visitDataRefName: visit,
-                                                                 self.config.ccdDataRefName: ccdId})
-                except RuntimeError:
-                    # Not found
-                    continue
+                if butler is not None:
+                    # Gen2 Mode
+                    try:
+                        calexpRef = butler.dataRef('calexp', dataId={self.config.visitDataRefName: visit,
+                                                                     self.config.ccdDataRefName: ccdId})
+                    except RuntimeError:
+                        # Not found
+                        continue
+                else:
+                    # Gen3 mode
+                    calexpRef = calexpDataRefDict.get((visit, ccdId))
+                    if calexpRef is None:
+                        continue
+
                 # It was found.  Add and quit out, since we only
                 # need one calexp per visit.
                 groupedDataRefs[visit].append(calexpRef)
@@ -148,9 +359,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # And append this dataRef
             groupedDataRefs[visit].append(dataRef)
 
-        return groupedDataRefs
+        # This should be sorted by visit (the key)
+        return dict(sorted(groupedDataRefs.items()))
 
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
+                                    sourceSchemaDataRef,
+                                    camera,
                                     calibFluxApertureRadius=None,
                                     visitCatDataRef=None,
                                     starObsDataRef=None,
@@ -161,8 +375,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         # want to store checkpoint files.  If both are set, we will
         # do checkpoint files.  And if only one is set, this is potentially
         # unintentional and we will warn.
-        if (visitCatDataRef is not None and starObsDataRef is None or
-           visitCatDataRef is None and starObsDataRef is not None):
+        if (visitCatDataRef is not None and starObsDataRef is None
+           or visitCatDataRef is None and starObsDataRef is not None):
             self.log.warn("Only one of visitCatDataRef and starObsDataRef are set, so "
                           "no checkpoint files will be persisted.")
 
@@ -171,13 +385,11 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         # To get the correct output schema, we use similar code as fgcmBuildStarsTask
         # We are not actually using this mapper, except to grab the outputSchema
-        dataRef = groupedDataRefs[list(groupedDataRefs.keys())[0]][0]
-        sourceSchema = dataRef.get('src_schema', immediate=True).schema
+        sourceSchema = sourceSchemaDataRef.get().schema
         sourceMapper = self._makeSourceMapper(sourceSchema)
         outputSchema = sourceMapper.getOutputSchema()
 
         # Construct mapping from ccd number to index
-        camera = dataRef.get('camera')
         ccdMapping = {}
         for ccdIndex, detector in enumerate(camera):
             ccdMapping[detector.getId()] = ccdIndex
@@ -215,9 +427,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             expTime = visit['exptime']
 
             dataRef = groupedDataRefs[visit['visit']][-1]
-            srcTable = dataRef.get()
 
-            df = srcTable.toDataFrame(columns)
+            if isinstance(dataRef, dafPersist.ButlerDataRef):
+                srcTable = dataRef.get()
+                df = srcTable.toDataFrame(columns)
+            else:
+                df = dataRef.get(parameters={'columns': columns})
 
             goodSrc = self.sourceSelector.selectSources(df)
 
@@ -225,8 +440,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # if necessary
             if self.config.doSubtractLocalBackground:
                 localBackground = localBackgroundArea*df[self.config.localBackgroundFluxField].values
-                use, = np.where((goodSrc.selected) &
-                                ((df[self.config.instFluxField].values - localBackground) > 0.0))
+                use, = np.where((goodSrc.selected)
+                                & ((df[self.config.instFluxField].values - localBackground) > 0.0))
             else:
                 use, = np.where(goodSrc.selected)
 
@@ -237,8 +452,10 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             tempCat['dec'][:] = np.deg2rad(df['decl'].values[use])
             tempCat['x'][:] = df['x'].values[use]
             tempCat['y'][:] = df['y'].values[use]
-            tempCat[visitKey][:] = df[self.config.visitDataRefName].values[use]
-            tempCat[ccdKey][:] = df[self.config.ccdDataRefName].values[use]
+            # These "visit" and "ccd" names in the parquet tables are
+            # hard-coded.
+            tempCat[visitKey][:] = df['visit'].values[use]
+            tempCat[ccdKey][:] = df['ccd'].values[use]
             tempCat['psf_candidate'] = df['Calib_psf_candidate'].values[use]
 
             if self.config.doSubtractLocalBackground:
@@ -255,8 +472,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
                 # This is the difference between the mag with local background correction
                 # and the mag without local background correction.
-                tempCat['deltaMagBkg'] = (-2.5*np.log10(df[self.config.instFluxField].values[use] -
-                                                        localBackground[use]) -
+                tempCat['deltaMagBkg'] = (-2.5*np.log10(df[self.config.instFluxField].values[use]
+                                                        - localBackground[use]) -
                                           -2.5*np.log10(df[self.config.instFluxField].values[use]))
             else:
                 tempCat['deltaMagBkg'][:] = 0.0
@@ -268,14 +485,14 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                 use2 = (tempCat[ccdKey] == ccdId)
                 tempCat['jacobian'][use2] = approxPixelAreaFields[ccdId].evaluate(tempCat['x'][use2],
                                                                                   tempCat['y'][use2])
-                scaledInstFlux = (df[self.config.instFluxField].values[use[use2]] *
-                                  visit['scaling'][ccdMapping[ccdId]])
+                scaledInstFlux = (df[self.config.instFluxField].values[use[use2]]
+                                  * visit['scaling'][ccdMapping[ccdId]])
                 tempCat[instMagKey][use2] = (-2.5*np.log10(scaledInstFlux) + 2.5*np.log10(expTime))
 
             # Compute instMagErr from instFluxErr/instFlux, any scaling
             # will cancel out.
-            tempCat[instMagErrKey][:] = k*(df[self.config.instFluxField + 'Err'].values[use] /
-                                           df[self.config.instFluxField].values[use])
+            tempCat[instMagErrKey][:] = k*(df[self.config.instFluxField + 'Err'].values[use]
+                                           / df[self.config.instFluxField].values[use])
 
             # Apply the jacobian if configured
             if self.config.doApplyWcsJacobian:
@@ -289,14 +506,14 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                 np.warnings.simplefilter("ignore")
 
                 instMagIn = -2.5*np.log10(df[self.config.apertureInnerInstFluxField].values[use])
-                instMagErrIn = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values[use] /
-                                  df[self.config.apertureInnerInstFluxField].values[use])
+                instMagErrIn = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values[use]
+                                  / df[self.config.apertureInnerInstFluxField].values[use])
                 instMagOut = -2.5*np.log10(df[self.config.apertureOuterInstFluxField].values[use])
-                instMagErrOut = k*(df[self.config.apertureOuterInstFluxField + 'Err'].values[use] /
-                                   df[self.config.apertureOuterInstFluxField].values[use])
+                instMagErrOut = k*(df[self.config.apertureOuterInstFluxField + 'Err'].values[use]
+                                   / df[self.config.apertureOuterInstFluxField].values[use])
 
-            ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn) &
-                  np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
+            ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn)
+                  & np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
 
             visit['deltaAper'] = np.median(instMagIn[ok] - instMagOut[ok])
             visit['sources_read'] = True
@@ -304,8 +521,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             self.log.info("  Found %d good stars in visit %d (deltaAper = %0.3f)",
                           use.size, visit['visit'], visit['deltaAper'])
 
-            if ((counter % self.config.nVisitsPerCheckpoint) == 0 and
-               starObsDataRef is not None and visitCatDataRef is not None):
+            if ((counter % self.config.nVisitsPerCheckpoint) == 0
+               and starObsDataRef is not None and visitCatDataRef is not None):
                 # We need to persist both the stars and the visit catalog which gets
                 # additional metadata from each visit.
                 starObsDataRef.put(fullCatalog)
@@ -325,7 +542,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         columns : `list`
            List of columns to read from sourceTable_visit
         """
-        columns = [self.config.visitDataRefName, self.config.ccdDataRefName,
+        # These "visit" and "ccd" names in the parquet tables are hard-coded.
+        columns = ['visit', 'ccd',
                    'ra', 'decl', 'x', 'y', self.config.psfCandidateName,
                    self.config.instFluxField, self.config.instFluxField + 'Err',
                    self.config.apertureInnerInstFluxField, self.config.apertureInnerInstFluxField + 'Err',

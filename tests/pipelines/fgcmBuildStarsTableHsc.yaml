@@ -1,0 +1,5 @@
+description: Build fgcmcal input stars
+instrument: lsst.obs.subaru.HyperSuprimeCam
+tasks:
+  fgcmBuildStarsTable:
+    class: lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask

@@ -12,3 +12,5 @@ config.fgcmFitCycle.load(os.path.join(getPackageDir('fgcmcal'),
                                       'fgcmFitCycleHsc.py'))
 config.maxFitCycles = 3
 config.fgcmOutputProducts.doRefcatOutput = True
+
+config.connections.refCat = 'ps1_pv3_3pi_20170110'

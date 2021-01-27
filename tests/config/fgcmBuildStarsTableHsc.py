@@ -10,3 +10,7 @@ config.coarseNside = 64
 config.nVisitsPerCheckpoint = 5
 # The tests are done with only the brightest reference stars
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.minimum = 50.0
+# The test data do not have persisted backgrounds, so don't use them
+config.doModelErrorsWithBackground = False
+
+config.connections.refCat = "ps1_pv3_3pi_20170110"

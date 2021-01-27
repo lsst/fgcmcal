@@ -82,7 +82,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         config.colorterms.data['ps1*'].data['i'].c2 = -0.006855
 
         butler = dafPersist.Butler(self.inputDir)
-        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler, config=config)
+        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler=butler, config=config)
 
         ra = 337.656174
         dec = 0.823595
@@ -97,8 +97,8 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         self.assertLess(np.max(refCat['refMag'][:, 1]), 99.1)
         self.assertLess(np.max(refCat['refMagErr'][:, 0]), 99.1)
         self.assertLess(np.max(refCat['refMagErr'][:, 1]), 99.1)
-        test, = np.where((refCat['refMag'][:, 0] < 30.0) &
-                         (refCat['refMag'][:, 1] < 30.0))
+        test, = np.where((refCat['refMag'][:, 0] < 30.0)
+                         & (refCat['refMag'][:, 1] < 30.0))
         self.assertGreater(test.size, 0)
 
         # Check the separations from the center
@@ -142,7 +142,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         config.colorterms.data['ps1*'].data['i2'].c2 = -0.013666
 
         butler = dafPersist.Butler(self.inputDir)
-        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler, config=config)
+        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler=butler, config=config)
 
         ra = 337.656174
         dec = 0.823595
@@ -152,8 +152,8 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
 
         self.assertEqual(len(filterList), refCat['refMag'].shape[1])
         self.assertEqual(len(filterList), refCat['refMagErr'].shape[1])
-        test, = np.where((refCat['refMag'][:, 0] < 30.0) &
-                         (refCat['refMag'][:, 1] < 30.0))
+        test, = np.where((refCat['refMag'][:, 0] < 30.0)
+                         & (refCat['refMag'][:, 1] < 30.0))
         self.assertGreater(test.size, 0)
 
 
