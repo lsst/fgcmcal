@@ -43,7 +43,6 @@ import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
 import lsst.afw.cameraGeom as afwCameraGeom
-from lsst.afw.image import Filter
 from .utilities import lookupStaticCalibrations
 
 import fgcm
@@ -235,7 +234,10 @@ class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
     filterNames = pexConfig.ListField(
         doc="Filter names to build LUT ('short' names)",
         dtype=str,
-        default=None,
+        default=[],
+        deprecated=("This field is no longer used, and has been deprecated by "
+                    "DM-28088.  It will be removed after v22.  Use "
+                    "stdPhysicalFilterMap instead.")
     )
     stdFilterNames = pexConfig.ListField(
         doc=("Standard filterNames ('short' names). "
@@ -245,7 +247,22 @@ class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
              "which allows replacement (or time-variable) filters to be "
              "properly cross-calibrated."),
         dtype=str,
-        default=None,
+        default=[],
+        deprecated=("This field is no longer used, and has been deprecated by "
+                    "DM-28088.  It will be removed after v22.  Use "
+                    "stdPhysicalFilterMap instead.")
+    )
+    stdPhysicalFilterMap = pexConfig.DictField(
+        doc=("Mapping from physical filter names to 'standard' physical filter "
+             "names.  Each physical filter key in this dict will be calibrated "
+             "to the matched standard physical filter.  In generic usage, one "
+             "would have (e.g.) g->g, r->r, etc.  In the case of HSC, one would "
+             "have HSC-G->HSC-G, HSC-R->HSC-R2, HSC-R2->HSC-R2 which allows "
+             "replacement (or time-variable) filters to be properly "
+             "cross-calibrated to a specific bandpass."),
+        keytype=str,
+        itemtype=str,
+        default={},
     )
     atmosphereTableName = pexConfig.Field(
         doc="FGCM name or filename of precomputed atmospheres",
@@ -269,8 +286,7 @@ class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
         directly from the specified atmosphereTableName.
         """
         # check that filterNames and stdFilterNames are okay
-        self._fields['filterNames'].validate(self)
-        self._fields['stdFilterNames'].validate(self)
+        self._fields['stdPhysicalFilterMap'].validate(self)
 
         if self.atmosphereTableName is None:
             # Validate the parameters
@@ -389,21 +405,14 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                                                                  dataId={'ccd': detector.getId()})
 
         filterDataRefDict = {}
-        for filterName in self.config.filterNames:
-            f = Filter(filterName)
-            foundTrans = False
-            # Get all possible aliases and also try the short filterName
-            aliases = f.getAliases()
-            aliases.extend(filterName)
-            for alias in f.getAliases():
-                dataRef = butler.dataRef('transmission_filter', filter=alias)
-                if dataRef.datasetExists():
-                    foundTrans = True
-                    filterDataRefDict[alias] = dataRef
-                    break
-            if not foundTrans:
-                raise ValueError("Cound not find transmission for filter %s via any alias." %
-                                 (filterName))
+        for physicalFilter in self.config.stdPhysicalFilterMap:
+            # The physical filters map directly to dataId filter names
+            # for gen2 HSC.  This is the only camera that will be supported
+            # by Gen2 fgcmcal, so we do not need to worry about other cases.
+            dataRef = butler.dataRef('transmission_filter', filter=physicalFilter)
+            if not dataRef.datasetExists():
+                raise ValueError(f"Could not find transmission for filter {physicalFilter}.")
+            filterDataRefDict[physicalFilter] = dataRef
 
         lutCat = self._fgcmMakeLut(camera,
                                    opticsDataRef,
@@ -489,12 +498,12 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                        throughputLambda[1] - throughputLambda[0]))
 
         throughputDict = {}
-        for i, filterName in enumerate(self.config.filterNames):
+        for i, physicalFilter in enumerate(self.config.stdPhysicalFilterMap):
             tDict = {}
             tDict['LAMBDA'] = throughputLambda
             for ccdIndex, detector in enumerate(camera):
-                tDict[ccdIndex] = self._getThroughputDetector(detector, filterName, throughputLambda)
-            throughputDict[filterName] = tDict
+                tDict[ccdIndex] = self._getThroughputDetector(detector, physicalFilter, throughputLambda)
+            throughputDict[physicalFilter] = tDict
 
         # set the throughputs
         self.fgcmLutMaker.setThroughputs(throughputDict)
@@ -507,18 +516,23 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         # build the index values
         comma = ','
-        filterNameString = comma.join(self.config.filterNames)
-        stdFilterNameString = comma.join(self.config.stdFilterNames)
+        physicalFilters = []
+        stdPhysicalFilters = []
+        for physicalFilter in self.config.stdPhysicalFilterMap:
+            physicalFilters.append(physicalFilter)
+            stdPhysicalFilters.append(self.config.stdPhysicalFilterMap[physicalFilter])
+        physicalFilterString = comma.join(physicalFilters)
+        stdPhysicalFilterString = comma.join(stdPhysicalFilters)
 
         atmosphereTableName = 'NoTableWasUsed'
         if self.config.atmosphereTableName is not None:
             atmosphereTableName = self.config.atmosphereTableName
 
-        lutSchema = self._makeLutSchema(filterNameString, stdFilterNameString,
+        lutSchema = self._makeLutSchema(physicalFilterString, stdPhysicalFilterString,
                                         atmosphereTableName)
 
-        lutCat = self._makeLutCat(lutSchema, filterNameString,
-                                  stdFilterNameString, atmosphereTableName)
+        lutCat = self._makeLutCat(lutSchema, physicalFilterString,
+                                  stdPhysicalFilterString, atmosphereTableName)
         return lutCat
 
     def _createLutConfig(self, nCcd):
@@ -534,8 +548,13 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         # create the common stub of the lutConfig
         lutConfig = {}
         lutConfig['logger'] = self.log
-        lutConfig['filterNames'] = self.config.filterNames
-        lutConfig['stdFilterNames'] = self.config.stdFilterNames
+        physicalFilters = []
+        stdPhysicalFilters = []
+        for physicalFilter in self.config.stdPhysicalFilterMap:
+            physicalFilters.append(physicalFilter)
+            stdPhysicalFilters.append(self.config.stdPhysicalFilterMap[physicalFilter])
+        lutConfig['filterNames'] = physicalFilters
+        lutConfig['stdFilterNames'] = stdPhysicalFilters
         lutConfig['nCCD'] = nCcd
 
         # atmosphereTable already validated if available
@@ -599,22 +618,10 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             self._sensorsTransmission[detector.getId()] = sensorDataRefDict[detector.getId()].get()
 
         self._filtersTransmission = {}
-        for filterName in self.config.filterNames:
-            f = Filter(filterName)
-            foundTrans = False
-            # Get all possible aliases, and also try the short filterName
-            aliases = f.getAliases()
-            aliases.extend(filterName)
-            for alias in f.getAliases():
-                if alias in filterDataRefDict:
-                    self._filtersTransmission[filterName] = filterDataRefDict[alias].get()
-                    foundTrans = True
-                    break
-            if not foundTrans:
-                raise ValueError("Could not find transmission for filter %s via any alias." %
-                                 (filterName))
+        for physicalFilter in self.config.stdPhysicalFilterMap:
+            self._filtersTransmission[physicalFilter] = filterDataRefDict[physicalFilter].get()
 
-    def _getThroughputDetector(self, detector, filterName, throughputLambda):
+    def _getThroughputDetector(self, detector, physicalFilter, throughputLambda):
         """Internal method to get throughput for a detector.
 
         Returns the throughput at the center of the detector for a given filter.
@@ -623,8 +630,8 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         ----------
         detector: `lsst.afw.cameraGeom._detector.Detector`
            Detector on camera
-        filterName: `str`
-           Short name for filter
+        physicalFilter: `str`
+           Physical filter name
         throughputLambda: `np.array(dtype=np.float64)`
            Wavelength steps (Angstrom)
 
@@ -643,25 +650,25 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         throughput *= self._sensorsTransmission[detector.getId()].sampleAt(position=c,
                                                                            wavelengths=throughputLambda)
 
-        throughput *= self._filtersTransmission[filterName].sampleAt(position=c,
-                                                                     wavelengths=throughputLambda)
+        throughput *= self._filtersTransmission[physicalFilter].sampleAt(position=c,
+                                                                         wavelengths=throughputLambda)
 
         # Clip the throughput from 0 to 1
         throughput = np.clip(throughput, 0.0, 1.0)
 
         return throughput
 
-    def _makeLutSchema(self, filterNameString, stdFilterNameString,
+    def _makeLutSchema(self, physicalFilterString, stdPhysicalFilterString,
                        atmosphereTableName):
         """
         Make the LUT schema
 
         Parameters
         ----------
-        filterNameString: `str`
-           Combined string of all the filterNames
-        stdFilterNameString: `str`
-           Combined string of all the standard filterNames
+        physicalFilterString: `str`
+           Combined string of all the physicalFilters
+        stdPhysicalFilterString: `str`
+           Combined string of all the standard physicalFilters
         atmosphereTableName: `str`
            Name of the atmosphere table used to generate LUT
 
@@ -675,10 +682,10 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         lutSchema.addField('tablename', type=str, doc='Atmosphere table name',
                            size=len(atmosphereTableName))
         lutSchema.addField('elevation', type=float, doc="Telescope elevation used for LUT")
-        lutSchema.addField('filterNames', type=str, doc='filterNames in LUT',
-                           size=len(filterNameString))
-        lutSchema.addField('stdFilterNames', type=str, doc='Standard filterNames in LUT',
-                           size=len(stdFilterNameString))
+        lutSchema.addField('physicalFilters', type=str, doc='physicalFilters in LUT',
+                           size=len(physicalFilterString))
+        lutSchema.addField('stdPhysicalFilters', type=str, doc='Standard physicalFilters in LUT',
+                           size=len(stdPhysicalFilterString))
         lutSchema.addField('pmb', type='ArrayD', doc='Barometric Pressure',
                            size=self.fgcmLutMaker.pmb.size)
         lutSchema.addField('pmbFactor', type='ArrayD', doc='PMB scaling factor',
@@ -733,7 +740,7 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         return lutSchema
 
-    def _makeLutCat(self, lutSchema, filterNameString, stdFilterNameString,
+    def _makeLutCat(self, lutSchema, physicalFilterString, stdPhysicalFilterString,
                     atmosphereTableName):
         """
         Make the LUT schema
@@ -742,10 +749,10 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         ----------
         lutSchema: `afwTable.schema`
            Lut catalog schema
-        filterNameString: `str`
-           Combined string of all the filterNames
-        stdFilterNameString: `str`
-           Combined string of all the standard filterNames
+        physicalFilterString: `str`
+           Combined string of all the physicalFilters
+        stdPhysicalFilterString: `str`
+           Combined string of all the standard physicalFilters
         atmosphereTableName: `str`
            Name of the atmosphere table used to generate LUT
 
@@ -767,8 +774,8 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         rec['tablename'] = atmosphereTableName
         rec['elevation'] = self.fgcmLutMaker.atmosphereTable.elevation
-        rec['filterNames'] = filterNameString
-        rec['stdFilterNames'] = stdFilterNameString
+        rec['physicalFilters'] = physicalFilterString
+        rec['stdPhysicalFilters'] = stdPhysicalFilterString
         rec['pmb'][:] = self.fgcmLutMaker.pmb
         rec['pmbFactor'][:] = self.fgcmLutMaker.pmbFactor
         rec['pmbElevation'] = self.fgcmLutMaker.pmbElevation

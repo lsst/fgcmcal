@@ -242,6 +242,16 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         keytype=str,
         itemtype=str,
         default={},
+        deprecated=("This field is no longer used, and has been deprecated by "
+                    "DM-28088.  It will be removed after v22.  Use "
+                    "physicalFilterMap instead.")
+    )
+    # The following will not be necessary after Gen2 retirement.
+    physicalFilterMap = pexConfig.DictField(
+        doc="Mapping from 'physicalFilter' to band.",
+        keytype=str,
+        itemtype=str,
+        default={},
     )
     doReferenceCalibration = pexConfig.Field(
         doc="Use reference catalog as additional constraint on calibration",
@@ -1075,7 +1085,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                                     self.outputZeropoints)
 
         lutCat = dataRefDict['fgcmLookUpTable'].get()
-        fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat, dict(self.config.filterMap))
+        fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat,
+                                                         dict(self.config.physicalFilterMap))
         del lutCat
 
         # next we need the exposure/visit information
@@ -1132,7 +1143,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
             refMag, refMagErr = extractReferenceMags(refStars,
                                                      self.config.bands,
-                                                     self.config.filterMap)
+                                                     self.config.physicalFilterMap)
             refId = refStars['fgcm_id'][:]
         else:
             refStars = None

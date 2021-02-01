@@ -116,8 +116,8 @@ def makeConfigDict(config, log, camera, maxIter,
                   'fitBands': list(config.fitBands),
                   'notFitBands': notFitBands,
                   'requiredBands': list(config.requiredBands),
-                  'filterToBand': dict(config.filterMap),
-                  'logLevel': 'INFO',  # FIXME
+                  'filterToBand': dict(config.physicalFilterMap),
+                  'logLevel': 'INFO',
                   'nCore': config.nCore,
                   'nStarPerRun': config.nStarPerRun,
                   'nExpPerRun': config.nExpPerRun,
@@ -205,7 +205,7 @@ def makeConfigDict(config, log, camera, maxIter,
     return configDict
 
 
-def translateFgcmLut(lutCat, filterMap):
+def translateFgcmLut(lutCat, physicalFilterMap):
     """
     Translate the FGCM look-up-table into an fgcm-compatible object
 
@@ -213,8 +213,8 @@ def translateFgcmLut(lutCat, filterMap):
     ----------
     lutCat: `lsst.afw.table.BaseCatalog`
        Catalog describing the FGCM look-up table
-    filterMap: `dict`
-       Filter to band mapping
+    physicalFilterMap: `dict`
+       Physical filter to band mapping
 
     Returns
     -------
@@ -232,8 +232,8 @@ def translateFgcmLut(lutCat, filterMap):
 
     # first we need the lutIndexVals
     # dtype is set for py2/py3/fits/fgcm compatibility
-    lutFilterNames = np.array(lutCat[0]['filterNames'].split(','), dtype='a')
-    lutStdFilterNames = np.array(lutCat[0]['stdFilterNames'].split(','), dtype='a')
+    lutFilterNames = np.array(lutCat[0]['physicalFilters'].split(','), dtype='a')
+    lutStdFilterNames = np.array(lutCat[0]['stdPhysicalFilters'].split(','), dtype='a')
 
     # Note that any discrepancies between config values will raise relevant
     # exceptions in the FGCM code.
@@ -331,7 +331,7 @@ def translateFgcmLut(lutCat, filterMap):
     # references to the temporary objects (lutCat, lutFlat, lutDerivFlat)
     # will fall out of scope and can be cleaned up by the garbage collector.
     fgcmLut = fgcm.FgcmLUT(lutIndexVals, lutFlat, lutDerivFlat, lutStd,
-                           filterToBand=filterMap)
+                           filterToBand=physicalFilterMap)
 
     return fgcmLut, lutIndexVals, lutStd
 
@@ -367,7 +367,7 @@ def translateVisitCatalog(visitCat):
                                                  ('TELDEC', 'f8'),
                                                  ('TELROT', 'f8'),
                                                  ('PMB', 'f8'),
-                                                 ('FILTERNAME', 'a10')])
+                                                 ('FILTERNAME', 'a30')])
     fgcmExpInfo['VISIT'][:] = visitCat['visit']
     fgcmExpInfo['MJD'][:] = visitCat['mjd']
     fgcmExpInfo['EXPTIME'][:] = visitCat['exptime']
@@ -382,7 +382,7 @@ def translateVisitCatalog(visitCat):
     fgcmExpInfo['SKYBACKGROUND'][:] = visitCat['skyBackground']
     # Note that we have to go through asAstropy() to get a string
     #  array out of an afwTable.  This is faster than a row-by-row loop.
-    fgcmExpInfo['FILTERNAME'][:] = visitCat.asAstropy()['filtername']
+    fgcmExpInfo['FILTERNAME'][:] = visitCat.asAstropy()['physicalFilter']
 
     return fgcmExpInfo
 

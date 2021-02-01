@@ -59,27 +59,27 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         Test loading of the fgcm reference catalogs.
         """
 
-        filterList = ['r', 'i']
+        filterList = ['HSC-R', 'HSC-I']
 
         config = fgcmcal.FgcmLoadReferenceCatalogConfig()
         config.applyColorTerms = True
         config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
-        config.refFilterMap = {'r': 'r', 'i': 'i'}
+        config.refFilterMap = {'HSC-R': 'r', 'HSC-I': 'i'}
         config.colorterms.data = {}
         config.colorterms.data['ps1*'] = lsst.pipe.tasks.colorterms.ColortermDict()
         config.colorterms.data['ps1*'].data = {}
-        config.colorterms.data['ps1*'].data['r'] = lsst.pipe.tasks.colorterms.Colorterm()
-        config.colorterms.data['ps1*'].data['r'].primary = 'r'
-        config.colorterms.data['ps1*'].data['r'].secondary = 'i'
-        config.colorterms.data['ps1*'].data['r'].c0 = -0.000144
-        config.colorterms.data['ps1*'].data['r'].c1 = 0.001369
-        config.colorterms.data['ps1*'].data['r'].c2 = -0.008380
-        config.colorterms.data['ps1*'].data['i'] = lsst.pipe.tasks.colorterms.Colorterm()
-        config.colorterms.data['ps1*'].data['i'].primary = 'i'
-        config.colorterms.data['ps1*'].data['i'].secondary = 'z'
-        config.colorterms.data['ps1*'].data['i'].c0 = 0.000643
-        config.colorterms.data['ps1*'].data['i'].c1 = -0.130078
-        config.colorterms.data['ps1*'].data['i'].c2 = -0.006855
+        config.colorterms.data['ps1*'].data['HSC-R'] = lsst.pipe.tasks.colorterms.Colorterm()
+        config.colorterms.data['ps1*'].data['HSC-R'].primary = 'r'
+        config.colorterms.data['ps1*'].data['HSC-R'].secondary = 'i'
+        config.colorterms.data['ps1*'].data['HSC-R'].c0 = -0.000144
+        config.colorterms.data['ps1*'].data['HSC-R'].c1 = 0.001369
+        config.colorterms.data['ps1*'].data['HSC-R'].c2 = -0.008380
+        config.colorterms.data['ps1*'].data['HSC-I'] = lsst.pipe.tasks.colorterms.Colorterm()
+        config.colorterms.data['ps1*'].data['HSC-I'].primary = 'i'
+        config.colorterms.data['ps1*'].data['HSC-I'].secondary = 'z'
+        config.colorterms.data['ps1*'].data['HSC-I'].c0 = 0.000643
+        config.colorterms.data['ps1*'].data['HSC-I'].c1 = -0.130078
+        config.colorterms.data['ps1*'].data['HSC-I'].c2 = -0.006855
 
         butler = dafPersist.Butler(self.inputDir)
         loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler=butler, config=config)
@@ -119,27 +119,27 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         Test loading of the fgcm reference catalogs using unmatched filter names.
         """
 
-        filterList = ['r2', 'i2']
+        filterList = ['HSC-R2', 'HSC-I2']
 
         config = fgcmcal.FgcmLoadReferenceCatalogConfig()
         config.applyColorTerms = True
         config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
-        config.refFilterMap = {'r2': 'r', 'i2': 'i'}
+        config.refFilterMap = {'HSC-R2': 'r', 'HSC-I2': 'i'}
         config.colorterms.data = {}
         config.colorterms.data['ps1*'] = lsst.pipe.tasks.colorterms.ColortermDict()
         config.colorterms.data['ps1*'].data = {}
-        config.colorterms.data['ps1*'].data['r2'] = lsst.pipe.tasks.colorterms.Colorterm()
-        config.colorterms.data['ps1*'].data['r2'].primary = 'r'
-        config.colorterms.data['ps1*'].data['r2'].secondary = 'i'
-        config.colorterms.data['ps1*'].data['r2'].c0 = -0.000032
-        config.colorterms.data['ps1*'].data['r2'].c1 = -0.002866
-        config.colorterms.data['ps1*'].data['r2'].c2 = -0.012638
-        config.colorterms.data['ps1*'].data['i2'] = lsst.pipe.tasks.colorterms.Colorterm()
-        config.colorterms.data['ps1*'].data['i2'].primary = 'i'
-        config.colorterms.data['ps1*'].data['i2'].secondary = 'z'
-        config.colorterms.data['ps1*'].data['i2'].c0 = 0.001625
-        config.colorterms.data['ps1*'].data['i2'].c1 = -0.200406
-        config.colorterms.data['ps1*'].data['i2'].c2 = -0.013666
+        config.colorterms.data['ps1*'].data['HSC-R2'] = lsst.pipe.tasks.colorterms.Colorterm()
+        config.colorterms.data['ps1*'].data['HSC-R2'].primary = 'r'
+        config.colorterms.data['ps1*'].data['HSC-R2'].secondary = 'i'
+        config.colorterms.data['ps1*'].data['HSC-R2'].c0 = -0.000032
+        config.colorterms.data['ps1*'].data['HSC-R2'].c1 = -0.002866
+        config.colorterms.data['ps1*'].data['HSC-R2'].c2 = -0.012638
+        config.colorterms.data['ps1*'].data['HSC-I2'] = lsst.pipe.tasks.colorterms.Colorterm()
+        config.colorterms.data['ps1*'].data['HSC-I2'].primary = 'i'
+        config.colorterms.data['ps1*'].data['HSC-I2'].secondary = 'z'
+        config.colorterms.data['ps1*'].data['HSC-I2'].c0 = 0.001625
+        config.colorterms.data['ps1*'].data['HSC-I2'].c1 = -0.200406
+        config.colorterms.data['ps1*'].data['HSC-I2'].c2 = -0.013666
 
         butler = dafPersist.Butler(self.inputDir)
         loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler=butler, config=config)

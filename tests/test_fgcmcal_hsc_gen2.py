@@ -159,12 +159,11 @@ class FgcmcalTestHSCGen2(fgcmcalTestBaseGen2.FgcmcalTestBaseGen2, lsst.utils.tes
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        filterMapping = {'r': 'HSC-R', 'i': 'HSC-I'}
         zpOffsets = np.array([0.0010470541892573237, 0.005398149602115154])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
-                                     filterMapping, zpOffsets,
-                                     36236, 87, 'i', 1)
+                                     zpOffsets,
+                                     36236, 87, 'HSC-I', 1)
 
     def test_fgcmcalTract(self):
         # Set numpy seed for stability

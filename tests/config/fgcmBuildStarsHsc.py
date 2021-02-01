@@ -1,4 +1,4 @@
-config.filterMap = {'g': 'g', 'r': 'r', 'i': 'i'}
+config.physicalFilterMap = {'HSC-G': 'g', 'HSC-R': 'r', 'HSC-I': 'i'}
 config.requiredBands = ['r', 'i']
 config.primaryBands = ['i']
 config.minPerBand = 2

@@ -282,7 +282,7 @@ class FgcmcalTestBaseGen2(object):
 
         self.assertEqual(len(stds), nStdStars)
 
-    def _testFgcmOutputProducts(self, visitDataRefName, ccdDataRefName, filterMapping,
+    def _testFgcmOutputProducts(self, visitDataRefName, ccdDataRefName,
                                 zpOffsets, testVisit, testCcd, testFilter, testBandIndex):
         """
         Test running of FgcmOutputProductsTask
@@ -293,8 +293,6 @@ class FgcmcalTestBaseGen2(object):
            Name of column in dataRef to get the visit
         ccdDataRefName: `str`
            Name of column in dataRef to get the ccd
-        filterMapping: `dict`
-           Mapping of filterName to dataRef filter names
         zpOffsets: `np.array`
            Zeropoint offsets expected
         testVisit: `int`
@@ -369,14 +367,14 @@ class FgcmcalTestBaseGen2(object):
             testCal = butler.get('fgcm_photoCalib',
                                  dataId={visitDataRefName: int(rec['visit']),
                                          ccdDataRefName: int(rec['detector']),
-                                         'filter': filterMapping[rec['filtername']]})
+                                         'filter': rec['filtername']})
             self.assertIsNotNone(testCal)
 
         # We do round-trip value checking on just the final one (chosen arbitrarily)
         testCal = butler.get('fgcm_photoCalib',
                              dataId={visitDataRefName: int(testVisit),
                                      ccdDataRefName: int(testCcd),
-                                     'filter': filterMapping[testFilter]})
+                                     'filter': testFilter})
         self.assertIsNotNone(testCal)
 
         src = butler.get('src', dataId={visitDataRefName: int(testVisit),

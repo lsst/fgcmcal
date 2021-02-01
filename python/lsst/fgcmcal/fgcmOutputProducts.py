@@ -408,7 +408,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         dataRefDict['fgcmBuildStarsTableConfig'] = butlerQC.get(inputRefs.fgcmBuildStarsTableConfig)
 
         fgcmBuildStarsConfig = butlerQC.get(inputRefs.fgcmBuildStarsTableConfig)
-        filterMap = fgcmBuildStarsConfig.filterMap
+        physicalFilterMap = fgcmBuildStarsConfig.physicalFilterMap
 
         if self.config.doComposeWcsJacobian and not fgcmBuildStarsConfig.doApplyWcsJacobian:
             raise RuntimeError("Cannot compose the WCS jacobian if it hasn't been applied "
@@ -416,7 +416,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         if not self.config.doComposeWcsJacobian and fgcmBuildStarsConfig.doApplyWcsJacobian:
             self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
 
-        struct = self.run(dataRefDict, filterMap, returnCatalogs=True)
+        struct = self.run(dataRefDict, physicalFilterMap, returnCatalogs=True)
 
         # Output the photoCalib exposure catalogs
         if struct.photoCalibCatalogs is not None:
@@ -496,7 +496,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             fgcmBuildStarsConfig = butler.get('fgcmBuildStars_config')
         visitDataRefName = fgcmBuildStarsConfig.visitDataRefName
         ccdDataRefName = fgcmBuildStarsConfig.ccdDataRefName
-        filterMap = fgcmBuildStarsConfig.filterMap
+        physicalFilterMap = fgcmBuildStarsConfig.physicalFilterMap
 
         if self.config.doComposeWcsJacobian and not fgcmBuildStarsConfig.doApplyWcsJacobian:
             raise RuntimeError("Cannot compose the WCS jacobian if it hasn't been applied "
@@ -535,25 +535,16 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             dataRefDict['fgcmAtmosphereParameters'] = butler.dataRef('fgcmAtmosphereParameters',
                                                                      fgcmcycle=self.config.cycleNumber)
 
-        struct = self.run(dataRefDict, filterMap, butler=butler, returnCatalogs=False)
+        struct = self.run(dataRefDict, physicalFilterMap, butler=butler, returnCatalogs=False)
 
         if struct.photoCalibs is not None:
             self.log.info("Outputting photoCalib files.")
 
-            filterMapping = {}
-            for visit, detector, filtername, photoCalib in struct.photoCalibs:
-                if filtername not in filterMapping:
-                    # We need to find the mapping from encoded filter to dataid filter,
-                    # and this trick allows us to do that.
-                    dataId = {visitDataRefName: visit,
-                              ccdDataRefName: detector}
-                    dataRef = butler.dataRef('raw', dataId=dataId)
-                    filterMapping[filtername] = dataRef.dataId['filter']
-
+            for visit, detector, physicalFilter, photoCalib in struct.photoCalibs:
                 butler.put(photoCalib, 'fgcm_photoCalib',
                            dataId={visitDataRefName: visit,
                                    ccdDataRefName: detector,
-                                   'filter': filterMapping[filtername]})
+                                   'filter': physicalFilter})
 
             self.log.info("Done outputting photoCalib files.")
 
@@ -566,7 +557,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         return pipeBase.Struct(offsets=struct.offsets)
 
-    def run(self, dataRefDict, filterMap, returnCatalogs=True, butler=None):
+    def run(self, dataRefDict, physicalFilterMap, returnCatalogs=True, butler=None):
         """Run the output products task.
 
         Parameters
@@ -590,8 +581,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                 dataRef for the atmosphere parameter catalog.
             ``"fgcmBuildStarsTableConfig"``
                 Config for `lsst.fgcmcal.fgcmBuildStarsTableTask`.
-        filterMap : `dict`
-            Dictionary of mappings from filter to FGCM band.
+        physicalFilterMap : `dict`
+            Dictionary of mappings from physical filter to FGCM band.
         returnCatalogs : `bool`, optional
             Return photoCalibs as per-visit exposure catalogs.
         butler : `lsst.daf.persistence.Butler`, optional
@@ -633,7 +624,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             visitCat = dataRefDict['fgcmVisitCatalog'].get()
 
             pcgen = self._outputZeropoints(dataRefDict['camera'], zptCat, visitCat, offsets, bands,
-                                           filterMap, returnCatalogs=returnCatalogs)
+                                           physicalFilterMap, returnCatalogs=returnCatalogs)
         else:
             pcgen = None
 
@@ -707,7 +698,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                 Generator that returns (visit, exposureCatalog) tuples.
                 (returned if returnCatalogs is True).
         """
-        filterMap = fgcmBuildStarsConfig.filterMap
+        physicalFilterMap = fgcmBuildStarsConfig.physicalFilterMap
 
         md = stdCat.getMetadata()
         bands = md.getArray('BANDS')
@@ -733,7 +724,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         if self.config.doZeropointOutput:
             pcgen = self._outputZeropoints(dataRefDict['camera'], zptCat, visitCat, offsets, bands,
-                                           filterMap, returnCatalogs=returnCatalogs)
+                                           physicalFilterMap, returnCatalogs=returnCatalogs)
         else:
             pcgen = None
 
@@ -1049,7 +1040,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         return formattedCat
 
     def _outputZeropoints(self, camera, zptCat, visitCat, offsets, bands,
-                          filterMap, returnCatalogs=True,
+                          physicalFilterMap, returnCatalogs=True,
                           tract=None):
         """Output the zeropoints in fgcm_photoCalib format.
 
@@ -1065,8 +1056,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             Float array of absolute calibration offsets, one for each filter.
         bands : `list` [`str`]
             List of band names from FGCM output.
-        filterMap : `dict`
-            Dictionary of mappings from filter to FGCM band.
+        physicalFilterMap : `dict`
+            Dictionary of mappings from physical filter to FGCM band.
         returnCatalogs : `bool`, optional
             Return photoCalibs as per-visit exposure catalogs.
         tract: `int`, optional
@@ -1097,10 +1088,10 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         # Get a mapping from filtername to the offsets
         offsetMapping = {}
-        for f in filterMap:
+        for f in physicalFilterMap:
             # Not every filter in the map will necesarily have a band.
-            if filterMap[f] in bands:
-                offsetMapping[f] = offsets[bands.index(filterMap[f])]
+            if physicalFilterMap[f] in bands:
+                offsetMapping[f] = offsets[bands.index(physicalFilterMap[f])]
 
         # Get a mapping from "ccd" to the ccd index used for the scaling
         ccdMapping = {}
