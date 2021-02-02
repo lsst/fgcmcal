@@ -246,7 +246,9 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
                     "DM-28088.  It will be removed after v22.  Use "
                     "physicalFilterMap instead.")
     )
-    # The following will not be necessary after Gen2 retirement.
+    # The following config will not be necessary after Gen2 retirement.
+    # In the meantime, it is set to 'filterDefinitions.filter_to_band' which
+    # is easiest to access in the config file.
     physicalFilterMap = pexConfig.DictField(
         doc="Mapping from 'physicalFilter' to band.",
         keytype=str,

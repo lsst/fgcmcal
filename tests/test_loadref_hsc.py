@@ -64,7 +64,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         config = fgcmcal.FgcmLoadReferenceCatalogConfig()
         config.applyColorTerms = True
         config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
-        config.refFilterMap = {'HSC-R': 'r', 'HSC-I': 'i'}
+        config.filterMap = {'HSC-R': 'r', 'HSC-I': 'i'}
         config.colorterms.data = {}
         config.colorterms.data['ps1*'] = lsst.pipe.tasks.colorterms.ColortermDict()
         config.colorterms.data['ps1*'].data = {}
@@ -124,7 +124,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         config = fgcmcal.FgcmLoadReferenceCatalogConfig()
         config.applyColorTerms = True
         config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
-        config.refFilterMap = {'HSC-R2': 'r', 'HSC-I2': 'i'}
+        config.filterMap = {'HSC-R2': 'r', 'HSC-I2': 'i'}
         config.colorterms.data = {}
         config.colorterms.data['ps1*'] = lsst.pipe.tasks.colorterms.ColortermDict()
         config.colorterms.data['ps1*'].data = {}

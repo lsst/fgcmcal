@@ -100,7 +100,9 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
                     "DM-28088.  It will be removed after v22.  Use "
                     "physicalFilterMap instead.")
     )
-    # The following will not be necessary after Gen2 retirement.
+    # The following config will not be necessary after Gen2 retirement.
+    # In the meantime, obs packages should set to 'filterDefinitions.filter_to_band'
+    # which is easiest to access in the config file.
     physicalFilterMap = pexConfig.DictField(
         doc="Mapping from 'physicalFilter' to band.",
         keytype=str,
@@ -564,6 +566,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                 psf = exp.getPsf()
             else:
                 visitInfo = dataRef.get(component='visitInfo')
+                # TODO: When DM-28583 is fixed we can get the filterLabel
+                # via dataRef.get(component='filterLabel')
                 physicalFilter = dataRef.dataId['physical_filter']
                 psf = dataRef.get(component='psf')
 
@@ -733,7 +737,6 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             referenceFilterNames = []
 
         # make the fgcm starConfig dict
-        print(self.config.physicalFilterMap)
         starConfig = {'logger': self.log,
                       'filterToBand': self.config.physicalFilterMap,
                       'requiredBands': self.config.requiredBands,

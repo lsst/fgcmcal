@@ -12,7 +12,7 @@ config.bands = ('g', 'r', 'i', 'z', 'y')
 config.fitBands = ('g', 'r', 'i', 'z', 'y')
 # Bands that are required for a star to be considered a calibration star.
 config.requiredBands = ('g', 'r', 'i', 'z', 'y')
-config.filterMap = {'g': 'g', 'r': 'r', 'i': 'i', 'z': 'z', 'y': 'y'}
+
 
 # Maximum number of fit iterations (15 for testing, 50+ for a full run.)
 config.maxIterBeforeFinalCycle = 30

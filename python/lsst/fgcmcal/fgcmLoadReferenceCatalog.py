@@ -57,6 +57,15 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
         keytype=str,
         itemtype=str,
         default={},
+        deprecated=("This field is no longer used, and has been deprecated by "
+                    "DM-28088.  It will be removed after v22.  Use "
+                    "filterMap instead.")
+    )
+    filterMap = pexConfig.DictField(
+        doc="Mapping from physicalFilter label to reference filter name.",
+        keytype=str,
+        itemtype=str,
+        default={},
     )
     applyColorTerms = pexConfig.Field(
         doc=("Apply photometric color terms to reference stars?"
@@ -75,9 +84,9 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
 
     def validate(self):
         super().validate()
-        if not self.refFilterMap:
-            msg = 'Must set refFilterMap'
-            raise pexConfig.FieldValidationError(FgcmLoadReferenceCatalogConfig.refFilterMap, self, msg)
+        if not self.filterMap:
+            msg = 'Must set filterMap'
+            raise pexConfig.FieldValidationError(FgcmLoadReferenceCatalogConfig.filterMap, self, msg)
         if self.applyColorTerms and len(self.colorterms.data) == 0:
             msg = "applyColorTerms=True requires the `colorterms` field be set to a ColortermLibrary."
             raise pexConfig.FieldValidationError(FgcmLoadReferenceCatalogConfig.colorterms, self, msg)
@@ -308,7 +317,7 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         # via the refObjLoader task which requires a valid filterName
         foundReferenceFilter = False
         for filterName in filterList:
-            refFilterName = self.config.refFilterMap.get(filterName)
+            refFilterName = self.config.filterMap.get(filterName)
             if refFilterName is None:
                 continue
 
@@ -333,7 +342,7 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         for filterName in filterList:
             fluxField = None
 
-            refFilterName = self.config.refFilterMap.get(filterName)
+            refFilterName = self.config.filterMap.get(filterName)
 
             if refFilterName is not None:
                 try:
