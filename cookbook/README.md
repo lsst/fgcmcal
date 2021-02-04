@@ -64,16 +64,19 @@ filters aren't replaced that often.)
 ### Constructing a LUT from a precomputed atmosphere table
 
 A [sample config](fgcmMakeLutHscFromTable.py) for HSC in in the `cookbook/`
-directory.  There are only 3 fields to know about.  `filterNames` is a list of
-the "canonical" filter names.  Multiple "filters" can reference a single "band"
-(for example as the `r` and `i` filters have been replaced on HSC).  All filters
-that map to a single band will be calibrated together and put on the same
-system.  The `stdFilterNames` field is a list which matches each filter to a
-"standard filter".  For example, you can specify that all observations taken
-with the `i` filter should be transformed to the `i2` filter.  Note that at the
-current time the RC dataset on `lsst-dev` does not contain any `i2` data.  Finally,
-`atmosphereTableName` specifies the name of the table distributed with the
-third-party FGCM code; see that code for details.
+directory.  There are only 3 fields to know about.  `physicalFilters` is a list
+of the physical filter labels to make the LUT.  Multiple physical filters can
+reference a single band (for example, HSC-R and HSC-R2 both refer to the same
+r-band).  All filters that map to a single band will be calibrated together and
+put on the same system.  The `stdPhysicalFilterOverrideMap` dictionary field
+is the override mapping from physical filter labels to "standard" physical
+filter labels.  The "standard" physical filter defines the transmission curve
+that the FGCM standard bandpass will be based on.  Any filter not listed here
+will be mapped to itself (e.g. HSC-G->HSC-G).  Use this override for cross-
+filter calibration such as HSC-R->HSC-R2 and HSC-I->HSC-I2.  Note that at the
+current time the RC2 dataset on `lsst-devl` does not contain any HSC-R2 or
+HSC-I2 data.  Finally, `atmosphereTableName` specifies the name of the table
+distributed with the third-party FGCM code; see that code for details.
 
 ### Constructing a LUT using MODTRAN4
 
