@@ -1169,6 +1169,9 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                     # And start a new one
                     zptVisitCatalog = afwTable.ExposureCatalog(zptExpCatSchema)
                     zptVisitCatalog.resize(len(camera))
+                    zptVisitCatalog['visit'] = rec['visit']
+                    # By default all records will not resolve to a valid detector.
+                    zptVisitCatalog['detector_id'] = -1
 
                     # Reset the counter
                     zptCounter = 0
@@ -1176,7 +1179,6 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                     lastVisit = int(rec['visit'])
 
                 zptVisitCatalog[zptCounter].setPhotoCalib(photoCalib)
-                zptVisitCatalog[zptCounter]['visit'] = int(rec['visit'])
                 zptVisitCatalog[zptCounter]['detector_id'] = int(rec['detector'])
 
                 zptCounter += 1

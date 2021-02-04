@@ -252,12 +252,6 @@ class FgcmcalTestBaseGen2(object):
         if skipChecks:
             return
 
-        # Check that the expected number of plots are there.
-        plots = glob.glob(os.path.join(self.testDir, self.config.outfileBase
-                                       + '_cycle%02d_plots/' % (self.config.cycleNumber)
-                                       + '*.png'))
-        self.assertEqual(len(plots), nPlots)
-
         butler = dafPersist.butler.Butler(self.testDir)
 
         zps = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
@@ -281,6 +275,12 @@ class FgcmcalTestBaseGen2(object):
         stds = butler.get('fgcmStandardStars', fgcmcycle=self.config.cycleNumber)
 
         self.assertEqual(len(stds), nStdStars)
+
+        # Check that the expected number of plots are there.
+        plots = glob.glob(os.path.join(self.testDir, self.config.outfileBase
+                                       + '_cycle%02d_plots/' % (self.config.cycleNumber)
+                                       + '*.png'))
+        self.assertEqual(len(plots), nPlots)
 
     def _testFgcmOutputProducts(self, visitDataRefName, ccdDataRefName,
                                 zpOffsets, testVisit, testCcd, testFilter, testBandIndex):
