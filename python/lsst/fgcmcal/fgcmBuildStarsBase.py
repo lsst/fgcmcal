@@ -96,6 +96,18 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
         keytype=str,
         itemtype=str,
         default={},
+        deprecated=("This field is no longer used, and has been deprecated by "
+                    "DM-28088.  It will be removed after v22.  Use "
+                    "physicalFilterMap instead.")
+    )
+    # The following config will not be necessary after Gen2 retirement.
+    # In the meantime, obs packages should set to 'filterDefinitions.filter_to_band'
+    # which is easiest to access in the config file.
+    physicalFilterMap = pexConfig.DictField(
+        doc="Mapping from 'physicalFilter' to band.",
+        keytype=str,
+        itemtype=str,
+        default={},
     )
     requiredBands = pexConfig.ListField(
         doc="Bands required for each star",
@@ -549,16 +561,19 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             if isinstance(dataRef, dafPersist.ButlerDataRef):
                 exp = dataRef.get(datasetType='calexp_sub', bbox=bbox)
                 visitInfo = exp.getInfo().getVisitInfo()
-                f = exp.getFilter()
+                label = dataRef.get(datasetType='calexp_filterLabel')
+                physicalFilter = label.physicalLabel
                 psf = exp.getPsf()
             else:
                 visitInfo = dataRef.get(component='visitInfo')
-                f = dataRef.get(component='filter')
+                # TODO: When DM-28583 is fixed we can get the filterLabel
+                # via dataRef.get(component='filterLabel')
+                physicalFilter = dataRef.dataId['physical_filter']
                 psf = dataRef.get(component='psf')
 
             rec = visitCat[i]
             rec['visit'] = visit
-            rec['filtername'] = f.getName()
+            rec['physicalFilter'] = physicalFilter
             # TODO DM-26991: when gen2 is removed, gen3 workflow will make it
             # much easier to get the wcs's necessary to recompute the pointing
             # ra/dec at the center of the camera.
@@ -688,9 +703,9 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
         """
         # get filter names into a numpy array...
         # This is the type that is expected by the fgcm code
-        visitFilterNames = np.zeros(len(visitCat), dtype='a10')
+        visitFilterNames = np.zeros(len(visitCat), dtype='a30')
         for i in range(len(visitCat)):
-            visitFilterNames[i] = visitCat[i]['filtername']
+            visitFilterNames[i] = visitCat[i]['physicalFilter']
 
         # match to put filterNames with observations
         visitIndex = np.searchsorted(visitCat['visit'],
@@ -703,10 +718,10 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             lutCat = lutDataRef.get()
 
             stdFilterDict = {filterName: stdFilter for (filterName, stdFilter) in
-                             zip(lutCat[0]['filterNames'].split(','),
-                                 lutCat[0]['stdFilterNames'].split(','))}
+                             zip(lutCat[0]['physicalFilters'].split(','),
+                                 lutCat[0]['stdPhysicalFilters'].split(','))}
             stdLambdaDict = {stdFilter: stdLambda for (stdFilter, stdLambda) in
-                             zip(lutCat[0]['stdFilterNames'].split(','),
+                             zip(lutCat[0]['stdPhysicalFilters'].split(','),
                                  lutCat[0]['lambdaStdFilter'])}
 
             del lutCat
@@ -722,9 +737,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             referenceFilterNames = []
 
         # make the fgcm starConfig dict
-
         starConfig = {'logger': self.log,
-                      'filterToBand': self.config.filterMap,
+                      'filterToBand': self.config.physicalFilterMap,
                       'requiredBands': self.config.requiredBands,
                       'minPerBand': self.config.minPerBand,
                       'matchRadius': self.config.matchRadius,
@@ -824,8 +838,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
 
         schema = afwTable.Schema()
         schema.addField('visit', type=np.int32, doc="Visit number")
-        # Note that the FGCM code currently handles filternames up to 2 characters long
-        schema.addField('filtername', type=str, size=10, doc="Filter name")
+        schema.addField('physicalFilter', type=str, size=30, doc="Physical filter")
         schema.addField('telra', type=np.float64, doc="Pointing RA (deg)")
         schema.addField('teldec', type=np.float64, doc="Pointing Dec (deg)")
         schema.addField('telha', type=np.float64, doc="Pointing Hour Angle (deg)")
@@ -923,7 +936,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
         """
 
         # Find the unique list of filter names in visitCat
-        filterNames = np.unique(visitCat.asAstropy()['filtername'])
+        filterNames = np.unique(visitCat.asAstropy()['physicalFilter'])
 
         # Find the unique list of "standard" filters
         stdFilterNames = {stdFilterDict[filterName] for filterName in filterNames}

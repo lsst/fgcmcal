@@ -240,20 +240,11 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         if struct.photoCalibs is not None:
             self.log.info("Outputting photoCalib files.")
 
-            filterMapping = {}
-            for visit, detector, filtername, photoCalib in struct.photoCalibs:
-                if filtername not in filterMapping:
-                    # We need to find the mapping from encoded filter to dataid filter,
-                    # and this trick allows us to do that.
-                    dataId = {visitDataRefName: visit,
-                              ccdDataRefName: detector}
-                    dataRef = butler.dataRef('raw', dataId=dataId)
-                    filterMapping[filtername] = dataRef.dataId['filter']
-
+            for visit, detector, physicalFilter, photoCalib in struct.photoCalibs:
                 butler.put(photoCalib, 'fgcm_tract_photoCalib',
                            dataId={visitDataRefName: visit,
                                    ccdDataRefName: detector,
-                                   'filter': filterMapping[filtername],
+                                   'filter': physicalFilter,
                                    'tract': tract})
 
             self.log.info("Done outputting photoCalib files.")
@@ -380,7 +371,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         # Load the LUT
         lutCat = dataRefDict['fgcmLookUpTable'].get()
         fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat,
-                                                         dict(self.config.fgcmFitCycle.filterMap))
+                                                         dict(self.config.fgcmFitCycle.physicalFilterMap))
         del lutCat
 
         # Translate the visit catalog into fgcm format
@@ -426,7 +417,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
 
         refMag, refMagErr = extractReferenceMags(fgcmRefCat,
                                                  self.config.fgcmFitCycle.bands,
-                                                 self.config.fgcmFitCycle.filterMap)
+                                                 self.config.fgcmFitCycle.physicalFilterMap)
         refId = fgcmRefCat['fgcm_id'][:]
 
         fgcmStars = fgcm.FgcmStars(fgcmFitCycle.fgcmConfig)

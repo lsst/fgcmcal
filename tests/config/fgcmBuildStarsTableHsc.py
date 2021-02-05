@@ -1,7 +1,7 @@
 # This override is to be consistent with the old tests
 config.referenceCCD = 13
 # The filterMap and bands are for the small subset of bands used in the tests
-config.filterMap = {'g': 'g', 'r': 'r', 'i': 'i'}
+config.physicalFilterMap = {'HSC-G': 'g', 'HSC-R': 'r', 'HSC-I': 'i'}
 config.requiredBands = ['r', 'i']
 config.primaryBands = ['i']
 # The coarseNside is set appropriate to the area of the test data

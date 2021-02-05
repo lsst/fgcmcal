@@ -688,7 +688,7 @@ class FgcmcalTestBase(object):
             count = 0
             for ref in set(refs):
                 expCat = butler.getDirect(ref)
-                test, = np.where(expCat['visit'] > 0)
+                test, = np.where((expCat['visit'] > 0) & (expCat['detector_id'] >= 0))
                 count += test.size
 
             self.assertEqual(count, filterNCalibMap[filterName])
