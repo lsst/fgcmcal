@@ -246,7 +246,7 @@ class FgcmcalTestBase(object):
                                        'pipelines',
                                        'fgcmBuildStarsTable%s.yaml' % (instCamel)),
                           configFiles=[configFile],
-                          inputCollections='%s/testfgcmcal/lut,refcats' % (instName),
+                          inputCollections=f'{instName}/testfgcmcal/lut,refcats/gen2',
                           outputCollection=outputCollection,
                           configOptions=['fgcmBuildStarsTable:ccdDataRefName=detector'],
                           queryString=queryString,
@@ -646,7 +646,7 @@ class FgcmcalTestBase(object):
         configFiles = ['fgcmCalibrateTractTable:' + configFile]
         outputCollection = '%s/testfgcmcal/tract' % (instName)
 
-        inputCollections = '%s/testfgcmcal/lut,refcats' % (instName)
+        inputCollections = f'{instName}/testfgcmcal/lut,refcats/gen2'
         configOption = 'fgcmCalibrateTractTable:fgcmOutputProducts.doRefcatOutput=False'
 
         queryString = f"tract={tract:d} and skymap='{skymapName:s}'"
