@@ -902,7 +902,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             rec.set(badStarKey, True)
 
         exposure = afwImage.ExposureF()
-        exposure.setFilter(afwImage.Filter(band))
+        exposure.setFilterLabel(afwImage.FilterLabel(band=band))
 
         if refFluxFields[b] is None:
             # Need to find the flux field in the reference catalog
