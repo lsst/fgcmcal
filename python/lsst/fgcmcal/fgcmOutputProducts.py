@@ -827,7 +827,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         results['hpix'] = ipring[rev[rev[gdpix]]]
 
         # We need a boolean index to deal with catalogs...
-        selected = np.zeros(len(stdCat), dtype=np.bool)
+        selected = np.zeros(len(stdCat), dtype=bool)
 
         refFluxFields = [None]*len(bands)
 
@@ -882,7 +882,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
            Name of band for reference catalog
         stdCat: `lsst.afw.table.SimpleCatalog`
            FGCM standard stars
-        selected: `numpy.array(dtype=np.bool)`
+        selected: `numpy.array(dtype=bool)`
            Boolean array of which stars are in the pixel
         refFluxFields: `list`
            List of names of flux fields for reference catalog
@@ -968,7 +968,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         # Break up the pixels using a histogram
         h, rev = esutil.stat.histogram(indices, rev=True)
         gd, = np.where(h > 0)
-        selected = np.zeros(len(formattedCat), dtype=np.bool)
+        selected = np.zeros(len(formattedCat), dtype=bool)
         for i in gd:
             i1a = rev[rev[i]: rev[i + 1]]
 

@@ -336,15 +336,12 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         # Note that we will need visitCat at the end of the procedure for the outputs
         if isinstance(butler, dafPersist.Butler):
             # Gen2
-            groupedDataRefs = self.fgcmBuildStars._findAndGroupDataRefs(dataRefDict['camera'],
-                                                                        dataRefDict['source_catalogs'],
-                                                                        butler=butler)
+            groupedDataRefs = self.fgcmBuildStars._findAndGroupDataRefsGen2(butler, dataRefDict['camera'],
+                                                                            dataRefDict['source_catalogs'])
         else:
             # Gen3
-            cdrd = dataRefDict['calexps']
-            groupedDataRefs = self.fgcmBuildStars._findAndGroupDataRefs(dataRefDict['camera'],
-                                                                        dataRefDict['source_catalogs'],
-                                                                        calexpDataRefDict=cdrd)
+            groupedDataRefs = self.fgcmBuildStars._groupDataRefs(dataRefDict['sourceTableDataRefDict'],
+                                                                 dataRefDict['visitSummaryDataRefDict'])
         visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(dataRefDict['camera'], groupedDataRefs)
         rad = calibFluxApertureRadius
         fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedDataRefs,

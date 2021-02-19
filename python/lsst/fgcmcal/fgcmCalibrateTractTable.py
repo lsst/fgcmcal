@@ -84,11 +84,11 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    calexp = connectionTypes.Input(
-        doc="Calibrated exposures used for psf and metadata",
-        name="calexp",
-        storageClass="ExposureF",
-        dimensions=("instrument", "visit", "detector"),
+    visitSummary = connectionTypes.Input(
+        doc="Per-visit summary statistics table",
+        name="visitSummary",
+        storageClass="ExposureCatalog",
+        dimensions=("instrument", "visit"),
         deferLoad=True,
         multiple=True,
     )
@@ -183,11 +183,16 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
         # Run the build stars tasks
         tract = butlerQC.quantum.dataId['tract']
 
-        calexpRefs = dataRefDict['calexp']
-        calexpRefDict = {(calexpRef.dataId.byName()['visit'],
-                          calexpRef.dataId.byName()['detector']):
-                         calexpRef for calexpRef in calexpRefs}
-        dataRefDict['calexps'] = calexpRefDict
+        sourceTableRefs = dataRefDict['source_catalogs']
+        sourceTableDataRefDict = {sourceTableRef.dataId['visit']: sourceTableRef for
+                                  sourceTableRef in sourceTableRefs}
+
+        visitSummaryRefs = dataRefDict['visitSummary']
+        visitSummaryDataRefDict = {visitSummaryRef.dataId['visit']: visitSummaryRef for
+                                   visitSummaryRef in visitSummaryRefs}
+
+        dataRefDict['sourceTableDataRefDict'] = sourceTableDataRefDict
+        dataRefDict['visitSummaryDataRefDict'] = visitSummaryDataRefDict
 
         # And the outputs
         if self.config.fgcmOutputProducts.doZeropointOutput:
@@ -221,7 +226,7 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
             self.fgcmOutputProducts.refObjLoader = loader
 
         struct = self.run(dataRefDict, tract,
-                          buildStarsRefObjLoader=buildStarsRefObjLoader, butler=butlerQC)
+                          buildStarsRefObjLoader=buildStarsRefObjLoader)
 
         if struct.photoCalibCatalogs is not None:
             self.log.info("Outputting photoCalib catalogs.")

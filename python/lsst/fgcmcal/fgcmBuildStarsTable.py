@@ -94,11 +94,11 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    calexp = connectionTypes.Input(
-        doc="Calibrated exposures used for psf and metadata",
-        name="calexp",
-        storageClass="ExposureF",
-        dimensions=("instrument", "visit", "detector"),
+    visitSummary = connectionTypes.Input(
+        doc="Per-visit summary statistics table",
+        name="visitSummary",
+        storageClass="ExposureCatalog",
+        dimensions=("instrument", "visit"),
         deferLoad=True,
         multiple=True,
     )
@@ -224,9 +224,13 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputRefDict = butlerQC.get(inputRefs)
 
-        dataRefs = inputRefDict['sourceTable_visit']
+        sourceTableRefs = inputRefDict['sourceTable_visit']
 
-        self.log.info("Running with %d sourceTable_visit dataRefs", (len(dataRefs)))
+        self.log.info("Running with %d sourceTable_visit dataRefs",
+                      (len(sourceTableRefs)))
+
+        sourceTableDataRefDict = {sourceTableRef.dataId['visit']: sourceTableRef for
+                                  sourceTableRef in sourceTableRefs}
 
         if self.config.doReferenceMatches:
             # Get the LUT dataRef
@@ -248,21 +252,20 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         calibFluxApertureRadius = None
         if self.config.doSubtractLocalBackground:
             try:
-                calibFluxApertureRadius = computeApertureRadiusFromDataRef(dataRefs[0],
+                calibFluxApertureRadius = computeApertureRadiusFromDataRef(sourceTableRefs[0],
                                                                            self.config.instFluxField)
             except RuntimeError as e:
                 raise RuntimeError("Could not determine aperture radius from %s. "
                                    "Cannot use doSubtractLocalBackground." %
                                    (self.config.instFluxField)) from e
 
-        calexpRefs = inputRefDict['calexp']
-        calexpDataRefDict = {(calexpRef.dataId.byName()['visit'],
-                              calexpRef.dataId.byName()['detector']): calexpRef for
-                             calexpRef in calexpRefs}
+        visitSummaryRefs = inputRefDict['visitSummary']
+        visitSummaryDataRefDict = {visitSummaryRef.dataId['visit']: visitSummaryRef for
+                                   visitSummaryRef in visitSummaryRefs}
 
         camera = inputRefDict['camera']
-        groupedDataRefs = self._findAndGroupDataRefs(camera, dataRefs,
-                                                     calexpDataRefDict=calexpDataRefDict)
+        groupedDataRefs = self._groupDataRefs(sourceTableDataRefDict,
+                                              visitSummaryDataRefDict)
 
         if self.config.doModelErrorsWithBackground:
             bkgRefs = inputRefDict['background']
@@ -310,11 +313,34 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         return parser
 
-    def _findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
-        if (butler is None and calexpDataRefDict is None) or \
-                (butler is not None and calexpDataRefDict is not None):
-            raise RuntimeError("Must either set butler (Gen2) or dataRefDict (Gen3)")
+    def _groupDataRefs(self, sourceTableDataRefDict, visitSummaryDataRefDict):
+        """Group sourceTable and visitSummary dataRefs (gen3 only).
 
+        Parameters
+        ----------
+        sourceTableDataRefDict : `dict` [`int`, `str`]
+            Dict of source tables, keyed by visit.
+        visitSummaryDataRefDict : `dict` [int, `str`]
+            Dict of visit summary catalogs, keyed by visit.
+
+        Returns
+        -------
+        groupedDataRefs : `dict` [`int`, `list`]
+            Dictionary with sorted visit keys, and `list`s with
+            `lsst.daf.butler.DeferredDataSetHandle`.  The first
+            item in the list will be the visitSummary ref, and
+            the second will be the source table ref.
+        """
+        groupedDataRefs = collections.defaultdict(list)
+        visits = sorted(sourceTableDataRefDict.keys())
+
+        for visit in visits:
+            groupedDataRefs[visit] = [visitSummaryDataRefDict[visit],
+                                      sourceTableDataRefDict[visit]]
+
+        return groupedDataRefs
+
+    def _findAndGroupDataRefsGen2(self, butler, camera, dataRefs):
         self.log.info("Grouping dataRefs by %s", (self.config.visitDataRefName))
 
         ccdIds = []
@@ -337,19 +363,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # Find an existing calexp (we need for psf and metadata)
             # and make the relevant dataRef
             for ccdId in ccdIds:
-                if butler is not None:
-                    # Gen2 Mode
-                    try:
-                        calexpRef = butler.dataRef('calexp', dataId={self.config.visitDataRefName: visit,
-                                                                     self.config.ccdDataRefName: ccdId})
-                    except RuntimeError:
-                        # Not found
-                        continue
-                else:
-                    # Gen3 mode
-                    calexpRef = calexpDataRefDict.get((visit, ccdId))
-                    if calexpRef is None:
-                        continue
+                try:
+                    calexpRef = butler.dataRef('calexp', dataId={self.config.visitDataRefName: visit,
+                                                                 self.config.ccdDataRefName: ccdId})
+                except RuntimeError:
+                    # Not found
+                    continue
 
                 # It was found.  Add and quit out, since we only
                 # need one calexp per visit.
