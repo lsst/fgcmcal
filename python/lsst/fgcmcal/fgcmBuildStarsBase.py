@@ -400,7 +400,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
         Parameters
         ----------
         butler : `lsst.daf.persistence.Butler`
-            Gen2 butler when used as CommandLineTask
+            Gen2 butler.
         camera : `lsst.afw.cameraGeom.Camera`
             Camera from the butler.
         dataRefs : `list` of `lsst.daf.persistence.ButlerDataRef`
@@ -557,9 +557,9 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                 psfSigma = psf.computeShape().getDeterminantRadius()
             else:
                 # Gen3: use the visitSummary dataRef
-                summ = dataRef.get()
+                summary = dataRef.get()
 
-                detectors = list(summ['detector_id'])
+                detectors = list(summary['detector_id'])
 
                 try:
                     index = detectors.index(self.config.referenceCCD)
@@ -567,10 +567,16 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                     # Take first available ccd if reference isn't available
                     index = 0
 
-                visitInfo = summ[index].getVisitInfo()
-                physicalFilter = summ[index]['physical_filter']
-                psfSigma = summ[index]['psfSigma']
-                visitInfo = summ[index].getVisitInfo()
+                visitInfo = summary[index].getVisitInfo()
+                physicalFilter = summary[index]['physical_filter']
+                # Compute the median psf sigma if possible
+                goodSigma, = np.where(summary['psfSigma'] > 0)
+                if goodSigma.size > 2:
+                    psfSigma = np.median(summary['psfSigma'][goodSigma])
+                elif goodSigma > 0:
+                    psfSigma = np.mean(summary['psfSigma'][goodSigma])
+                else:
+                    psfSigma = 0.0
 
             rec = visitCat[i]
             rec['visit'] = visit

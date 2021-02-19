@@ -227,7 +227,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         sourceTableRefs = inputRefDict['sourceTable_visit']
 
         self.log.info("Running with %d sourceTable_visit dataRefs",
-                      (len(sourceTableRefs)))
+                      len(sourceTableRefs))
 
         sourceTableDataRefDict = {sourceTableRef.dataId['visit']: sourceTableRef for
                                   sourceTableRef in sourceTableRefs}
