@@ -430,7 +430,7 @@ def computeCcdOffsets(camera, defaultOrientation):
     # Create a temporary visitInfo for input to createInitialSkyWcs
     visitInfo = afwImage.VisitInfo(boresightRaDec=boresight,
                                    boresightRotAngle=orientation,
-                                   rotType=afwImage.visitInfo.RotType.SKY)
+                                   rotType=afwImage.RotType.SKY)
 
     for i, detector in enumerate(camera):
         ccdOffsets['CCDNUM'][i] = detector.getId()
@@ -472,7 +472,7 @@ def computeReferencePixelScale(camera):
     # Create a temporary visitInfo for input to createInitialSkyWcs
     visitInfo = afwImage.VisitInfo(boresightRaDec=boresight,
                                    boresightRotAngle=orientation,
-                                   rotType=afwImage.visitInfo.RotType.SKY)
+                                   rotType=afwImage.RotType.SKY)
 
     pixelScales = np.zeros(len(camera))
     for i, detector in enumerate(camera):
@@ -509,7 +509,7 @@ def computeApproxPixelAreaFields(camera):
     # The orientation does not matter for the area computation
     visitInfo = afwImage.VisitInfo(boresightRaDec=boresight,
                                    boresightRotAngle=0.0*geom.degrees,
-                                   rotType=afwImage.visitInfo.RotType.SKY)
+                                   rotType=afwImage.RotType.SKY)
 
     approxPixelAreaFields = {}
 
