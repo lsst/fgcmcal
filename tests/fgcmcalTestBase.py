@@ -437,7 +437,7 @@ class FgcmcalTestBase(object):
                                 collections=[outputCollection], instrument=instName)
             for row in expCat:
                 if row['visit'] == visit:
-                    photoCalibDict[(visit, row['detector_id'])] = row.getPhotoCalib()
+                    photoCalibDict[(visit, row['id'])] = row.getPhotoCalib()
 
         for rec in zptCat[selected]:
             self.assertTrue((rec['visit'], rec['detector']) in photoCalibDict)
@@ -688,7 +688,7 @@ class FgcmcalTestBase(object):
             count = 0
             for ref in set(refs):
                 expCat = butler.getDirect(ref)
-                test, = np.where((expCat['visit'] > 0) & (expCat['detector_id'] >= 0))
+                test, = np.where((expCat['visit'] > 0) & (expCat['id'] >= 0))
                 count += test.size
 
             self.assertEqual(count, filterNCalibMap[filterName])
