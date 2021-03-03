@@ -264,8 +264,7 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
 
                 self.log.debug("Applying color terms for filtername=%r" % (filterName))
 
-                colorterm = self.config.colorterms.getColorterm(
-                    filterName=filterName, photoCatName=refCatName, doRaise=True)
+                colorterm = self.config.colorterms.getColorterm(filterName, refCatName, doRaise=True)
 
                 refMag, refMagErr = colorterm.getCorrectedMagnitudes(refCat)
 
