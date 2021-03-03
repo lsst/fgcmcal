@@ -332,7 +332,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                                    (self.config.instFluxField)) from e
 
         camera = butler.get('camera')
-        groupedDataRefs = self._findAndGroupDataRefs(camera, dataRefs, butler=butler)
+        groupedDataRefs = self._findAndGroupDataRefsGen2(butler, camera, dataRefs)
 
         # Make the visit catalog if necessary
         # First check if the visit catalog is in the _current_ path
@@ -393,35 +393,26 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             butler.put(fgcmRefCat, 'fgcmReferenceStars')
 
     @abc.abstractmethod
-    def _findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
+    def _findAndGroupDataRefsGen2(self, butler, camera, dataRefs):
         """
-        Find and group dataRefs (by visit).  For Gen2 usage, set butler, and for
-        Gen3, use calexpDataRefDict
+        Find and group dataRefs (by visit); Gen2 only.
 
         Parameters
         ----------
+        butler : `lsst.daf.persistence.Butler`
+            Gen2 butler.
         camera : `lsst.afw.cameraGeom.Camera`
             Camera from the butler.
-        dataRefs : `list` of `lsst.daf.persistence.ButlerDataRef` or
-                   `lsst.daf.butler.DeferredDatasetHandle`
+        dataRefs : `list` of `lsst.daf.persistence.ButlerDataRef`
             Data references for the input visits.
-        butler : `lsst.daf.persistence.Butler`, optional
-            Gen2 butler when used as CommandLineTask
-        calexpDataRefDict : `dict`, optional
-            Dictionary of Gen3 deferred data refs for calexps
 
         Returns
         -------
-        groupedDataRefs : `OrderedDict` [`int`, `list`]
+        groupedDataRefs : `dict` [`int`, `list`]
             Dictionary with sorted visit keys, and `list`s of
-            `lsst.daf.persistence.ButlerDataRef` or
-            `lsst.daf.butler.DeferredDatasetHandle`
-
-        Raises
-        ------
-        RuntimeError : Raised if neither or both of butler and dataRefDict are set.
+            `lsst.daf.persistence.ButlerDataRef`
         """
-        raise NotImplementedError("_findAndGroupDataRefs not implemented.")
+        raise NotImplementedError("_findAndGroupDataRefsGen2 not implemented.")
 
     @abc.abstractmethod
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
@@ -554,22 +545,38 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                 if visitCatDataRef is not None:
                     visitCatDataRef.put(visitCat)
 
-            # Note that the reference ccd is first in the list (if available).
-
-            # The first dataRef in the group will be the reference ccd (if available)
             dataRef = groupedDataRefs[visit][0]
             if isinstance(dataRef, dafPersist.ButlerDataRef):
+                # Gen2: calexp dataRef
+                # The first dataRef in the group will be the reference ccd (if available)
                 exp = dataRef.get(datasetType='calexp_sub', bbox=bbox)
                 visitInfo = exp.getInfo().getVisitInfo()
                 label = dataRef.get(datasetType='calexp_filterLabel')
                 physicalFilter = label.physicalLabel
                 psf = exp.getPsf()
+                psfSigma = psf.computeShape().getDeterminantRadius()
             else:
-                visitInfo = dataRef.get(component='visitInfo')
-                # TODO: When DM-28583 is fixed we can get the filterLabel
-                # via dataRef.get(component='filterLabel')
-                physicalFilter = dataRef.dataId['physical_filter']
-                psf = dataRef.get(component='psf')
+                # Gen3: use the visitSummary dataRef
+                summary = dataRef.get()
+
+                detectors = list(summary['detector_id'])
+
+                try:
+                    index = detectors.index(self.config.referenceCCD)
+                except ValueError:
+                    # Take first available ccd if reference isn't available
+                    index = 0
+
+                visitInfo = summary[index].getVisitInfo()
+                physicalFilter = summary[index]['physical_filter']
+                # Compute the median psf sigma if possible
+                goodSigma, = np.where(summary['psfSigma'] > 0)
+                if goodSigma.size > 2:
+                    psfSigma = np.median(summary['psfSigma'][goodSigma])
+                elif goodSigma > 0:
+                    psfSigma = np.mean(summary['psfSigma'][goodSigma])
+                else:
+                    psfSigma = 0.0
 
             rec = visitCat[i]
             rec['visit'] = visit
@@ -593,8 +600,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             rec['scaling'][:] = 1.0
             # Median delta aperture, to be measured from stars
             rec['deltaAper'] = 0.0
-
-            rec['psfSigma'] = psf.computeShape().getDeterminantRadius()
+            rec['psfSigma'] = psfSigma
 
             if self.config.doModelErrorsWithBackground:
                 foundBkg = False
@@ -604,7 +610,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                         bgList = dataRef.get(datasetType='calexpBackground')
                         foundBkg = True
                 else:
-                    det = dataRef.dataId.byName()['detector']
+                    det = dataRef.dataId['detector']
                     try:
                         bkgRef = bkgDataRefDict[(visit, det)]
                         bgList = bkgRef.get()

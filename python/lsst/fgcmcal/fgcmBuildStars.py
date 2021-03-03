@@ -104,12 +104,7 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
 
         return parser
 
-    def _findAndGroupDataRefs(self, camera, dataRefs, butler=None, calexpDataRefDict=None):
-        if butler is None:
-            raise RuntimeError("Gen2 _findAndGroupDataRefs must be called with a butler.")
-        if calexpDataRefDict is not None:
-            self.log.warn("Ignoring calexpDataRefDict in gen2 _findAndGroupDataRefs")
-
+    def _findAndGroupDataRefsGen2(self, butler, camera, dataRefs):
         self.log.info("Grouping dataRefs by %s" % (self.config.visitDataRefName))
 
         ccdIds = []
