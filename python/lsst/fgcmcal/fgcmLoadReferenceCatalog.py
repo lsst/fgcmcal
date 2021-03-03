@@ -267,7 +267,7 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
                 colorterm = self.config.colorterms.getColorterm(
                     filterName=filterName, photoCatName=refCatName, doRaise=True)
 
-                refMag, refMagErr = colorterm.getCorrectedMagnitudes(refCat, filterName)
+                refMag, refMagErr = colorterm.getCorrectedMagnitudes(refCat)
 
                 # nan_to_num replaces nans with zeros, and this ensures that we select
                 # magnitudes that both filter out nans and are not very large (corresponding
