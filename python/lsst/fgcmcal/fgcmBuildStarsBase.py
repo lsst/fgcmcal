@@ -559,16 +559,13 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                 # Gen3: use the visitSummary dataRef
                 summary = dataRef.get()
 
-                detectors = list(summary['detector_id'])
+                summaryRow = summary.find(self.config.referenceCCD)
+                if summaryRow is None:
+                    # Take the first available ccd if reference isn't available
+                    summaryRow = summary[0]
 
-                try:
-                    index = detectors.index(self.config.referenceCCD)
-                except ValueError:
-                    # Take first available ccd if reference isn't available
-                    index = 0
-
-                visitInfo = summary[index].getVisitInfo()
-                physicalFilter = summary[index]['physical_filter']
+                visitInfo = summaryRow.getVisitInfo()
+                physicalFilter = summaryRow['physical_filter']
                 # Compute the median psf sigma if possible
                 goodSigma, = np.where(summary['psfSigma'] > 0)
                 if goodSigma.size > 2:
