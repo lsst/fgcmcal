@@ -40,6 +40,7 @@ import healpy as hp
 import esutil
 from astropy import units
 
+import lsst.daf.base as dafBase
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
@@ -132,7 +133,9 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
     )
 
     fgcmPhotoCalib = connectionTypes.Output(
-        doc="Per-visit photoCalib exposure catalogs produced from fgcm calibration",
+        doc=("Per-visit photometric calibrations derived from fgcm calibration. "
+             "These catalogs use detector id for the id and are sorted for "
+             "fast lookups of a detector."),
         name="fgcmPhotoCalibCatalog",
         storageClass="ExposureCatalog",
         dimensions=("instrument", "visit",),
@@ -1108,10 +1111,13 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         # The zptCat is sorted by visit, which is useful
         lastVisit = -1
-        zptCounter = 0
         zptVisitCatalog = None
-        for rec in zptCat[selected]:
 
+        metadata = dafBase.PropertyList()
+        metadata.add("COMMENT", "Catalog id is detector id, sorted.")
+        metadata.add("COMMENT", "Only detectors with data have entries.")
+
+        for rec in zptCat[selected]:
             # Retrieve overall scaling
             scaling = scalingMapping[rec['visit']][ccdMapping[rec['detector']]]
 
@@ -1159,32 +1165,29 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                     # This is a new visit.  If the last visit was not -1, yield
                     # the ExposureCatalog
                     if lastVisit > -1:
+                        # ensure that the detectors are in sorted order, for fast lookups
+                        zptVisitCatalog.sort()
                         yield (int(lastVisit), zptVisitCatalog)
                     else:
                         # We need to create a new schema
                         zptExpCatSchema = afwTable.ExposureTable.makeMinimalSchema()
                         zptExpCatSchema.addField('visit', type='I', doc='Visit number')
-                        zptExpCatSchema.addField('detector_id', type='I', doc='Detector number')
 
                     # And start a new one
                     zptVisitCatalog = afwTable.ExposureCatalog(zptExpCatSchema)
-                    zptVisitCatalog.resize(len(camera))
-                    zptVisitCatalog['visit'] = rec['visit']
-                    # By default all records will not resolve to a valid detector.
-                    zptVisitCatalog['detector_id'] = -1
-
-                    # Reset the counter
-                    zptCounter = 0
+                    zptVisitCatalog.setMetadata(metadata)
 
                     lastVisit = int(rec['visit'])
 
-                zptVisitCatalog[zptCounter].setPhotoCalib(photoCalib)
-                zptVisitCatalog[zptCounter]['detector_id'] = int(rec['detector'])
-
-                zptCounter += 1
+                catRecord = zptVisitCatalog.addNew()
+                catRecord['id'] = int(rec['detector'])
+                catRecord['visit'] = rec['visit']
+                catRecord.setPhotoCalib(photoCalib)
 
         # Final output of last exposure catalog
         if returnCatalogs:
+            # ensure that the detectors are in sorted order, for fast lookups
+            zptVisitCatalog.sort()
             yield (int(lastVisit), zptVisitCatalog)
 
     def _getChebyshevBoundedField(self, coefficients, xyMax, offset=0.0, scaling=1.0):
