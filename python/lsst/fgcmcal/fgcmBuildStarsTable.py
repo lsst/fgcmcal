@@ -95,7 +95,9 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
     )
 
     visitSummary = connectionTypes.Input(
-        doc="Per-visit summary statistics table",
+        doc=("Per-visit consolidated exposure metadata.  These catalogs use "
+             "detector id for the id and must be sorted for fast lookups of a "
+             "detector."),
         name="visitSummary",
         storageClass="ExposureCatalog",
         dimensions=("instrument", "visit"),
