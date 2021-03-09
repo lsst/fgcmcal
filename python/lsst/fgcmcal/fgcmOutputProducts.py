@@ -612,7 +612,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         bands = md.getArray('BANDS')
 
         if self.config.doReferenceCalibration:
-            offsets = self._computeReferenceOffsets(stdCat, bands)
+            lutCat = dataRefDict['fgcmLookUpTable'].get()
+            offsets = self._computeReferenceOffsets(stdCat, lutCat, physicalFilterMap, bands)
         else:
             offsets = np.zeros(len(bands))
 
@@ -714,7 +715,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
 
         if self.config.doReferenceCalibration:
-            offsets = self._computeReferenceOffsets(stdCat, bands)
+            lutCat = dataRefDict['fgcmLookUpTable'].get()
+            offsets = self._computeReferenceOffsets(stdCat, lutCat, bands, physicalFilterMap)
         else:
             offsets = np.zeros(len(bands))
 
@@ -745,7 +747,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         return retStruct
 
-    def _computeReferenceOffsets(self, stdCat, bands):
+    def _computeReferenceOffsets(self, stdCat, lutCat, physicalFilterMap, bands):
         """
         Compute offsets relative to a reference catalog.
 
@@ -759,6 +761,10 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         ----------
         stdCat : `lsst.afw.table.SimpleCatalog`
             FGCM standard stars
+        lutCat : `lsst.afw.table.SimpleCatalog`
+            FGCM Look-up table
+        physicalFilterMap : `dict`
+            Dictionary of mappings from physical filter to FGCM band.
         bands : `list` [`str`]
             List of band names from FGCM output
         Returns
@@ -777,6 +783,25 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         self.log.info("Found %d stars with at least 1 good observation in each band" %
                       (len(stdCat)))
+
+        # Associate each band with the appropriate physicalFilter and make
+        # filterLabels
+        filterLabels = []
+
+        lutPhysicalFilters = lutCat[0]['physicalFilters'].split(',')
+        lutStdPhysicalFilters = lutCat[0]['stdPhysicalFilters'].split(',')
+        physicalFilterMapBands = list(physicalFilterMap.values())
+        physicalFilterMapFilters = list(physicalFilterMap.keys())
+        for band in bands:
+            # Find a physical filter associated from the band by doing
+            # a reverse lookup on the physicalFilterMap dict
+            physicalFilterMapIndex = physicalFilterMapBands.index(band)
+            physicalFilter = physicalFilterMapFilters[physicalFilterMapIndex]
+            # Find the appropriate fgcm standard physicalFilter
+            lutPhysicalFilterIndex = lutPhysicalFilters.index(physicalFilter)
+            stdPhysicalFilter = lutStdPhysicalFilters[lutPhysicalFilterIndex]
+            filterLabels.append(afwImage.FilterLabel(band=band,
+                                                     physical=stdPhysicalFilter))
 
         # We have to make a table for each pixel with flux/fluxErr
         # This is a temporary table generated for input to the photoCal task.
@@ -831,7 +856,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         refFluxFields = [None]*len(bands)
 
-        for p, pix in enumerate(gdpix):
+        for p_index, pix in enumerate(gdpix):
             i1a = rev[rev[pix]: rev[pix + 1]]
 
             # the stdCat afwTable can only be indexed with boolean arrays,
@@ -840,82 +865,82 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             selected[:] = False
             selected[i1a] = True
 
-            for b, band in enumerate(bands):
-
-                struct = self._computeOffsetOneBand(sourceMapper, badStarKey, b, band, stdCat,
+            for b_index, filterLabel in enumerate(filterLabels):
+                struct = self._computeOffsetOneBand(sourceMapper, badStarKey, b_index,
+                                                    filterLabel, stdCat,
                                                     selected, refFluxFields)
-                results['nstar'][p, b] = len(i1a)
-                results['nmatch'][p, b] = len(struct.arrays.refMag)
-                results['zp'][p, b] = struct.zp
-                results['zpErr'][p, b] = struct.sigma
+                results['nstar'][p_index, b_index] = len(i1a)
+                results['nmatch'][p_index, b_index] = len(struct.arrays.refMag)
+                results['zp'][p_index, b_index] = struct.zp
+                results['zpErr'][p_index, b_index] = struct.sigma
 
         # And compute the summary statistics
         offsets = np.zeros(len(bands))
 
-        for b, band in enumerate(bands):
+        for b_index, band in enumerate(bands):
             # make configurable
-            ok, = np.where(results['nmatch'][:, b] >= self.config.referenceMinMatch)
-            offsets[b] = np.median(results['zp'][ok, b])
+            ok, = np.where(results['nmatch'][:, b_index] >= self.config.referenceMinMatch)
+            offsets[b_index] = np.median(results['zp'][ok, b_index])
             # use median absolute deviation to estimate Normal sigma
             # see https://en.wikipedia.org/wiki/Median_absolute_deviation
-            madSigma = 1.4826*np.median(np.abs(results['zp'][ok, b] - offsets[b]))
-            self.log.info("Reference catalog offset for %s band: %.12f +/- %.12f" %
-                          (band, offsets[b], madSigma))
+            madSigma = 1.4826*np.median(np.abs(results['zp'][ok, b_index] - offsets[b_index]))
+            self.log.info("Reference catalog offset for %s band: %.12f +/- %.12f",
+                          band, offsets[b_index], madSigma)
 
         return offsets
 
     def _computeOffsetOneBand(self, sourceMapper, badStarKey,
-                              b, band, stdCat, selected, refFluxFields):
+                              b_index, filterLabel, stdCat, selected, refFluxFields):
         """
         Compute the zeropoint offset between the fgcm stdCat and the reference
         stars for one pixel in one band
 
         Parameters
         ----------
-        sourceMapper: `lsst.afw.table.SchemaMapper`
-           Mapper to go from stdCat to calibratable catalog
-        badStarKey: `lsst.afw.table.Key`
-           Key for the field with bad stars
-        b: `int`
-           Index of the band in the star catalog
-        band: `str`
-           Name of band for reference catalog
-        stdCat: `lsst.afw.table.SimpleCatalog`
-           FGCM standard stars
-        selected: `numpy.array(dtype=bool)`
-           Boolean array of which stars are in the pixel
-        refFluxFields: `list`
-           List of names of flux fields for reference catalog
+        sourceMapper : `lsst.afw.table.SchemaMapper`
+            Mapper to go from stdCat to calibratable catalog
+        badStarKey : `lsst.afw.table.Key`
+            Key for the field with bad stars
+        b_index : `int`
+            Index of the band in the star catalog
+        filterLabel : `lsst.afw.image.FilterLabel`
+            filterLabel with band and physical filter
+        stdCat : `lsst.afw.table.SimpleCatalog`
+            FGCM standard stars
+        selected : `numpy.array(dtype=bool)`
+            Boolean array of which stars are in the pixel
+        refFluxFields : `list`
+            List of names of flux fields for reference catalog
         """
 
         sourceCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
         sourceCat.reserve(selected.sum())
         sourceCat.extend(stdCat[selected], mapper=sourceMapper)
-        sourceCat['instFlux'] = 10.**(stdCat['mag_std_noabs'][selected, b]/(-2.5))
-        sourceCat['instFluxErr'] = (np.log(10.)/2.5)*(stdCat['magErr_std'][selected, b]
+        sourceCat['instFlux'] = 10.**(stdCat['mag_std_noabs'][selected, b_index]/(-2.5))
+        sourceCat['instFluxErr'] = (np.log(10.)/2.5)*(stdCat['magErr_std'][selected, b_index]
                                                       * sourceCat['instFlux'])
         # Make sure we only use stars that have valid measurements
         # (This is perhaps redundant with requirements above that the
         # stars be observed in all bands, but it can't hurt)
-        badStar = (stdCat['mag_std_noabs'][selected, b] > 90.0)
+        badStar = (stdCat['mag_std_noabs'][selected, b_index] > 90.0)
         for rec in sourceCat[badStar]:
             rec.set(badStarKey, True)
 
         exposure = afwImage.ExposureF()
-        exposure.setFilterLabel(afwImage.FilterLabel(band=band))
+        exposure.setFilterLabel(filterLabel)
 
-        if refFluxFields[b] is None:
+        if refFluxFields[b_index] is None:
             # Need to find the flux field in the reference catalog
             # to work around limitations of DirectMatch in PhotoCal
             ctr = stdCat[0].getCoord()
             rad = 0.05*lsst.geom.degrees
-            refDataTest = self.refObjLoader.loadSkyCircle(ctr, rad, band)
-            refFluxFields[b] = refDataTest.fluxField
+            refDataTest = self.refObjLoader.loadSkyCircle(ctr, rad, filterLabel.bandLabel)
+            refFluxFields[b_index] = refDataTest.fluxField
 
         # Make a copy of the config so that we can modify it
         calConfig = copy.copy(self.config.photoCal.value)
-        calConfig.match.referenceSelection.signalToNoise.fluxField = refFluxFields[b]
-        calConfig.match.referenceSelection.signalToNoise.errField = refFluxFields[b] + 'Err'
+        calConfig.match.referenceSelection.signalToNoise.fluxField = refFluxFields[b_index]
+        calConfig.match.referenceSelection.signalToNoise.errField = refFluxFields[b_index] + 'Err'
         calTask = self.config.photoCal.target(refObjLoader=self.refObjLoader,
                                               config=calConfig,
                                               schema=sourceCat.getSchema())
