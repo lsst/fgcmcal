@@ -372,6 +372,10 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                     # Not found
                     continue
 
+                # Make sure the dataset exists
+                if not calexpRef.datasetExists():
+                    continue
+
                 # It was found.  Add and quit out, since we only
                 # need one calexp per visit.
                 groupedDataRefs[visit].append(calexpRef)
