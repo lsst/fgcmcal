@@ -1,7 +1,10 @@
 import lsst.fgcmcal as fgcmcal
 
 config.outfileBase = 'TestFgcm'
-config.physicalFilterMap = {'HSC-G': 'g', 'HSC-R': 'r', 'HSC-I': 'i'}
+config.physicalFilterMap = {'HSC-G': 'g',
+                            'HSC-R': 'r',
+                            'HSC-I': 'i',
+                            'HSC-Z': 'z'}
 config.bands = ['g', 'r', 'i']
 config.fitBands = ['g', 'r', 'i']
 config.requiredBands = ['r', 'i']
