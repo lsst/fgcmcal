@@ -66,7 +66,7 @@ def makeConfigDict(config, log, camera, maxIter,
     outputZeropoints: `bool`
         Compute zeropoints for output?
     lutFilterNames : array-like, `str`
-        Array of physical filter names in the LUT
+        Array of physical filter names in the LUT.
     tract: `int`, optional
         Tract number for extending the output file name for debugging.
         Default is None.
