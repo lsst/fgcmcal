@@ -376,7 +376,9 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
 
         configDict = makeConfigDict(self.config.fgcmFitCycle, self.log, dataRefDict['camera'],
                                     self.config.fgcmFitCycle.maxIterBeforeFinalCycle,
-                                    True, False, tract=tract)
+                                    True, False, lutIndexVals[0]['FILTERNAMES'],
+                                    tract=tract)
+
         # Turn off plotting in tract mode
         configDict['doPlots'] = False
 

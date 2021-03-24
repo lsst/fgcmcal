@@ -1082,14 +1082,15 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             self.outputZeropoints = True
             self.resetFitParameters = False
 
-        configDict = makeConfigDict(self.config, self.log, camera,
-                                    self.maxIter, self.resetFitParameters,
-                                    self.outputZeropoints)
-
         lutCat = dataRefDict['fgcmLookUpTable'].get()
         fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat,
                                                          dict(self.config.physicalFilterMap))
         del lutCat
+
+        configDict = makeConfigDict(self.config, self.log, camera,
+                                    self.maxIter, self.resetFitParameters,
+                                    self.outputZeropoints,
+                                    lutIndexVals[0]['FILTERNAMES'])
 
         # next we need the exposure/visit information
         visitCat = dataRefDict['fgcmVisitCatalog'].get()

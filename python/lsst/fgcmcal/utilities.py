@@ -46,7 +46,8 @@ FGCM_CCD_FIELD = 'DETECTOR'
 
 
 def makeConfigDict(config, log, camera, maxIter,
-                   resetFitParameters, outputZeropoints, tract=None):
+                   resetFitParameters, outputZeropoints,
+                   lutFilterNames, tract=None):
     """
     Make the FGCM fit cycle configuration dict
 
@@ -64,6 +65,8 @@ def makeConfigDict(config, log, camera, maxIter,
         Reset fit parameters before fitting?
     outputZeropoints: `bool`
         Compute zeropoints for output?
+    lutFilterNames : array-like, `str`
+        Array of physical filter names in the LUT.
     tract: `int`, optional
         Tract number for extending the output file name for debugging.
         Default is None.
@@ -91,6 +94,10 @@ def makeConfigDict(config, log, camera, maxIter,
     gains = [amp.getGain() for detector in camera for amp in detector.getAmplifiers()]
     cameraGain = float(np.median(gains))
 
+    # Cut down the filter map to those that are in the LUT
+    filterToBand = {filterName: config.physicalFilterMap[filterName] for
+                    filterName in lutFilterNames}
+
     if tract is None:
         outfileBase = config.outfileBase
     else:
@@ -116,7 +123,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'fitBands': list(config.fitBands),
                   'notFitBands': notFitBands,
                   'requiredBands': list(config.requiredBands),
-                  'filterToBand': dict(config.physicalFilterMap),
+                  'filterToBand': filterToBand,
                   'logLevel': 'INFO',
                   'nCore': config.nCore,
                   'nStarPerRun': config.nStarPerRun,
@@ -231,9 +238,8 @@ def translateFgcmLut(lutCat, physicalFilterMap):
     """
 
     # first we need the lutIndexVals
-    # dtype is set for py2/py3/fits/fgcm compatibility
-    lutFilterNames = np.array(lutCat[0]['physicalFilters'].split(','), dtype='a')
-    lutStdFilterNames = np.array(lutCat[0]['stdPhysicalFilters'].split(','), dtype='a')
+    lutFilterNames = np.array(lutCat[0]['physicalFilters'].split(','), dtype='U')
+    lutStdFilterNames = np.array(lutCat[0]['stdPhysicalFilters'].split(','), dtype='U')
 
     # Note that any discrepancies between config values will raise relevant
     # exceptions in the FGCM code.

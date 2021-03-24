@@ -516,15 +516,17 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
 
         Parameters
         ----------
-        visitCat: `afw.table.BaseCatalog`
-           Catalog with schema from _makeFgcmVisitSchema()
-        groupedDataRefs: `dict`
-           Dictionary with visit keys, and `list`s of
-           `lsst.daf.persistence.ButlerDataRef`
-        visitCatDataRef: `lsst.daf.persistence.ButlerDataRef`, optional
-           Dataref to write visitCat for checkpoints
-        bkgDataRefDict: `dict`, optional
-           Dictionary of gen3 dataRefHandles for background info. FIXME
+        visitCat : `afw.table.BaseCatalog`
+            Visit catalog.  See _makeFgcmVisitSchema() for schema definition.
+        groupedDataRefs : `dict`
+            Dictionary with visit keys, and `list`s of
+            `lsst.daf.persistence.ButlerDataRef` or
+            `lsst.daf.butler.DeferredDatasetHandle`
+        visitCatDataRef : `lsst.daf.persistence.ButlerDataRef`, optional
+            Dataref to write ``visitCat`` for checkpoints.  Gen2 only.
+        bkgDataRefDict : `dict`, optional
+            Dictionary of Gen3 `lsst.daf.butler.DeferredDatasetHandle`
+            for background info.
         """
         bbox = geom.BoxI(geom.PointI(0, 0), geom.PointI(1, 1))
 
@@ -564,6 +566,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                     # Take the first available ccd if reference isn't available
                     summaryRow = summary[0]
 
+                summaryDetector = summaryRow['id']
                 visitInfo = summaryRow.getVisitInfo()
                 physicalFilter = summaryRow['physical_filter']
                 # Compute the median psf sigma if possible
@@ -602,14 +605,16 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             if self.config.doModelErrorsWithBackground:
                 foundBkg = False
                 if isinstance(dataRef, dafPersist.ButlerDataRef):
+                    # Gen2-style dataRef
                     det = dataRef.dataId[self.config.ccdDataRefName]
                     if dataRef.datasetExists(datasetType='calexpBackground'):
                         bgList = dataRef.get(datasetType='calexpBackground')
                         foundBkg = True
                 else:
-                    det = dataRef.dataId['detector']
+                    # Gen3-style dataRef
                     try:
-                        bkgRef = bkgDataRefDict[(visit, det)]
+                        # Use the same detector used from the summary.
+                        bkgRef = bkgDataRefDict[(visit, summaryDetector)]
                         bgList = bkgRef.get()
                         foundBkg = True
                     except KeyError:
