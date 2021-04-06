@@ -439,8 +439,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         if self.config.doSubtractLocalBackground:
             localBackgroundArea = np.pi*calibFluxApertureRadius**2.
 
-        # Determine which columns we need from the sourceTable_visit catalogs
-        columns = self._get_sourceTable_visit_columns()
+        columns = None
 
         k = 2.5/np.log(10.)
 
@@ -455,8 +454,13 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
             if isinstance(dataRef, dafPersist.ButlerDataRef):
                 srcTable = dataRef.get()
+                if columns is None:
+                    columns, detColumn = self._get_sourceTable_visit_columns(srcTable.columns)
                 df = srcTable.toDataFrame(columns)
             else:
+                if columns is None:
+                    inColumns = dataRef.get(component='columns')
+                    columns, detColumn = self._get_sourceTable_visit_columns(inColumns)
                 df = dataRef.get(parameters={'columns': columns})
 
             goodSrc = self.sourceSelector.selectSources(df)
@@ -477,10 +481,9 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             tempCat['dec'][:] = np.deg2rad(df['decl'].values[use])
             tempCat['x'][:] = df['x'].values[use]
             tempCat['y'][:] = df['y'].values[use]
-            # These "visit" and "ccd" names in the parquet tables are
-            # hard-coded.
+            # The "visit" name in the parquet table is hard-coded.
             tempCat[visitKey][:] = df['visit'].values[use]
-            tempCat[ccdKey][:] = df['ccd'].values[use]
+            tempCat[ccdKey][:] = df[detColumn].values[use]
             tempCat['psf_candidate'] = df['Calib_psf_candidate'].values[use]
 
             if self.config.doSubtractLocalBackground:
@@ -558,17 +561,30 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         return fullCatalog
 
-    def _get_sourceTable_visit_columns(self):
+    def _get_sourceTable_visit_columns(self, inColumns):
         """
         Get the sourceTable_visit columns from the config.
+
+        Parameters
+        ----------
+        inColumns : `list`
+            List of columns available in the sourceTable_visit
 
         Returns
         -------
         columns : `list`
-           List of columns to read from sourceTable_visit
+            List of columns to read from sourceTable_visit.
+        detectorColumn : `str`
+            Name of the detector column.
         """
-        # These "visit" and "ccd" names in the parquet tables are hard-coded.
-        columns = ['visit', 'ccd',
+        if 'detector' in inColumns:
+            # Default name for Gen3.
+            detectorColumn = 'detector'
+        else:
+            # Default name for Gen2 and Gen2 conversions.
+            detectorColumn = 'ccd'
+        # Some names are hard-coded in the parquet table.
+        columns = ['visit', detectorColumn,
                    'ra', 'decl', 'x', 'y', self.config.psfCandidateName,
                    self.config.instFluxField, self.config.instFluxField + 'Err',
                    self.config.apertureInnerInstFluxField, self.config.apertureInnerInstFluxField + 'Err',
@@ -583,4 +599,4 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         if self.config.doSubtractLocalBackground:
             columns.append(self.config.localBackgroundFluxField)
 
-        return columns
+        return columns, detectorColumn
