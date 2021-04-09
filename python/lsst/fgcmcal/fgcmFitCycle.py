@@ -55,6 +55,8 @@ import fgcm
 
 __all__ = ['FgcmFitCycleConfig', 'FgcmFitCycleTask', 'FgcmFitCycleRunner']
 
+MULTIPLE_CYCLES_MAX = 10
+
 
 class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                               dimensions=("instrument",),
@@ -78,7 +80,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmVisitCatalog = connectionTypes.PrerequisiteInput(
+    fgcmVisitCatalog = connectionTypes.Input(
         doc="Catalog of visit information for fgcm",
         name="fgcmVisitCatalog",
         storageClass="Catalog",
@@ -86,7 +88,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmStarObservations = connectionTypes.PrerequisiteInput(
+    fgcmStarObservations = connectionTypes.Input(
         doc="Catalog of star observations for fgcm",
         name="fgcmStarObservations",
         storageClass="Catalog",
@@ -94,7 +96,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmStarIds = connectionTypes.PrerequisiteInput(
+    fgcmStarIds = connectionTypes.Input(
         doc="Catalog of fgcm calibration star IDs",
         name="fgcmStarIds",
         storageClass="Catalog",
@@ -102,7 +104,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmStarIndices = connectionTypes.PrerequisiteInput(
+    fgcmStarIndices = connectionTypes.Input(
         doc="Catalog of fgcm calibration star indices",
         name="fgcmStarIndices",
         storageClass="Catalog",
@@ -110,7 +112,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmReferenceStars = connectionTypes.PrerequisiteInput(
+    fgcmReferenceStars = connectionTypes.Input(
         doc="Catalog of fgcm-matched reference stars",
         name="fgcmReferenceStars",
         storageClass="Catalog",
@@ -169,11 +171,46 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         dimensions=("instrument",),
     )
 
+    # Add connections for running multiple cycles
+    # This uses vars() to alter the class __dict__ to programmatically
+    # write many similar outputs.
+    for cycle in range(MULTIPLE_CYCLES_MAX):
+        vars()[f"fgcmFitParameters{cycle}"] = connectionTypes.Output(
+            doc=f"Catalog of fgcm fit parameters from fit cycle {cycle}",
+            name=f"fgcmFitParameters{cycle}",
+            storageClass="Catalog",
+            dimensions=("instrument",),
+        )
+        vars()[f"fgcmFlaggedStars{cycle}"] = connectionTypes.Output(
+            doc=f"Catalog of flagged stars for fgcm calibration from fit cycle {cycle}",
+            name=f"fgcmFlaggedStars{cycle}",
+            storageClass="Catalog",
+            dimensions=("instrument",),
+        )
+        vars()[f"fgcmZeropoints{cycle}"] = connectionTypes.Output(
+            doc=f"Catalog of fgcm zeropoint data from fit cycle {cycle}",
+            name=f"fgcmZeropoints{cycle}",
+            storageClass="Catalog",
+            dimensions=("instrument",),
+        )
+        vars()[f"fgcmAtmosphereParameters{cycle}"] = connectionTypes.Output(
+            doc=f"Catalog of atmospheric fit parameters from fit cycle {cycle}",
+            name=f"fgcmAtmosphereParameters{cycle}",
+            storageClass="Catalog",
+            dimensions=("instrument",),
+        )
+        vars()[f"fgcmStandardStars{cycle}"] = connectionTypes.Output(
+            doc=f"Catalog of standard star magnitudes from fit cycle {cycle}",
+            name=f"fgcmStandardStars{cycle}",
+            storageClass="SimpleCatalog",
+            dimensions=("instrument",),
+        )
+
     def __init__(self, *, config=None):
         super().__init__(config=config)
 
         if not config.doReferenceCalibration:
-            self.prerequisiteInputs.remove("fgcmReferenceStars")
+            self.inputs.remove("fgcmReferenceStars")
 
         if str(int(config.connections.cycleNumber)) != config.connections.cycleNumber:
             raise ValueError("cycleNumber must be of integer format")
@@ -186,18 +223,72 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
             self.prerequisiteInputs.remove("fgcmFlaggedStarsInput")
             self.prerequisiteInputs.remove("fgcmFitParametersInput")
 
-        if not self.config.isFinalCycle and not self.config.outputStandardsBeforeFinalCycle:
-            self.outputs.remove("fgcmStandardStars")
+        if not self.config.doMultipleCycles:
+            # Single-cycle run
+            if not self.config.isFinalCycle and not self.config.outputStandardsBeforeFinalCycle:
+                self.outputs.remove("fgcmStandardStars")
 
-        if not self.config.isFinalCycle and not self.config.outputZeropointsBeforeFinalCycle:
+            if not self.config.isFinalCycle and not self.config.outputZeropointsBeforeFinalCycle:
+                self.outputs.remove("fgcmZeropoints")
+                self.outputs.remove("fgcmAtmosphereParameters")
+
+            # Remove all multiple cycle outputs
+            for cycle in range(0, MULTIPLE_CYCLES_MAX):
+                self.outputs.remove(f"fgcmFitParameters{cycle}")
+                self.outputs.remove(f"fgcmFlaggedStars{cycle}")
+                self.outputs.remove(f"fgcmZeropoints{cycle}")
+                self.outputs.remove(f"fgcmAtmosphereParameters{cycle}")
+                self.outputs.remove(f"fgcmStandardStars{cycle}")
+
+        else:
+            # Multiple-cycle run
+            # Remove single-cycle outputs
+            self.outputs.remove("fgcmFitParameters")
+            self.outputs.remove("fgcmFlaggedStars")
             self.outputs.remove("fgcmZeropoints")
             self.outputs.remove("fgcmAtmosphereParameters")
+            self.outputs.remove("fgcmStandardStars")
+
+            # Remove outputs from cycles that are not used
+            for cycle in range(self.config.multipleCyclesFinalCycleNumber + 1,
+                               MULTIPLE_CYCLES_MAX):
+                self.outputs.remove(f"fgcmFitParameters{cycle}")
+                self.outputs.remove(f"fgcmFlaggedStars{cycle}")
+                self.outputs.remove(f"fgcmZeropoints{cycle}")
+                self.outputs.remove(f"fgcmAtmosphereParameters{cycle}")
+                self.outputs.remove(f"fgcmStandardStars{cycle}")
+
+            # Remove non-final-cycle outputs if necessary
+            for cycle in range(self.config.multipleCyclesFinalCycleNumber):
+                if not self.config.outputZeropointsBeforeFinalCycle:
+                    self.outputs.remove(f"fgcmZeropoints{cycle}")
+                    self.outputs.remove(f"fgcmAtmosphereParameters{cycle}")
+                if not self.config.outputStandardsBeforeFinalCycle:
+                    self.outputs.remove(f"fgcmStandardStars{cycle}")
 
 
 class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
                          pipelineConnections=FgcmFitCycleConnections):
     """Config for FgcmFitCycle"""
 
+    doMultipleCycles = pexConfig.Field(
+        doc="Run multiple fit cycles in one task",
+        dtype=bool,
+        default=False,
+    )
+    multipleCyclesFinalCycleNumber = pexConfig.RangeField(
+        doc=("Final cycle number in multiple cycle mode.  The initial cycle "
+             "is 0, with limited parameters fit.  The next cycle is 1 with "
+             "full parameter fit.  The final cycle is a clean-up with no "
+             "parameters fit.  There will be a total of "
+             "(multipleCycleFinalCycleNumber + 1) cycles run, and the final "
+             "cycle number cannot be less than 2."),
+        dtype=int,
+        default=5,
+        min=2,
+        max=MULTIPLE_CYCLES_MAX,
+        inclusiveMax=True,
+    )
     bands = pexConfig.ListField(
         doc="Bands to run calibration",
         dtype=str,
@@ -777,6 +868,11 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=False,
     )
+    doPlots = pexConfig.Field(
+        doc="Make fgcm QA plots.",
+        dtype=bool,
+        default=True,
+    )
     randomSeed = pexConfig.Field(
         doc="Random seed for fgcm for consistency in tests.",
         dtype=int,
@@ -941,15 +1037,43 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             dataRefDict['fgcmFlaggedStars'] = butlerQC.get(inputRefs.fgcmFlaggedStarsInput)
             dataRefDict['fgcmFitParameters'] = butlerQC.get(inputRefs.fgcmFitParametersInput)
 
-        fgcmDatasetDict = self._fgcmFitCycle(camera, dataRefDict)
+        fgcmDatasetDict = None
+        if self.config.doMultipleCycles:
+            # Run multiple cycles at once.
+            config = copy.copy(self.config)
+            config.update(cycleNumber=0)
+            for cycle in range(self.config.multipleCyclesFinalCycleNumber + 1):
+                if cycle == self.config.multipleCyclesFinalCycleNumber:
+                    config.update(isFinalCycle=True)
 
-        butlerQC.put(fgcmDatasetDict['fgcmFitParameters'], outputRefs.fgcmFitParameters)
-        butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'], outputRefs.fgcmFlaggedStars)
-        if self.outputZeropoints:
-            butlerQC.put(fgcmDatasetDict['fgcmZeropoints'], outputRefs.fgcmZeropoints)
-            butlerQC.put(fgcmDatasetDict['fgcmAtmosphereParameters'], outputRefs.fgcmAtmosphereParameters)
-        if self.outputStandards:
-            butlerQC.put(fgcmDatasetDict['fgcmStandardStars'], outputRefs.fgcmStandardStars)
+                if cycle > 0:
+                    dataRefDict['fgcmFlaggedStars'] = fgcmDatasetDict['fgcmFlaggedStars']
+                    dataRefDict['fgcmFitParameters'] = fgcmDatasetDict['fgcmFitParameters']
+
+                fgcmDatasetDict, config = self._fgcmFitCycle(camera, dataRefDict, config=config)
+                butlerQC.put(fgcmDatasetDict['fgcmFitParameters'],
+                             getattr(outputRefs, f'fgcmFitParameters{cycle}'))
+                butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'],
+                             getattr(outputRefs, f'fgcmFlaggedStars{cycle}'))
+                if self.outputZeropoints:
+                    butlerQC.put(fgcmDatasetDict['fgcmZeropoints'],
+                                 getattr(outputRefs, f'fgcmZeropoints{cycle}'))
+                    butlerQC.put(fgcmDatasetDict['fgcmAtmosphereParameters'],
+                                 getattr(outputRefs, f'fgcmAtmosphereParameters{cycle}'))
+                if self.outputStandards:
+                    butlerQC.put(fgcmDatasetDict['fgcmStandardStars'],
+                                 getattr(outputRefs, f'fgcmStandardStars{cycle}'))
+        else:
+            # Run a single cycle
+            fgcmDatasetDict, _ = self._fgcmFitCycle(camera, dataRefDict)
+
+            butlerQC.put(fgcmDatasetDict['fgcmFitParameters'], outputRefs.fgcmFitParameters)
+            butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'], outputRefs.fgcmFlaggedStars)
+            if self.outputZeropoints:
+                butlerQC.put(fgcmDatasetDict['fgcmZeropoints'], outputRefs.fgcmZeropoints)
+                butlerQC.put(fgcmDatasetDict['fgcmAtmosphereParameters'], outputRefs.fgcmAtmosphereParameters)
+            if self.outputStandards:
+                butlerQC.put(fgcmDatasetDict['fgcmStandardStars'], outputRefs.fgcmStandardStars)
 
     @pipeBase.timeMethod
     def runDataRef(self, butler):
@@ -978,7 +1102,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                                                               fgcmcycle=lastCycle)
 
         camera = butler.get('camera')
-        fgcmDatasetDict = self._fgcmFitCycle(camera, dataRefDict)
+        fgcmDatasetDict, _ = self._fgcmFitCycle(camera, dataRefDict)
 
         butler.put(fgcmDatasetDict['fgcmFitParameters'], 'fgcmFitParameters',
                    fgcmcycle=self.config.cycleNumber)
@@ -1033,7 +1157,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         else:
             butler.put(self.config, configName, fgcmcycle=self.config.cycleNumber)
 
-    def _fgcmFitCycle(self, camera, dataRefDict):
+    def _fgcmFitCycle(self, camera, dataRefDict, config=None):
         """
         Run the fit cycle
 
@@ -1061,19 +1185,26 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                 dataRef for flagged star catalog.
             ``"fgcmFitParameters"``
                 dataRef for fit parameter catalog.
+        config : `lsst.pex.config.Config`, optional
+            Configuration to use to override self.config.
 
         Returns
         -------
         fgcmDatasetDict : `dict`
             Dictionary of datasets to persist.
         """
+        if config is not None:
+            _config = config
+        else:
+            _config = self.config
+
         # Set defaults on whether to output standards and zeropoints
-        self.maxIter = self.config.maxIterBeforeFinalCycle
-        self.outputStandards = self.config.outputStandardsBeforeFinalCycle
-        self.outputZeropoints = self.config.outputZeropointsBeforeFinalCycle
+        self.maxIter = _config.maxIterBeforeFinalCycle
+        self.outputStandards = _config.outputStandardsBeforeFinalCycle
+        self.outputZeropoints = _config.outputZeropointsBeforeFinalCycle
         self.resetFitParameters = True
 
-        if self.config.isFinalCycle:
+        if _config.isFinalCycle:
             # This is the final fit cycle, so we do not want to reset fit
             # parameters, we want to run a final "clean-up" with 0 fit iterations,
             # and we always want to output standards and zeropoints
@@ -1084,10 +1215,10 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         lutCat = dataRefDict['fgcmLookUpTable'].get()
         fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat,
-                                                         dict(self.config.physicalFilterMap))
+                                                         dict(_config.physicalFilterMap))
         del lutCat
 
-        configDict = makeConfigDict(self.config, self.log, camera,
+        configDict = makeConfigDict(_config, self.log, camera,
                                     self.maxIter, self.resetFitParameters,
                                     self.outputZeropoints,
                                     lutIndexVals[0]['FILTERNAMES'])
@@ -1117,7 +1248,12 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                                                              fgcmLut,
                                                              fgcmExpInfo)
         else:
-            inParInfo, inParams, inSuperStar = self._loadParameters(dataRefDict['fgcmFitParameters'])
+            if isinstance(dataRefDict['fgcmFitParameters'], afwTable.BaseCatalog):
+                parCat = dataRefDict['fgcmFitParameters']
+            else:
+                parCat = dataRefDict['fgcmFitParameters'].get()
+            inParInfo, inParams, inSuperStar = self._loadParameters(parCat)
+            del parCat
             fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                               fgcmExpInfo,
                                                               inParInfo,
@@ -1133,7 +1269,10 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         # grab the flagged stars if available
         if 'fgcmFlaggedStars' in dataRefDict:
-            flaggedStars = dataRefDict['fgcmFlaggedStars'].get()
+            if isinstance(dataRefDict['fgcmFlaggedStars'], afwTable.BaseCatalog):
+                flaggedStars = dataRefDict['fgcmFlaggedStars']
+            else:
+                flaggedStars = dataRefDict['fgcmFlaggedStars'].get()
             flagId = flaggedStars['objId'][:]
             flagFlag = flaggedStars['objFlag'][:]
         else:
@@ -1141,12 +1280,12 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             flagId = None
             flagFlag = None
 
-        if self.config.doReferenceCalibration:
+        if _config.doReferenceCalibration:
             refStars = dataRefDict['fgcmReferenceStars'].get()
 
             refMag, refMagErr = extractReferenceMags(refStars,
-                                                     self.config.bands,
-                                                     self.config.physicalFilterMap)
+                                                     _config.bands,
+                                                     _config.physicalFilterMap)
             refId = refStars['fgcm_id'][:]
         else:
             refStars = None
@@ -1228,25 +1367,25 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         # We need to make a copy since the input one has been frozen
 
         updatedPhotometricCutDict = {b: float(fgcmFitCycle.updatedPhotometricCut[i]) for
-                                     i, b in enumerate(self.config.bands)}
+                                     i, b in enumerate(_config.bands)}
         updatedHighCutDict = {band: float(fgcmFitCycle.updatedHighCut[i]) for
-                              i, band in enumerate(self.config.bands)}
+                              i, band in enumerate(_config.bands)}
 
-        outConfig = copy.copy(self.config)
-        outConfig.update(cycleNumber=(self.config.cycleNumber + 1),
+        outConfig = copy.copy(_config)
+        outConfig.update(cycleNumber=(_config.cycleNumber + 1),
                          precomputeSuperStarInitialCycle=False,
                          freezeStdAtmosphere=False,
                          expGrayPhotometricCutDict=updatedPhotometricCutDict,
                          expGrayHighCutDict=updatedHighCutDict)
 
-        outConfig.connections.update(previousCycleNumber=str(self.config.cycleNumber),
-                                     cycleNumber=str(self.config.cycleNumber + 1))
+        outConfig.connections.update(previousCycleNumber=str(_config.cycleNumber),
+                                     cycleNumber=str(_config.cycleNumber + 1))
 
         configFileName = '%s_cycle%02d_config.py' % (outConfig.outfileBase,
                                                      outConfig.cycleNumber)
         outConfig.save(configFileName)
 
-        if self.config.isFinalCycle == 1:
+        if _config.isFinalCycle == 1:
             # We are done, ready to output products
             self.log.info("Everything is in place to run fgcmOutputProducts.py")
         else:
@@ -1257,7 +1396,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             self.log.info("If you are satisfied with the fit, please set:")
             self.log.info("   config.isFinalCycle = True")
 
-        return fgcmDatasetDict
+        return fgcmDatasetDict, outConfig
 
     def _checkDatasetsExist(self, butler):
         """
@@ -1304,14 +1443,14 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                 raise RuntimeError("Could not find fgcmReferenceStars in repo, and "
                                    "doReferenceCalibration is True.")
 
-    def _loadParameters(self, parDataRef):
+    def _loadParameters(self, parCat):
         """
         Load FGCM parameters from a previous fit cycle
 
         Parameters
         ----------
-        parDataRef : `lsst.daf.persistence.ButlerDataRef` or `lsst.daf.butler.DeferredDatasetHandle`
-            dataRef for previous fit parameter catalog.
+        parCat : `lsst.afw.table.BaseCatalog`
+            Parameter catalog in afw table form.
 
         Returns
         -------
@@ -1322,9 +1461,6 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         inSuperStar: `numpy.array`
            Superstar flat formatted for input to fgcm
         """
-        # note that we already checked that this is available
-        parCat = parDataRef.get()
-
         parLutFilterNames = np.array(parCat[0]['lutFilterNames'].split(','))
         parFitBands = np.array(parCat[0]['fitBands'].split(','))
 

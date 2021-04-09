@@ -50,17 +50,8 @@ class FgcmcalTestBase(object):
 
     Derive from this first, then from TestCase.
     """
-    def setUp_base(self, testDir):
-        """Common routines to set up tests.
-
-        Parameters
-        ----------
-        testDir : `str`
-            Temporary directory to run tests in.
-        """
-        self.testDir = testDir
-
-    def _importRepository(self, instrument, exportPath, exportFile):
+    @classmethod
+    def _importRepository(cls, instrument, exportPath, exportFile):
         """Import a test repository into self.testDir
 
         Parameters
@@ -72,13 +63,13 @@ class FgcmcalTestBase(object):
         exportFile : `str`
             Filename of export data.
         """
-        self.repo = os.path.join(self.testDir, 'testrepo')
+        cls.repo = os.path.join(cls.testDir, 'testrepo')
 
-        print('Importing %s into %s' % (exportFile, self.testDir))
+        print('Importing %s into %s' % (exportFile, cls.testDir))
 
         # Make the repo and retrieve a writeable Butler
-        _ = dafButler.Butler.makeRepo(self.repo)
-        butler = dafButler.Butler(self.repo, writeable=True)
+        _ = dafButler.Butler.makeRepo(cls.repo)
+        butler = dafButler.Butler(cls.repo, writeable=True)
         # Register the instrument
         instrInstance = obsBase.utils.getInstrument(instrument)
         instrInstance.register(butler.registry)
@@ -147,13 +138,15 @@ class FgcmcalTestBase(object):
             raise RuntimeError("Pipeline %s failed." % (pipelineFile)) from results.exception
         return results.exit_code
 
-    def _testFgcmMakeLut(self, instName, nBand, i0Std, i0Recon, i10Std, i10Recon):
+    def _testFgcmMakeLut(self, instName, testName, nBand, i0Std, i0Recon, i10Std, i10Recon):
         """Test running of FgcmMakeLutTask
 
         Parameters
         ----------
         instName : `str`
             Short name of the instrument
+        testName : `str`
+            Base name of the test collection
         nBand : `int`
             Number of bands tested
         i0Std : `np.ndarray'
@@ -170,7 +163,7 @@ class FgcmcalTestBase(object):
         configFile = 'fgcmMakeLut:' + os.path.join(ROOT,
                                                    'config',
                                                    'fgcmMakeLut%s.py' % (instCamel))
-        outputCollection = '%s/testfgcmcal/lut' % (instName)
+        outputCollection = f'{instName}/{testName}/lut'
 
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
@@ -218,13 +211,15 @@ class FgcmcalTestBase(object):
 
         self.assertFloatsAlmostEqual(i10Recon, i1/i0, msg='i10Recon', rtol=1e-5)
 
-    def _testFgcmBuildStarsTable(self, instName, queryString, visits, nStar, nObs):
+    def _testFgcmBuildStarsTable(self, instName, testName, queryString, visits, nStar, nObs):
         """Test running of FgcmBuildStarsTableTask
 
         Parameters
         ----------
         instName : `str`
             Short name of the instrument
+        testName : `str`
+            Base name of the test collection
         queryString : `str`
             Query to send to the pipetask.
         visits : `list`
@@ -239,14 +234,14 @@ class FgcmcalTestBase(object):
         configFile = 'fgcmBuildStarsTable:' + os.path.join(ROOT,
                                                            'config',
                                                            'fgcmBuildStarsTable%s.py' % (instCamel))
-        outputCollection = '%s/testfgcmcal/buildstars' % (instName)
+        outputCollection = f'{instName}/{testName}/buildstars'
 
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
                                        'pipelines',
                                        'fgcmBuildStarsTable%s.yaml' % (instCamel)),
                           configFiles=[configFile],
-                          inputCollections=f'{instName}/testfgcmcal/lut,refcats/gen2',
+                          inputCollections=f'{instName}/{testName}/lut,refcats/gen2',
                           outputCollection=outputCollection,
                           configOptions=['fgcmBuildStarsTable:ccdDataRefName=detector'],
                           queryString=queryString,
@@ -266,7 +261,7 @@ class FgcmcalTestBase(object):
                              instrument=instName)
         self.assertEqual(len(starObs), nObs)
 
-    def _testFgcmFitCycle(self, instName, cycleNumber,
+    def _testFgcmFitCycle(self, instName, testName, cycleNumber,
                           nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
                           skipChecks=False, extraConfig=None):
         """Test running of FgcmFitCycleTask
@@ -275,6 +270,8 @@ class FgcmcalTestBase(object):
         ----------
         instName : `str`
             Short name of the instrument
+        testName : `str`
+            Base name of the test collection
         cycleNumber : `int`
             Fit cycle number.
         nZp : `int`
@@ -302,16 +299,18 @@ class FgcmcalTestBase(object):
         if extraConfig is not None:
             configFiles.append('fgcmFitCycle:' + extraConfig)
 
-        outputCollection = '%s/testfgcmcal/fit' % (instName)
+        outputCollection = f'{instName}/{testName}/fit'
 
         if cycleNumber == 0:
-            inputCollections = '%s/testfgcmcal/buildstars' % (instName)
+            inputCollections = f'{instName}/{testName}/buildstars'
         else:
             # We are reusing the outputCollection so we can't specify the input
             inputCollections = None
 
         cwd = os.getcwd()
-        os.chdir(self.testDir)
+        runDir = os.path.join(self.testDir, testName)
+        os.makedirs(runDir, exist_ok=True)
+        os.chdir(runDir)
 
         configOptions = ['fgcmFitCycle:cycleNumber=%d' % (cycleNumber),
                          'fgcmFitCycle:connections.previousCycleNumber=%d' %
@@ -339,7 +338,7 @@ class FgcmcalTestBase(object):
         config = butler.get('fgcmFitCycle_config', collections=[outputCollection])
 
         # Check that the expected number of plots are there.
-        plots = glob.glob(os.path.join(self.testDir, config.outfileBase
+        plots = glob.glob(os.path.join(runDir, config.outfileBase
                                        + '_cycle%02d_plots/' % (cycleNumber)
                                        + '*.png'))
         self.assertEqual(len(plots), nPlots)
@@ -368,7 +367,7 @@ class FgcmcalTestBase(object):
 
         self.assertEqual(len(stds), nStdStars)
 
-    def _testFgcmOutputProducts(self, instName,
+    def _testFgcmOutputProducts(self, instName, testName,
                                 zpOffsets, testVisit, testCcd, testFilter, testBandIndex):
         """Test running of FgcmOutputProductsTask.
 
@@ -376,6 +375,8 @@ class FgcmcalTestBase(object):
         ----------
         instName : `str`
             Short name of the instrument
+        testName : `str`
+            Base name of the test collection
         zpOffsets : `np.ndarray`
             Zeropoint offsets expected
         testVisit : `int`
@@ -392,8 +393,8 @@ class FgcmcalTestBase(object):
         configFile = 'fgcmOutputProducts:' + os.path.join(ROOT,
                                                           'config',
                                                           'fgcmOutputProducts%s.py' % (instCamel))
-        inputCollection = '%s/testfgcmcal/fit' % (instName)
-        outputCollection = '%s/testfgcmcal/fit/output' % (instName)
+        inputCollection = f'{instName}/{testName}/fit'
+        outputCollection = f'{instName}/{testName}/fit/output'
 
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
@@ -561,6 +562,60 @@ class FgcmcalTestBase(object):
         ratio = np.median(testResp/testResp2)
         self.assertFloatsAlmostEqual(testResp/ratio, testResp2, atol=0.04)
 
+    def _testFgcmMultiFit(self, instName, testName, queryString, visits, zpOffsets):
+        """Test running the full pipeline with multiple fit cycles.
+
+        Parameters
+        ----------
+        instName : `str`
+            Short name of the instrument
+        testName : `str`
+            Base name of the test collection
+        queryString : `str`
+            Query to send to the pipetask.
+        visits : `list`
+            List of visits to calibrate
+        zpOffsets : `np.ndarray`
+            Zeropoint offsets expected
+        """
+        instCamel = instName.title()
+
+        configFiles = ['fgcmBuildStarsTable:' + os.path.join(ROOT,
+                                                             'config',
+                                                             f'fgcmBuildStarsTable{instCamel}.py'),
+                       'fgcmFitCycle:' + os.path.join(ROOT,
+                                                      'config',
+                                                      f'fgcmFitCycle{instCamel}.py'),
+                       'fgcmOutputProducts:' + os.path.join(ROOT,
+                                                            'config',
+                                                            f'fgcmOutputProducts{instCamel}.py')]
+        outputCollection = f'{instName}/{testName}/unified'
+
+        cwd = os.getcwd()
+        runDir = os.path.join(self.testDir, testName)
+        os.makedirs(runDir)
+        os.chdir(runDir)
+
+        self._runPipeline(self.repo,
+                          os.path.join(ROOT,
+                                       'pipelines',
+                                       f'fgcmFullPipeline{instCamel}.yaml'),
+                          configFiles=configFiles,
+                          inputCollections=f'{instName}/{testName}/lut,refcats/gen2',
+                          outputCollection=outputCollection,
+                          configOptions=['fgcmBuildStarsTable:ccdDataRefName=detector'],
+                          queryString=queryString,
+                          registerDatasetTypes=True)
+
+        os.chdir(cwd)
+
+        butler = dafButler.Butler(self.repo)
+
+        offsetCat = butler.get('fgcmReferenceCalibrationOffsets',
+                               collections=[outputCollection], instrument=instName)
+        offsets = offsetCat['offset'][:]
+        self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-6)
+
     def _getMatchedVisitCat(self, butler, srcRefs, photoCals,
                             rawStars, bandIndex, offsets):
         """
@@ -617,7 +672,7 @@ class FgcmcalTestBase(object):
 
         return matchMag, matchDelta
 
-    def _testFgcmCalibrateTract(self, instName, visits, tract, skymapName,
+    def _testFgcmCalibrateTract(self, instName, testName, visits, tract, skymapName,
                                 rawRepeatability, filterNCalibMap):
         """Test running of FgcmCalibrateTractTask
 
@@ -625,6 +680,8 @@ class FgcmcalTestBase(object):
         ----------
         instName : `str`
             Short name of the instrument
+        testName : `str`
+            Base name of the test collection
         visits : `list`
             List of visits to calibrate
         tract : `int`
@@ -644,9 +701,9 @@ class FgcmcalTestBase(object):
                                   'fgcmCalibrateTractTable%s.py' % (instCamel))
 
         configFiles = ['fgcmCalibrateTractTable:' + configFile]
-        outputCollection = '%s/testfgcmcal/tract' % (instName)
+        outputCollection = f'{instName}/{testName}/tract'
 
-        inputCollections = f'{instName}/testfgcmcal/lut,refcats/gen2'
+        inputCollections = f'{instName}/{testName}/lut,refcats/gen2'
         configOption = 'fgcmCalibrateTractTable:fgcmOutputProducts.doRefcatOutput=False'
 
         queryString = f"tract={tract:d} and skymap='{skymapName:s}'"
@@ -703,8 +760,9 @@ class FgcmcalTestBase(object):
                                                  where=whereClause)
             self.assertEqual(len(set(refs)), 1)
 
-    def tearDown(self):
+    @classmethod
+    def tearDownClass(cls):
         """Tear down and clear directories
         """
-        if os.path.exists(self.testDir):
-            shutil.rmtree(self.testDir, True)
+        if os.path.exists(cls.testDir):
+            shutil.rmtree(cls.testDir, True)

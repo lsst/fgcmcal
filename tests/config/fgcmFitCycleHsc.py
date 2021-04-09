@@ -1,12 +1,6 @@
 import lsst.fgcmcal as fgcmcal
 
 config.outfileBase = 'TestFgcm'
-# The unused z-band is here to test the case that extra filters
-# are in the map that are not used in the calibrations.
-config.physicalFilterMap = {'HSC-G': 'g',
-                            'HSC-R': 'r',
-                            'HSC-I': 'i',
-                            'HSC-Z': 'z'}
 config.bands = ['g', 'r', 'i']
 config.fitBands = ['g', 'r', 'i']
 config.requiredBands = ['r', 'i']
