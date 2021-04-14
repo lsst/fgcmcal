@@ -81,6 +81,7 @@ class FgcmCalibrateTractConfigBase(pexConfig.Config):
         pexConfig.Config.setDefaults(self)
 
         self.fgcmFitCycle.quietMode = True
+        self.fgcmFitCycle.doPlots = False
         self.fgcmOutputProducts.doReferenceCalibration = False
         self.fgcmOutputProducts.doRefcatOutput = False
         self.fgcmOutputProducts.cycleNumber = 0
@@ -378,9 +379,6 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
                                     self.config.fgcmFitCycle.maxIterBeforeFinalCycle,
                                     True, False, lutIndexVals[0]['FILTERNAMES'],
                                     tract=tract)
-
-        # Turn off plotting in tract mode
-        configDict['doPlots'] = False
 
         # Use the first orientation.
         # TODO: DM-21215 will generalize to arbitrary camera orientations

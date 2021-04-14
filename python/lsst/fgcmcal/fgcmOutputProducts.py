@@ -85,7 +85,7 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmVisitCatalog = connectionTypes.PrerequisiteInput(
+    fgcmVisitCatalog = connectionTypes.Input(
         doc="Catalog of visit information for fgcm",
         name="fgcmVisitCatalog",
         storageClass="Catalog",
@@ -93,7 +93,7 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmStandardStars = connectionTypes.PrerequisiteInput(
+    fgcmStandardStars = connectionTypes.Input(
         doc="Catalog of standard star data from fgcm fit",
         name="fgcmStandardStars{cycleNumber}",
         storageClass="SimpleCatalog",
@@ -101,7 +101,7 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmZeropoints = connectionTypes.PrerequisiteInput(
+    fgcmZeropoints = connectionTypes.Input(
         doc="Catalog of zeropoints from fgcm fit",
         name="fgcmZeropoints{cycleNumber}",
         storageClass="Catalog",
@@ -109,7 +109,7 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmAtmosphereParameters = connectionTypes.PrerequisiteInput(
+    fgcmAtmosphereParameters = connectionTypes.Input(
         doc="Catalog of atmosphere parameters from fgcm fit",
         name="fgcmAtmosphereParameters{cycleNumber}",
         storageClass="Catalog",
@@ -124,12 +124,6 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         dimensions=("skypix",),
         deferLoad=True,
         multiple=True,
-    )
-
-    fgcmBuildStarsTableConfig = connectionTypes.PrerequisiteInput(
-        doc="Config used to build FGCM input stars",
-        name="fgcmBuildStarsTable_config",
-        storageClass="Config",
     )
 
     fgcmPhotoCalib = connectionTypes.Output(
@@ -173,9 +167,9 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         if not config.doReferenceCalibration:
             self.prerequisiteInputs.remove("refCat")
         if not config.doAtmosphereOutput:
-            self.prerequisiteInputs.remove("fgcmAtmosphereParameters")
+            self.inputs.remove("fgcmAtmosphereParameters")
         if not config.doZeropointOutput:
-            self.prerequisiteInputs.remove("fgcmZeropoints")
+            self.inputs.remove("fgcmZeropoints")
         if not config.doReferenceCalibration:
             self.outputs.remove("fgcmOffsets")
 
@@ -189,7 +183,12 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
         dtype=int,
         default=None,
     )
-
+    physicalFilterMap = pexConfig.DictField(
+        doc="Mapping from 'physicalFilter' to band.",
+        keytype=str,
+        itemtype=str,
+        default={},
+    )
     # The following fields refer to calibrating from a reference
     # catalog, but in the future this might need to be expanded
     doReferenceCalibration = pexConfig.Field(
@@ -408,18 +407,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         else:
             self.refObjLoader = None
 
-        dataRefDict['fgcmBuildStarsTableConfig'] = butlerQC.get(inputRefs.fgcmBuildStarsTableConfig)
-
-        fgcmBuildStarsConfig = butlerQC.get(inputRefs.fgcmBuildStarsTableConfig)
-        physicalFilterMap = fgcmBuildStarsConfig.physicalFilterMap
-
-        if self.config.doComposeWcsJacobian and not fgcmBuildStarsConfig.doApplyWcsJacobian:
-            raise RuntimeError("Cannot compose the WCS jacobian if it hasn't been applied "
-                               "in fgcmBuildStarsTask.")
-        if not self.config.doComposeWcsJacobian and fgcmBuildStarsConfig.doApplyWcsJacobian:
-            self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
-
-        struct = self.run(dataRefDict, physicalFilterMap, returnCatalogs=True)
+        struct = self.run(dataRefDict, self.config.physicalFilterMap, returnCatalogs=True)
 
         # Output the photoCalib exposure catalogs
         if struct.photoCalibCatalogs is not None:

@@ -1,0 +1,14 @@
+description: Full fgcmcal pipeline
+instrument: lsst.obs.subaru.HyperSuprimeCam
+tasks:
+  fgcmBuildStarsTable:
+    class: lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask
+  fgcmFitCycle:
+    class: lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask
+    config:
+      doMultipleCycles: true
+      multipleCyclesFinalCycleNumber: 2
+  fgcmOutputProducts:
+    class: lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask
+    config:
+      doRefcatOutput: false

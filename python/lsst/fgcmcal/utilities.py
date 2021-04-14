@@ -25,6 +25,7 @@ and do not need to be part of a task.
 """
 
 import numpy as np
+import os
 import re
 
 from lsst.daf.base import PropertyList
@@ -36,7 +37,6 @@ import lsst.afw.math as afwMath
 import lsst.geom as geom
 from lsst.obs.base import createInitialSkyWcs
 from lsst.obs.base import Instrument
-
 
 import fgcm
 
@@ -203,9 +203,11 @@ def makeConfigDict(config, log, camera, maxIter,
                   'quietMode': config.quietMode,
                   'randomSeed': config.randomSeed,
                   'outputStars': False,
+                  'outputPath': os.path.abspath('.'),
                   'clobber': True,
                   'useSedLUT': False,
                   'resetParameters': resetFitParameters,
+                  'doPlots': config.doPlots,
                   'outputFgcmcalZpts': True,  # when outputting zpts, use fgcmcal format
                   'outputZeropoints': outputZeropoints}
 

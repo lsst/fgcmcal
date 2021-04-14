@@ -53,17 +53,18 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         except LookupError:
             raise unittest.SkipTest("obs_subaru not setup")
 
-    def setUp(self):
-        testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
-        self.setUp_base(testDir)
+        cls.testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
 
-        self._importRepository('lsst.obs.subaru.HyperSuprimeCam',
-                               os.path.join(self.dataDir, 'hsc'),
-                               os.path.join(self.dataDir, 'hsc', 'exports.yaml'))
+        cls._importRepository('lsst.obs.subaru.HyperSuprimeCam',
+                              os.path.join(cls.dataDir, 'hsc'),
+                              os.path.join(cls.dataDir, 'hsc', 'exports.yaml'))
 
     def test_fgcmcalPipeline(self):
         # Set numpy seed for stability
         np.random.seed(seed=1000)
+
+        instName = 'HSC'
+        testName = 'testfgcmcalpipe'
 
         nBand = 3
         i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
@@ -71,14 +72,16 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
         i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
 
-        self._testFgcmMakeLut('HSC', nBand, i0Std, i0Recon, i10Std, i10Recon)
+        self._testFgcmMakeLut(instName, testName,
+                              nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
 
         nStar = 305
         nObs = 3789
 
-        self._testFgcmBuildStarsTable('HSC', "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I')",
+        self._testFgcmBuildStarsTable(instName, testName,
+                                      "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I')",
                                       visits, nStar, nObs)
 
         nZp = 1120
@@ -88,8 +91,10 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nStdStars = 237
         nPlots = 35
 
-        self._testFgcmFitCycle('HSC', 0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
-        self._testFgcmFitCycle('HSC', 1, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
+        self._testFgcmFitCycle(instName, testName,
+                               0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
+        self._testFgcmFitCycle(instName, testName,
+                               1, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
 
         # We need to create an extra config file to turn on "sub-ccd gray" for testing.
         extraConfigFile = os.path.join(self.testDir, "cycle03_patch_config.py")
@@ -97,16 +102,21 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
             f.write("config.isFinalCycle = True\n")
             f.write("config.ccdGraySubCcdDict = {'g': True, 'r': True, 'i': True}\n")
 
-        self._testFgcmFitCycle('HSC', 2, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
+        self._testFgcmFitCycle(instName, testName,
+                               2, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
                                extraConfig=extraConfigFile)
 
         zpOffsets = np.array([0.0010470541892573237, 0.005398149602115154])
 
-        self._testFgcmOutputProducts('HSC', zpOffsets, 36236, 87, 'i', 1)
+        self._testFgcmOutputProducts(instName, testName,
+                                     zpOffsets, 36236, 87, 'i', 1)
 
-    def test_fgcmcalTractPipeline(self):
+    def test_fgcmcalMultipleFitPipeline(self):
         # Set numpy seed for stability
         np.random.seed(seed=1000)
+
+        instName = 'HSC'
+        testName = 'testfgcmcalmultiple'
 
         nBand = 3
         i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
@@ -114,7 +124,34 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
         i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
 
-        self._testFgcmMakeLut('HSC', nBand, i0Std, i0Recon, i10Std, i10Recon)
+        self._testFgcmMakeLut(instName, testName,
+                              nBand, i0Std, i0Recon, i10Std, i10Recon)
+
+        visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
+
+        # These are slightly different from above due to the configuration change
+        # mid-way in the separate fits.
+        zpOffsets = np.array([0.001053874963, 0.005209929310])
+
+        self._testFgcmMultiFit(instName, testName,
+                               "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I')",
+                               visits, zpOffsets)
+
+    def test_fgcmcalTractPipeline(self):
+        # Set numpy seed for stability
+        np.random.seed(seed=1000)
+
+        instName = 'HSC'
+        testName = 'testfgcmcaltract'
+
+        nBand = 3
+        i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
+        i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
+        i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
+        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
+
+        self._testFgcmMakeLut(instName, testName,
+                              nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         rawRepeatability = np.array([0.0, 0.008282480993703009, 0.006739350255884648])
         filterNCalibMap = {'HSC-R': 14,
@@ -123,7 +160,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
         tract = 9697
 
-        self._testFgcmCalibrateTract('HSC', visits, tract, 'hsc_rings_v1',
+        self._testFgcmCalibrateTract(instName, testName,
+                                     visits, tract, 'hsc_rings_v1',
                                      rawRepeatability, filterNCalibMap)
 
 
