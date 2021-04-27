@@ -1396,6 +1396,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             self.log.info("If you are satisfied with the fit, please set:")
             self.log.info("   config.isFinalCycle = True")
 
+        fgcmFitCycle.freeSharedMemory()
+
         return fgcmDatasetDict, outConfig
 
     def _checkDatasetsExist(self, butler):
