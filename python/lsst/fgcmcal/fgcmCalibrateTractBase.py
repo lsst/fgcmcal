@@ -571,4 +571,6 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
 
         outStruct.repeatability = fgcmFitCycle.fgcmPars.compReservedRawRepeatability
 
+        fgcmFitCycle.freeSharedMemory()
+
         return outStruct
