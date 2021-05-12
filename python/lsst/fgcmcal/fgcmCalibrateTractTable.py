@@ -59,11 +59,10 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    sourceSchema = connectionTypes.PrerequisiteInput(
+    sourceSchema = connectionTypes.InitInput(
         doc="Schema for source catalogs",
         name="src_schema",
         storageClass="SourceCatalog",
-        deferLoad=True,
     )
 
     refCat = connectionTypes.PrerequisiteInput(
@@ -175,6 +174,11 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
 
     canMultiprocess = False
 
+    def __init__(self, initInputs=None, **kwargs):
+        super().__init__(initInputs=initInputs, **kwargs)
+        if initInputs is not None:
+            self.sourceSchema = initInputs["sourceSchema"].schema
+
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         dataRefDict = butlerQC.get(inputRefs)
 
@@ -182,6 +186,8 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
 
         # Run the build stars tasks
         tract = butlerQC.quantum.dataId['tract']
+
+        dataRefDict['sourceSchema'] = self.sourceSchema
 
         sourceTableRefs = dataRefDict['source_catalogs']
         sourceTableDataRefDict = {sourceTableRef.dataId['visit']: sourceTableRef for

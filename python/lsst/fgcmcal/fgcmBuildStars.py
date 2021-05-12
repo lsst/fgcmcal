@@ -178,7 +178,7 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
         return dict(sorted(groupedDataRefs.items()))
 
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
-                                    srcSchemaDataRef,
+                                    sourceSchema,
                                     camera,
                                     calibFluxApertureRadius=None,
                                     visitCatDataRef=None,
@@ -200,7 +200,6 @@ class FgcmBuildStarsTask(FgcmBuildStarsBaseTask):
 
         # create our source schema.  Use the first valid dataRef
         dataRef = groupedDataRefs[list(groupedDataRefs.keys())[0]][0]
-        sourceSchema = dataRef.get('src_schema', immediate=True).schema
 
         # Construct a mapping from ccd number to index
         ccdMapping = {}

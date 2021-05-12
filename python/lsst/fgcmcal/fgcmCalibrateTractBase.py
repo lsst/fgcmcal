@@ -174,7 +174,7 @@ class FgcmCalibrateTractRunner(pipeBase.ButlerInitializedTaskRunner):
 class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.ABC):
     """Base class to calibrate a single tract using fgcmcal
     """
-    def __init__(self, butler=None, **kwargs):
+    def __init__(self, initInputs=None, butler=None, **kwargs):
         """
         Instantiate an `FgcmCalibrateTractTask`.
 
@@ -183,7 +183,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         butler : `lsst.daf.persistence.Butler`, optional
         """
         super().__init__(**kwargs)
-        self.makeSubtask("fgcmBuildStars", butler=butler)
+        self.makeSubtask("fgcmBuildStars", initInputs=initInputs, butler=butler)
         self.makeSubtask("fgcmOutputProducts", butler=butler)
 
     # no saving of metadata for now
@@ -230,7 +230,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
         dataRefDict = {}
         dataRefDict['camera'] = camera
         dataRefDict['source_catalogs'] = dataRefs
-        dataRefDict['sourceSchema'] = butler.dataRef('src_schema')
+        dataRefDict['sourceSchema'] = butler.get('src_schema', immediate=True).schema
         dataRefDict['fgcmLookUpTable'] = butler.dataRef('fgcmLookUpTable')
 
         struct = self.run(dataRefDict, tract, butler=butler, returnCatalogs=False)
