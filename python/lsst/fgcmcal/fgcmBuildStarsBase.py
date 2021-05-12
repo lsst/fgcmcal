@@ -283,7 +283,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
     ----------
     butler : `lsst.daf.persistence.Butler`
     """
-    def __init__(self, butler=None, initInputs=None, **kwargs):
+    def __init__(self, initInputs=None, butler=None, **kwargs):
         super().__init__(**kwargs)
 
         self.makeSubtask("sourceSelector")
@@ -366,9 +366,10 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
 
         rad = calibFluxApertureRadius
         sourceSchemaDataRef = butler.dataRef('src_schema')
+        sourceSchema = sourceSchemaDataRef.get('src_schema', immediate=True).schema
         fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                   visitCat,
-                                                                  sourceSchemaDataRef,
+                                                                  sourceSchema,
                                                                   camera,
                                                                   calibFluxApertureRadius=rad,
                                                                   starObsDataRef=starObsDataRef,
@@ -416,7 +417,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
 
     @abc.abstractmethod
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
-                                    sourceSchemaDataRef,
+                                    sourceSchema,
                                     camera,
                                     calibFluxApertureRadius=None,
                                     visitCatDataRef=None,
@@ -428,29 +429,28 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
 
         Parameters
         ----------
-        groupedDataRefs: `dict` of `list`s
-           Lists of `~lsst.daf.persistence.ButlerDataRef` or
-           `~lsst.daf.butler.DeferredDatasetHandle`, grouped by visit.
-        visitCat: `~afw.table.BaseCatalog`
-           Catalog with visit data for FGCM
-        sourceSchemaDataRef: `~lsst.daf.persistence.ButlerDataRef` or
-                             `~lsst.daf.butler.DeferredDatasetHandle`
-           DataRef for the schema of the src catalogs.
-        camera: `~lsst.afw.cameraGeom.Camera`
-        calibFluxApertureRadius: `float`, optional
-           Aperture radius for calibration flux.
-        visitCatDataRef: `~lsst.daf.persistence.ButlerDataRef`, optional
-           Dataref to write visitCat for checkpoints
-        starObsDataRef: `~lsst.daf.persistence.ButlerDataRef`, optional
-           Dataref to write the star observation catalog for checkpoints.
-        inStarObsCat: `~afw.table.BaseCatalog`
-           Input observation catalog.  If this is incomplete, observations
-           will be appended from when it was cut off.
+        groupedDataRefs : `dict` of `list`s
+            Lists of `~lsst.daf.persistence.ButlerDataRef` or
+            `~lsst.daf.butler.DeferredDatasetHandle`, grouped by visit.
+        visitCat : `~afw.table.BaseCatalog`
+            Catalog with visit data for FGCM
+        sourceSchema : `~lsst.afw.table.Schema`
+            Schema for the input src catalogs.
+        camera : `~lsst.afw.cameraGeom.Camera`
+        calibFluxApertureRadius : `float`, optional
+            Aperture radius for calibration flux.
+        visitCatDataRef : `~lsst.daf.persistence.ButlerDataRef`, optional
+            Dataref to write visitCat for checkpoints
+        starObsDataRef : `~lsst.daf.persistence.ButlerDataRef`, optional
+            Dataref to write the star observation catalog for checkpoints.
+        inStarObsCat : `~afw.table.BaseCatalog`
+            Input observation catalog.  If this is incomplete, observations
+            will be appended from when it was cut off.
 
         Returns
         -------
-        fgcmStarObservations: `afw.table.BaseCatalog`
-           Full catalog of good observations.
+        fgcmStarObservations : `afw.table.BaseCatalog`
+            Full catalog of good observations.
 
         Raises
         ------

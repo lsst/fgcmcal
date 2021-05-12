@@ -69,11 +69,10 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    sourceSchema = connectionTypes.PrerequisiteInput(
+    sourceSchema = connectionTypes.InitInput(
         doc="Schema for source catalogs",
         name="src_schema",
         storageClass="SourceCatalog",
-        deferLoad=True,
     )
 
     refCat = connectionTypes.PrerequisiteInput(
@@ -223,6 +222,11 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
     canMultiprocess = False
 
+    def __init__(self, initInputs=None, **kwargs):
+        super().__init__(initInputs=initInputs, **kwargs)
+        if initInputs is not None:
+            self.sourceSchema = initInputs["sourceSchema"].schema
+
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputRefDict = butlerQC.get(inputRefs)
 
@@ -285,10 +289,10 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                                              inVisitCat=None)
 
         rad = calibFluxApertureRadius
-        sourceSchemaDataRef = inputRefDict['sourceSchema']
+        # sourceSchemaDataRef = inputRefDict['sourceSchema']
         fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                   visitCat,
-                                                                  sourceSchemaDataRef,
+                                                                  self.sourceSchema,
                                                                   camera,
                                                                   calibFluxApertureRadius=rad,
                                                                   starObsDataRef=None,
@@ -388,7 +392,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         return dict(sorted(groupedDataRefs.items()))
 
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
-                                    sourceSchemaDataRef,
+                                    sourceSchema,
                                     camera,
                                     calibFluxApertureRadius=None,
                                     visitCatDataRef=None,
@@ -410,7 +414,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         # To get the correct output schema, we use similar code as fgcmBuildStarsTask
         # We are not actually using this mapper, except to grab the outputSchema
-        sourceSchema = sourceSchemaDataRef.get().schema
         sourceMapper = self._makeSourceMapper(sourceSchema)
         outputSchema = sourceMapper.getOutputSchema()
 
