@@ -15,6 +15,7 @@ from .fgcmLoadReferenceCatalog import *
 from .fgcmCalibrateTractBase import *
 from .fgcmCalibrateTract import *
 from .fgcmCalibrateTractTable import *
+from .photoCalibConsolidateGen2Gen3 import *
 from .sedterms import *
 from .version import *
 
