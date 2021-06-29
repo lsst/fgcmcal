@@ -294,17 +294,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         default=[],
     )
-    fitFlag = pexConfig.ListField(
-        doc=("Flag for which bands are directly constrained in the FGCM fit. "
-             "Bands set to 0 will have the atmosphere constrained from observations "
-             "in other bands on the same night.  Must be same length as config.bands, "
-             "and matched band-by-band."),
-        dtype=int,
-        default=(0,),
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use fitBands instead."),
-    )
     fitBands = pexConfig.ListField(
         doc=("Bands to use in atmospheric fit. The bands not listed here will have "
              "the atmosphere constrained from the 'fitBands' on the same night. "
@@ -312,30 +301,11 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         default=[],
     )
-    requiredFlag = pexConfig.ListField(
-        doc=("Flag for which bands are required for a star to be considered a calibration "
-             "star in the FGCM fit.  Typically this should be the same as fitFlag.  Must "
-             "be same length as config.bands, and matched band-by-band."),
-        dtype=int,
-        default=(0,),
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use requiredBands instead."),
-    )
     requiredBands = pexConfig.ListField(
         doc=("Bands that are required for a star to be considered a calibration star. "
              "Must be a subset of `config.bands`"),
         dtype=str,
         default=[],
-    )
-    filterMap = pexConfig.DictField(
-        doc="Mapping from 'filterName' to band.",
-        keytype=str,
-        itemtype=str,
-        default={},
-        deprecated=("This field is no longer used, and has been deprecated by "
-                    "DM-28088.  It will be removed after v22.  Use "
-                    "physicalFilterMap instead.")
     )
     # The following config will not be necessary after Gen2 retirement.
     # In the meantime, it is set to 'filterDefinitions.filter_to_band' which
@@ -397,14 +367,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=False,
     )
-    superStarSubCcd = pexConfig.Field(
-        doc="Compute superstar flat on sub-ccd scale",
-        dtype=bool,
-        default=True,
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use superStarSubCcdDict instead."),
-    )
     superStarSubCcdDict = pexConfig.DictField(
         doc=("Per-band specification on whether to compute superstar flat on sub-ccd scale. "
              "Must have one entry per band."),
@@ -434,14 +396,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         doc="Number of sigma to clip outliers per focal-plane.",
         dtype=float,
         default=4.0,
-    )
-    ccdGraySubCcd = pexConfig.Field(
-        doc="Compute CCD gray terms on sub-ccd scale",
-        dtype=bool,
-        default=False,
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use ccdGraySubCcdDict instead."),
     )
     ccdGraySubCcdDict = pexConfig.DictField(
         doc=("Per-band specification on whether to compute achromatic per-ccd residual "
@@ -578,15 +532,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=float,
         default=-0.25,
     )
-    expGrayPhotometricCut = pexConfig.ListField(
-        doc=("Maximum (negative) exposure gray for a visit to be considered photometric. "
-             "Must be same length as config.bands, and matched band-by-band."),
-        dtype=float,
-        default=(0.0,),
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use expGrayPhotometricCutDict instead."),
-    )
     expGrayPhotometricCutDict = pexConfig.DictField(
         doc=("Per-band specification on maximum (negative) achromatic exposure residual "
              "('gray term') for a visit to be considered photometric.  Must have one "
@@ -594,15 +539,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         keytype=str,
         itemtype=float,
         default={},
-    )
-    expGrayHighCut = pexConfig.ListField(
-        doc=("Maximum (positive) exposure gray for a visit to be considered photometric. "
-             "Must be same length as config.bands, and matched band-by-band."),
-        dtype=float,
-        default=(0.0,),
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use expGrayHighCutDict instead."),
     )
     expGrayHighCutDict = pexConfig.DictField(
         doc=("Per-band specification on maximum (positive) achromatic exposure residual "
@@ -618,14 +554,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
              "sufficient star observations (minStarPerCcd) on that CCD."),
         dtype=float,
         default=-1.0,
-    )
-    expVarGrayPhotometricCut = pexConfig.Field(
-        doc="Maximum exposure variance to be considered possibly photometric",
-        dtype=float,
-        default=0.0005,
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use expVarGrayPhotometricCutDict instead."),
     )
     expVarGrayPhotometricCutDict = pexConfig.DictField(
         doc=("Per-band specification on maximum exposure variance to be considered possibly "
@@ -649,18 +577,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=int,
         default=10,
     )
-    aperCorrInputSlopes = pexConfig.ListField(
-        doc=("Aperture correction input slope parameters.  These are used on the first "
-             "fit iteration, and aperture correction parameters will be updated from "
-             "the data if config.aperCorrFitNBins > 0.  It is recommended to set this"
-             "when there is insufficient data to fit the parameters (e.g. tract mode). "
-             "If set, must be same length as config.bands, and matched band-by-band."),
-        dtype=float,
-        default=[],
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use aperCorrInputSlopeDict instead."),
-    )
     aperCorrInputSlopeDict = pexConfig.DictField(
         doc=("Per-band specification of aperture correction input slope parameters.  These "
              "are used on the first fit iteration, and aperture correction parameters will "
@@ -670,15 +586,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         keytype=str,
         itemtype=float,
         default={},
-    )
-    sedFudgeFactors = pexConfig.ListField(
-        doc=("Fudge factors for computing linear SED from colors.  Must be same length as "
-             "config.bands, and matched band-by-band."),
-        dtype=float,
-        default=(0,),
-        optional=True,
-        deprecated=("This field has been deprecated and will be removed after v20. "
-                    "Please use sedSlopeTermMap and sedSlopeMap."),
     )
     sedboundaryterms = pexConfig.ConfigField(
         doc="Mapping from bands to SED boundary term names used is sedterms.",
@@ -693,15 +600,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=float,
         default=0.01,
     )
-    sigFgcmMaxEGray = pexConfig.ListField(
-        doc=("Maximum (absolute) gray value for observation in sigma_FGCM. "
-             "May be 1 element (same for all bands) or the same length as config.bands."),
-        dtype=float,
-        default=(0.05,),
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use sigFgcmMaxEGrayDict instead."),
-    )
     sigFgcmMaxEGrayDict = pexConfig.DictField(
         doc=("Per-band specification for maximum (absolute) achromatic residual (gray value) "
              "for observations in sigma_fgcm (raw repeatability).  Broad-band filters "
@@ -715,15 +613,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
              "computation"),
         dtype=float,
         default=0.10,
-    )
-    approxThroughput = pexConfig.ListField(
-        doc=("Approximate overall throughput at start of calibration observations. "
-             "May be 1 element (same for all bands) or the same length as config.bands."),
-        dtype=float,
-        default=(1.0, ),
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use approxThroughputDict instead."),
     )
     approxThroughputDict = pexConfig.DictField(
         doc=("Per-band specification of the approximate overall throughput at the start of "
@@ -773,14 +662,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         default=("NO_DATA",),
     )
-    colorSplitIndices = pexConfig.ListField(
-        doc="Band indices to use to split stars by color",
-        dtype=int,
-        default=None,
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use colorSplitBands instead."),
-    )
     colorSplitBands = pexConfig.ListField(
         doc="Band names to use to split stars by color.  Must have 2 entries.",
         dtype=str,
@@ -829,16 +710,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         doc="Output standard stars prior to final cycle?  Used in debugging.",
         dtype=bool,
         default=False,
-    )
-    useRepeatabilityForExpGrayCuts = pexConfig.ListField(
-        doc=("Use star repeatability (instead of exposures) for computing photometric "
-             "cuts? Recommended for tract mode or bands with few exposures. "
-             "May be 1 element (same for all bands) or the same length as config.bands."),
-        dtype=bool,
-        default=(False,),
-        optional=True,
-        deprecated=("This field is no longer used, and has been deprecated by DM-23699. "
-                    "It will be removed after v20.  Use useRepeatabilityForExpGrayCutsDict instead."),
     )
     useRepeatabilityForExpGrayCutsDict = pexConfig.DictField(
         doc=("Per-band specification on whether to use star repeatability (instead of exposures) "

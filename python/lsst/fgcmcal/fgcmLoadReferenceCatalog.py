@@ -52,15 +52,6 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
         target=LoadIndexedReferenceObjectsTask,
         doc="Reference object loader for photometry",
     )
-    refFilterMap = pexConfig.DictField(
-        doc="Mapping from camera 'filterName' to reference filter name.",
-        keytype=str,
-        itemtype=str,
-        default={},
-        deprecated=("This field is no longer used, and has been deprecated by "
-                    "DM-28088.  It will be removed after v22.  Use "
-                    "filterMap instead.")
-    )
     filterMap = pexConfig.DictField(
         doc="Mapping from physicalFilter label to reference filter name.",
         keytype=str,

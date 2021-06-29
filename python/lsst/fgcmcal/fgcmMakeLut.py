@@ -230,28 +230,6 @@ class FgcmMakeLutParametersConfig(pexConfig.Config):
 class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
                         pipelineConnections=FgcmMakeLutConnections):
     """Config for FgcmMakeLutTask"""
-
-    filterNames = pexConfig.ListField(
-        doc="Filter names to build LUT ('short' names)",
-        dtype=str,
-        default=[],
-        deprecated=("This field is no longer used, and has been deprecated by "
-                    "DM-28088.  It will be removed after v22.  Use "
-                    "stdPhysicalFilterMap instead.")
-    )
-    stdFilterNames = pexConfig.ListField(
-        doc=("Standard filterNames ('short' names). "
-             "Each filter in filterName will be calibrated to a matched "
-             "stdFilterName.  In regular usage, one has g->g, r->r, ... "
-             "In the case of HSC, one would have g->g, r->r2, r2->r2, ... "
-             "which allows replacement (or time-variable) filters to be "
-             "properly cross-calibrated."),
-        dtype=str,
-        default=[],
-        deprecated=("This field is no longer used, and has been deprecated by "
-                    "DM-28088.  It will be removed after v22.  Use "
-                    "stdPhysicalFilterMap instead.")
-    )
     physicalFilters = pexConfig.ListField(
         doc="List of physicalFilter labels to generate look-up table.",
         dtype=str,

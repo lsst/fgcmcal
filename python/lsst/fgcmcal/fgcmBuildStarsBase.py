@@ -91,15 +91,6 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
         dtype=int,
         default=8,
     )
-    filterMap = pexConfig.DictField(
-        doc="Mapping from 'filterName' to band.",
-        keytype=str,
-        itemtype=str,
-        default={},
-        deprecated=("This field is no longer used, and has been deprecated by "
-                    "DM-28088.  It will be removed after v22.  Use "
-                    "physicalFilterMap instead.")
-    )
     # The following config will not be necessary after Gen2 retirement.
     # In the meantime, obs packages should set to 'filterDefinitions.filter_to_band'
     # which is easiest to access in the config file.
