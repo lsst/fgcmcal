@@ -109,8 +109,9 @@ class FgcmcalTestBaseGen2(object):
         butler = dafPersist.butler.Butler(self.testDir)
         tempTask = fgcmcal.FgcmFitCycleTask()
         lutCat = butler.get('fgcmLookUpTable')
+        filterMapDict = dict(tempTask.config.physicalFilterMap)
         fgcmLut, lutIndexVals, lutStd = fgcmcal.utilities.translateFgcmLut(lutCat,
-                                                                           dict(tempTask.config.filterMap))
+                                                                           filterMapDict)
 
         # Check that we got the requested number of bands...
         self.assertEqual(nBand, len(lutIndexVals[0]['FILTERNAMES']))
