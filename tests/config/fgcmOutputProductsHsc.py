@@ -1,16 +1,20 @@
+# All camera defaults were copied from obs_subaru/config/fgcmOutputProducts.py
+# on 07/21/21, weekly w_2021_29.
+
 import os.path
 
-from lsst.utils import getPackageDir
 
 config.cycleNumber = 2
 
 config.doReferenceCalibration = True
 
+from lsst.obs.hsc.hscFilters import HSC_FILTER_DEFINITIONS
+config.physicalFilterMap = HSC_FILTER_DEFINITIONS.physical_to_band
+
 config.photoCal.applyColorTerms = True
 
 config.photoCal.photoCatName = 'ps1_pv3_3pi_20170110'
-config.photoCal.colorterms.load(os.path.join(getPackageDir('obs_subaru'),
-                                             'config',
-                                             'colorterms.py'))
+configDir = os.path.join(os.path.dirname(__file__))
+config.photoCal.colorterms.load(os.path.join(configDir, 'colorterms.py'))
 config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
 config.connections.refCat = 'ps1_pv3_3pi_20170110'
