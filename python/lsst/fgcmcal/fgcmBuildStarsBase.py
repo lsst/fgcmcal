@@ -81,6 +81,12 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
         dtype=int,
         default=1000,
     )
+    randomSeed = pexConfig.Field(
+        doc="Random seed for high density down-sampling.",
+        dtype=int,
+        default=None,
+        optional=True,
+    )
     matchNside = pexConfig.Field(
         doc="Healpix Nside for matching",
         dtype=int,
@@ -616,8 +622,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                                for bg in bgList)
                     rec['skyBackground'] = sum(np.median(bg[np.isfinite(bg)]) for bg in bgStats)
                 else:
-                    self.log.warn('Sky background not found for visit %d / ccd %d' %
-                                  (visit, det))
+                    self.log.warning('Sky background not found for visit %d / ccd %d' %
+                                     (visit, det))
                     rec['skyBackground'] = -1.0
             else:
                 rec['skyBackground'] = -1.0
@@ -746,6 +752,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                       'coarseNSide': self.config.coarseNside,
                       'densNSide': self.config.densityCutNside,
                       'densMaxPerPixel': self.config.densityCutMaxPerPixel,
+                      'randomSeed': self.config.randomSeed,
                       'primaryBands': self.config.primaryBands,
                       'referenceFilterNames': referenceFilterNames}
 
