@@ -494,7 +494,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                                "in fgcmBuildStarsTask.")
 
         if not self.config.doComposeWcsJacobian and fgcmBuildStarsConfig.doApplyWcsJacobian:
-            self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
+            self.log.warning("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
 
         # And make sure that the atmosphere was output properly
         if (self.config.doAtmosphereOutput
@@ -700,7 +700,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                                "in fgcmBuildStarsTask.")
 
         if not self.config.doComposeWcsJacobian and fgcmBuildStarsConfig.doApplyWcsJacobian:
-            self.log.warn("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
+            self.log.warning("Jacobian was applied in build-stars but doComposeWcsJacobian is not set.")
 
         if self.config.doReferenceCalibration:
             lutCat = dataRefDict['fgcmLookUpTable'].get()
@@ -826,8 +826,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                        self.config.referencePixelizationMinStars))
 
         if gdpix.size < self.config.referencePixelizationNPixels:
-            self.log.warn("Found fewer good pixels (%d) than preferred in configuration (%d)" %
-                          (gdpix.size, self.config.referencePixelizationNPixels))
+            self.log.warning("Found fewer good pixels (%d) than preferred in configuration (%d)" %
+                             (gdpix.size, self.config.referencePixelizationNPixels))
         else:
             # Sample out the pixels we want to use
             gdpix = np.random.choice(gdpix, size=self.config.referencePixelizationNPixels, replace=False)
@@ -1100,7 +1100,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         goodVisits = np.unique(zptCat['visit'][selected])
         allBadVisits = badVisits[~np.isin(badVisits, goodVisits)]
         for allBadVisit in allBadVisits:
-            self.log.warn(f'No suitable photoCalib for visit {allBadVisit}')
+            self.log.warning(f'No suitable photoCalib for visit {allBadVisit}')
 
         # Get a mapping from filtername to the offsets
         offsetMapping = {}

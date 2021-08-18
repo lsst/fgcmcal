@@ -74,8 +74,8 @@ class TractCheckDataIdContainer(pipeBase.DataIdContainer):
 
                     if log is None:
                         log = lsstLog.Log.getDefaultLogger()
-                    log.warn("Unexpected ID %s; guessing type is \"%s\"",
-                             key, 'str' if keyType == str else keyType)
+                    log.warning("Unexpected ID %s; guessing type is \"%s\"",
+                                key, 'str' if keyType == str else keyType)
                     idKeyTypeDict[key] = keyType
 
                 if keyType != str:
