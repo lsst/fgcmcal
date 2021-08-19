@@ -406,8 +406,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         # unintentional and we will warn.
         if (visitCatDataRef is not None and starObsDataRef is None
            or visitCatDataRef is None and starObsDataRef is not None):
-            self.log.warn("Only one of visitCatDataRef and starObsDataRef are set, so "
-                          "no checkpoint files will be persisted.")
+            self.log.warning("Only one of visitCatDataRef and starObsDataRef are set, so "
+                             "no checkpoint files will be persisted.")
 
         if self.config.doSubtractLocalBackground and calibFluxApertureRadius is None:
             raise RuntimeError("Must set calibFluxApertureRadius if doSubtractLocalBackground is True.")

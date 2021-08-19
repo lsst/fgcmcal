@@ -514,7 +514,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
 
         # Log warning if not converged
         if not converged:
-            self.log.warn("Maximum number of fit cycles exceeded (%d) without convergence." % (cycleNumber))
+            self.log.warning("Maximum number of fit cycles exceeded (%d) without convergence.", cycleNumber)
 
         # Do final clean-up iteration
         fgcmFitCycle.fgcmConfig.freezeStdAtmosphere = False
