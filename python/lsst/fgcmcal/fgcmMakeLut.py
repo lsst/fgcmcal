@@ -37,7 +37,6 @@ import traceback
 
 import numpy as np
 
-from lsst.obs.base import Instrument
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
@@ -406,9 +405,6 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         camera = butlerQC.get(inputRefs.camera)
 
-        # Instantiate the instrument to load filter information
-        _ = Instrument.fromName(inputRefs.camera.dataId['instrument'],
-                                butlerQC.registry)
         opticsDataRef = butlerQC.get(inputRefs.transmission_optics)
 
         sensorRefs = butlerQC.get(inputRefs.transmission_sensor)
