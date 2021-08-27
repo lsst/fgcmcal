@@ -117,7 +117,7 @@ class FgcmcalTestHSCGen2(fgcmcalTestBaseGen2.FgcmcalTestBaseGen2, lsst.utils.tes
         nGoodZp = 27
         nOkZp = 27
         nBadZp = 1093
-        nStdStars = 237
+        nStdStars = 235
         nPlots = 35
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -159,7 +159,8 @@ class FgcmcalTestHSCGen2(fgcmcalTestBaseGen2.FgcmcalTestBaseGen2, lsst.utils.tes
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        zpOffsets = np.array([0.0010470541892573237, 0.005398149602115154])
+        zpOffsets = np.array([-0.0008161436999216676,
+                              0.006149172317236662])
 
         self._testFgcmOutputProducts(visitDataRefName, ccdDataRefName,
                                      zpOffsets,
@@ -188,7 +189,9 @@ class FgcmcalTestHSCGen2(fgcmcalTestBaseGen2.FgcmcalTestBaseGen2, lsst.utils.tes
         self.configfiles = [testConfigFile]
         self.otherArgs = []
 
-        rawRepeatability = np.array([0.0, 0.008282480993703009, 0.006739350255884648])
+        rawRepeatability = np.array([0.0,
+                                     0.004436014222072738,
+                                     0.00451764656339253])
         filterNCalibMap = {'HSC-R': 14,
                            'HSC-I': 15}
 

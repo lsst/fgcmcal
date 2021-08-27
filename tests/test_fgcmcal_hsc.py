@@ -88,7 +88,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nGoodZp = 27
         nOkZp = 27
         nBadZp = 1093
-        nStdStars = 237
+        nStdStars = 235
         nPlots = 35
 
         self._testFgcmFitCycle(instName, testName,
@@ -106,7 +106,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                                2, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
                                extraConfig=extraConfigFile)
 
-        zpOffsets = np.array([0.0010470541892573237, 0.005398149602115154])
+        zpOffsets = np.array([-0.0008161436999216676,
+                              0.006149172317236662])
 
         self._testFgcmOutputProducts(instName, testName,
                                      zpOffsets, 36236, 87, 'i', 1)
@@ -131,7 +132,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # These are slightly different from above due to the configuration change
         # mid-way in the separate fits.
-        zpOffsets = np.array([0.001053874963, 0.005209929310])
+        zpOffsets = np.array([-0.0007102462113834918,
+                              0.005907602142542601])
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I')",
@@ -153,7 +155,9 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self._testFgcmMakeLut(instName, testName,
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
 
-        rawRepeatability = np.array([0.0, 0.008282480993703009, 0.006739350255884648])
+        rawRepeatability = np.array([0.0,
+                                     0.004436014222072738,
+                                     0.00451764656339253])
         filterNCalibMap = {'HSC-R': 14,
                            'HSC-I': 15}
 
