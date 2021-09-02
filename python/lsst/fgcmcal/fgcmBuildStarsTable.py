@@ -220,8 +220,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
     RunnerClass = FgcmBuildStarsRunner
     _DefaultName = "fgcmBuildStarsTable"
 
-    canMultiprocess = False
-
     def __init__(self, initInputs=None, **kwargs):
         super().__init__(initInputs=initInputs, **kwargs)
         if initInputs is not None:
