@@ -885,6 +885,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
     RunnerClass = FgcmFitCycleRunner
     _DefaultName = "fgcmFitCycle"
 
+    canMultiprocess = False
+
     def __init__(self, butler=None, initInputs=None, **kwargs):
         super().__init__(**kwargs)
 
