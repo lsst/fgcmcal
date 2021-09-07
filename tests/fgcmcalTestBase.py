@@ -81,7 +81,7 @@ class FgcmcalTestBase(object):
     def _runPipeline(self, repo, pipelineFile, queryString=None,
                      inputCollections=None, outputCollection=None,
                      configFiles=None, configOptions=None,
-                     registerDatasetTypes=False):
+                     registerDatasetTypes=False, logFile=None):
         """Run a pipeline via pipetask.
 
         Parameters
@@ -102,6 +102,8 @@ class FgcmcalTestBase(object):
             List of individual config options to use (with "-c").
         registerDatasetTypes : `bool`, optional
             Set "--register-dataset-types".
+        logFile : `str`, optional
+            Name of output log file.
 
         Returns
         -------
@@ -130,6 +132,9 @@ class FgcmcalTestBase(object):
                 pipelineArgs.extend(["-c", configOption])
         if registerDatasetTypes:
             pipelineArgs.extend(["--register-dataset-types"])
+        if logFile is not None:
+            # The --log-file option must come first
+            pipelineArgs[0: 0] = ["--log-file", logFile]
 
         # CliRunner is an unsafe workaround for DM-26239
         runner = click.testing.CliRunner()
@@ -165,6 +170,9 @@ class FgcmcalTestBase(object):
                                                    'fgcmMakeLut%s.py' % (instCamel))
         outputCollection = f'{instName}/{testName}/lut'
 
+        cwd = os.getcwd()
+        logFile = os.path.join(cwd, f"testFgcmMakeLut-{testName}-{instName}.log")
+
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
                                        'pipelines',
@@ -172,7 +180,8 @@ class FgcmcalTestBase(object):
                           configFiles=[configFile],
                           inputCollections='%s/calib,%s/testdata' % (instName, instName),
                           outputCollection=outputCollection,
-                          registerDatasetTypes=True)
+                          registerDatasetTypes=True,
+                          logFile=None)
 
         # Check output values
         butler = dafButler.Butler(self.repo)
@@ -236,6 +245,9 @@ class FgcmcalTestBase(object):
                                                            'fgcmBuildStarsTable%s.py' % (instCamel))
         outputCollection = f'{instName}/{testName}/buildstars'
 
+        cwd = os.getcwd()
+        logFile = os.path.join(cwd, f"testFgcmBuildStarsTable-{testName}-{instName}.log")
+
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
                                        'pipelines',
@@ -245,7 +257,8 @@ class FgcmcalTestBase(object):
                           outputCollection=outputCollection,
                           configOptions=['fgcmBuildStarsTable:ccdDataRefName=detector'],
                           queryString=queryString,
-                          registerDatasetTypes=True)
+                          registerDatasetTypes=True,
+                          logFile=None)
 
         butler = dafButler.Butler(self.repo)
 
@@ -308,6 +321,7 @@ class FgcmcalTestBase(object):
             inputCollections = None
 
         cwd = os.getcwd()
+        logFile = os.path.join(cwd, f"testFgcmFitCycle-{cycleNumber}-{testName}-{instName}.log")
         runDir = os.path.join(self.testDir, testName)
         os.makedirs(runDir, exist_ok=True)
         os.chdir(runDir)
@@ -326,7 +340,8 @@ class FgcmcalTestBase(object):
                           inputCollections=inputCollections,
                           outputCollection=outputCollection,
                           configOptions=configOptions,
-                          registerDatasetTypes=True)
+                          registerDatasetTypes=True,
+                          logFile=None)
 
         os.chdir(cwd)
 
@@ -396,6 +411,9 @@ class FgcmcalTestBase(object):
         inputCollection = f'{instName}/{testName}/fit'
         outputCollection = f'{instName}/{testName}/fit/output'
 
+        cwd = os.getcwd()
+        logFile = os.path.join(cwd, f"testFgcmOutputProducts-{testName}-{instName}.log")
+
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
                                        'pipelines',
@@ -404,7 +422,8 @@ class FgcmcalTestBase(object):
                           inputCollections=inputCollection,
                           outputCollection=outputCollection,
                           configOptions=['fgcmOutputProducts:doRefcatOutput=False'],
-                          registerDatasetTypes=True)
+                          registerDatasetTypes=True,
+                          logFile=None)
 
         butler = dafButler.Butler(self.repo)
         offsetCat = butler.get('fgcmReferenceCalibrationOffsets',
@@ -592,6 +611,7 @@ class FgcmcalTestBase(object):
         outputCollection = f'{instName}/{testName}/unified'
 
         cwd = os.getcwd()
+        logFile = os.path.join(cwd, f"testFgcmMultiFit-{testName}-{instName}.log")
         runDir = os.path.join(self.testDir, testName)
         os.makedirs(runDir)
         os.chdir(runDir)
@@ -605,7 +625,8 @@ class FgcmcalTestBase(object):
                           outputCollection=outputCollection,
                           configOptions=['fgcmBuildStarsTable:ccdDataRefName=detector'],
                           queryString=queryString,
-                          registerDatasetTypes=True)
+                          registerDatasetTypes=True,
+                          logFile=logFile)
 
         os.chdir(cwd)
 
@@ -708,6 +729,9 @@ class FgcmcalTestBase(object):
 
         queryString = f"tract={tract:d} and skymap='{skymapName:s}'"
 
+        cwd = os.getcwd()
+        logFile = os.path.join(cwd, f"testFgcmCalibrateTractTable-{testName}-{instName}.log")
+
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
                                        'pipelines',
@@ -717,7 +741,8 @@ class FgcmcalTestBase(object):
                           inputCollections=inputCollections,
                           outputCollection=outputCollection,
                           configOptions=[configOption],
-                          registerDatasetTypes=True)
+                          registerDatasetTypes=True,
+                          logFile=None)
 
         butler = dafButler.Butler(self.repo)
 
