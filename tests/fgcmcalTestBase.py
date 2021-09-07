@@ -36,6 +36,7 @@ import click.testing
 import lsst.ctrl.mpexec.cli.pipetask
 
 import lsst.daf.butler as dafButler
+from lsst.daf.butler.cli.cliLog import CliLog
 import lsst.obs.base as obsBase
 import lsst.geom as geom
 import lsst.log
@@ -134,13 +135,16 @@ class FgcmcalTestBase(object):
             pipelineArgs.extend(["--register-dataset-types"])
         if logFile is not None:
             # The --log-file option must come first
-            pipelineArgs[0: 0] = ["--log-file", logFile]
+            pipelineArgs[0: 0] = ["--log-file", logFile, "--long-log"]
 
         # CliRunner is an unsafe workaround for DM-26239
         runner = click.testing.CliRunner()
         results = runner.invoke(lsst.ctrl.mpexec.cli.pipetask.cli, pipelineArgs)
         if results.exception:
             raise RuntimeError("Pipeline %s failed." % (pipelineFile)) from results.exception
+
+        if logFile is not None:
+            CliLog.resetLog()
         return results.exit_code
 
     def _testFgcmMakeLut(self, instName, testName, nBand, i0Std, i0Recon, i10Std, i10Recon):
@@ -181,7 +185,7 @@ class FgcmcalTestBase(object):
                           inputCollections='%s/calib,%s/testdata' % (instName, instName),
                           outputCollection=outputCollection,
                           registerDatasetTypes=True,
-                          logFile=None)
+                          logFile=logFile)
 
         # Check output values
         butler = dafButler.Butler(self.repo)
@@ -258,7 +262,7 @@ class FgcmcalTestBase(object):
                           configOptions=['fgcmBuildStarsTable:ccdDataRefName=detector'],
                           queryString=queryString,
                           registerDatasetTypes=True,
-                          logFile=None)
+                          logFile=logFile)
 
         butler = dafButler.Butler(self.repo)
 
@@ -341,7 +345,7 @@ class FgcmcalTestBase(object):
                           outputCollection=outputCollection,
                           configOptions=configOptions,
                           registerDatasetTypes=True,
-                          logFile=None)
+                          logFile=logFile)
 
         os.chdir(cwd)
 
@@ -423,7 +427,7 @@ class FgcmcalTestBase(object):
                           outputCollection=outputCollection,
                           configOptions=['fgcmOutputProducts:doRefcatOutput=False'],
                           registerDatasetTypes=True,
-                          logFile=None)
+                          logFile=logFile)
 
         butler = dafButler.Butler(self.repo)
         offsetCat = butler.get('fgcmReferenceCalibrationOffsets',
@@ -742,7 +746,7 @@ class FgcmcalTestBase(object):
                           outputCollection=outputCollection,
                           configOptions=[configOption],
                           registerDatasetTypes=True,
-                          logFile=None)
+                          logFile=logFile)
 
         butler = dafButler.Butler(self.repo)
 
