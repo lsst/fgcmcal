@@ -921,7 +921,17 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                     dataRefDict['fgcmFlaggedStars'] = fgcmDatasetDict['fgcmFlaggedStars']
                     dataRefDict['fgcmFitParameters'] = fgcmDatasetDict['fgcmFitParameters']
 
+                    self.log.info("!!!!! Getting compExpGray ...")
+                    fitpars = dataRefDict['fgcmFitParameters']
+                    for ii in range(len(fitpars['compExpGray'][0])):
+                        self.log.info("!!!!! compExpGray[%d] = %.10f" % (ii, fitpars['compExpGray'][0][ii]))
+
                 fgcmDatasetDict, config = self._fgcmFitCycle(camera, dataRefDict, config=config)
+                self.log.info("!!!!! Persisting compExpGray ...")
+                fitpars = fgcmDatasetDict['fgcmFitParameters']
+                for ii in range(len(fitpars['compExpGray'][0])):
+                    self.log.info("!!!!! compExpGray[%d] = %.10f" % (ii, fitpars['compExpGray'][0][ii]))
+
                 butlerQC.put(fgcmDatasetDict['fgcmFitParameters'],
                              getattr(outputRefs, f'fgcmFitParameters{cycle}'))
                 butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'],
@@ -1125,6 +1135,9 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                 parCat = dataRefDict['fgcmFitParameters'].get()
             inParInfo, inParams, inSuperStar = self._loadParameters(parCat)
             del parCat
+            self.log.info("!!!!! Converted compExpGray ...")
+            for ii in range(len(inParams['COMPEXPGRAY'][0])):
+                self.log.info("!!!!! compExpGray[%d] = %.10f" % (ii, inParams['COMPEXPGRAY'][0][ii]))
             fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                               fgcmExpInfo,
                                                               inParInfo,
