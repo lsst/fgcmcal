@@ -16,6 +16,7 @@ from .fgcmCalibrateTractBase import *
 from .fgcmCalibrateTract import *
 from .fgcmCalibrateTractTable import *
 from .photoCalibConsolidateGen2Gen3 import *
+from .focalPlaneProjector import *
 from .sedterms import *
 from .version import *
 

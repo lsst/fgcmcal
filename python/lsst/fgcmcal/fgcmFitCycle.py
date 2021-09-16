@@ -47,10 +47,11 @@ from lsst.utils.timer import timeMethod
 
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
 from .utilities import extractReferenceMags
-from .utilities import computeCcdOffsets, makeZptSchema, makeZptCat
+from .utilities import makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat, makeStdSchema, makeStdCat
 from .sedterms import SedboundarytermDict, SedtermDict
 from .utilities import lookupStaticCalibrations
+from .focalPlaneProjector import FocalPlaneProjector
 
 import fgcm
 
@@ -490,6 +491,11 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
     # telescope latitude directly from the camera.
     latitude = pexConfig.Field(
         doc="Observatory latitude",
+        dtype=float,
+        default=None,
+    )
+    defaultCameraOrientation = pexConfig.Field(
+        doc="Default camera orientation for QA plots.",
         dtype=float,
         default=None,
     )
@@ -1100,14 +1106,13 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         fgcmExpInfo = translateVisitCatalog(visitCat)
         del visitCat
 
-        # Use the first orientation.
-        # TODO: DM-21215 will generalize to arbitrary camera orientations
-        ccdOffsets = computeCcdOffsets(camera, fgcmExpInfo['TELROT'][0])
+        focalPlaneProjector = FocalPlaneProjector(camera,
+                                                  self.config.defaultCameraOrientation)
 
         noFitsDict = {'lutIndex': lutIndexVals,
                       'lutStd': lutStd,
                       'expInfo': fgcmExpInfo,
-                      'ccdOffsets': ccdOffsets}
+                      'focalPlaneProjector': focalPlaneProjector}
 
         # set up the fitter object
         fgcmFitCycle = fgcm.FgcmFitCycle(configDict, useFits=False,

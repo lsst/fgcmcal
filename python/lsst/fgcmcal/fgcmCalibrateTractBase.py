@@ -37,10 +37,11 @@ from .fgcmBuildStars import FgcmBuildStarsTask, FgcmBuildStarsConfig
 from .fgcmFitCycle import FgcmFitCycleConfig
 from .fgcmOutputProducts import FgcmOutputProductsTask
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
-from .utilities import computeCcdOffsets, computeApertureRadiusFromDataRef, extractReferenceMags
+from .utilities import computeApertureRadiusFromDataRef, extractReferenceMags
 from .utilities import makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat
 from .utilities import makeStdSchema, makeStdCat
+from .focalPlaneProjector import FocalPlaneProjector
 
 import fgcm
 
@@ -381,16 +382,15 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
                                     True, False, lutIndexVals[0]['FILTERNAMES'],
                                     tract=tract)
 
-        # Use the first orientation.
-        # TODO: DM-21215 will generalize to arbitrary camera orientations
-        ccdOffsets = computeCcdOffsets(dataRefDict['camera'], fgcmExpInfo['TELROT'][0])
+        focalPlaneProjector = FocalPlaneProjector(dataRefDict['camera'],
+                                                  self.config.fgcmFitCycle.defaultCameraOrientation)
 
         # Set up the fit cycle task
 
         noFitsDict = {'lutIndex': lutIndexVals,
                       'lutStd': lutStd,
                       'expInfo': fgcmExpInfo,
-                      'ccdOffsets': ccdOffsets}
+                      'focalPlaneProjector': focalPlaneProjector}
 
         fgcmFitCycle = fgcm.FgcmFitCycle(configDict, useFits=False,
                                          noFitsDict=noFitsDict, noOutput=True)
