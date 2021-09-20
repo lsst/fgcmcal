@@ -58,6 +58,7 @@ from lsst.meas.algorithms.ingestIndexReferenceTask import addRefCatMetadata
 
 from .utilities import computeApproxPixelAreaFields
 from .utilities import lookupStaticCalibrations
+from .utilities import FGCM_ILLEGAL_VALUE
 
 import fgcm
 
@@ -1093,7 +1094,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         # ccds.
         cannot_compute = fgcm.fgcmUtilities.zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
         selected = (((zptCat['fgcmFlag'] & cannot_compute) == 0)
-                    & (zptCat['fgcmZptVar'] > 0.0))
+                    & (zptCat['fgcmZptVar'] > 0.0)
+                    & (zptCat['fgcmZpt'] > FGCM_ILLEGAL_VALUE))
 
         # Log warnings for any visit which has no valid zeropoints
         badVisits = np.unique(zptCat['visit'][~selected])
