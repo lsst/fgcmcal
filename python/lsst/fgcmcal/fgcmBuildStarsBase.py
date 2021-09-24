@@ -553,7 +553,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
                 label = dataRef.get(datasetType='calexp_filterLabel')
                 physicalFilter = label.physicalLabel
                 psf = exp.getPsf()
-                psfSigma = psf.computeShape().getDeterminantRadius()
+                bbox = dataRef.get(datasetType='calexp_bbox')
+                psfSigma = psf.computeShape(bbox.getCenter()).getDeterminantRadius()
             else:
                 # Gen3: use the visitSummary dataRef
                 summary = dataRef.get()

@@ -426,11 +426,13 @@ class FgcmcalTestBase(object):
         # Test the fgcm_photoCalib output
         zptCat = butler.get('fgcmZeropoints' + config.connections.cycleNumber,
                             collections=[inputCollection], instrument=instName)
-        selected = (zptCat['fgcmFlag'] < 16)
+
+        good = (zptCat['fgcmFlag'] < 16)
+        bad = (zptCat['fgcmFlag'] >= 16)
 
         # Read in all the calibrations, these should all be there
         # This test is simply to ensure that all the photoCalib files exist
-        visits = np.unique(zptCat['visit'])
+        visits = np.unique(zptCat['visit'][good])
         photoCalibDict = {}
         for visit in visits:
             expCat = butler.get('fgcmPhotoCalibCatalog',
@@ -440,8 +442,13 @@ class FgcmcalTestBase(object):
                 if row['visit'] == visit:
                     photoCalibDict[(visit, row['id'])] = row.getPhotoCalib()
 
-        for rec in zptCat[selected]:
+        # Check that all of the good photocalibs are there.
+        for rec in zptCat[good]:
             self.assertTrue((rec['visit'], rec['detector']) in photoCalibDict)
+
+        # Check that none of the bad photocalibs are there.
+        for rec in zptCat[bad]:
+            self.assertFalse((rec['visit'], rec['detector']) in photoCalibDict)
 
         # We do round-trip value checking on just the final one (chosen arbitrarily)
         testCal = photoCalibDict[(testVisit, testCcd)]

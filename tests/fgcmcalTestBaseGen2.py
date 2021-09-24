@@ -360,16 +360,34 @@ class FgcmcalTestBaseGen2(object):
         # Test the fgcm_photoCalib output
 
         zptCat = butler.get('fgcmZeropoints', fgcmcycle=self.config.cycleNumber)
-        selected = (zptCat['fgcmFlag'] < 16)
 
-        # Read in all the calibrations, these should all be there
-        # This test is simply to ensure that all the photoCalib files exist
-        for rec in zptCat[selected]:
-            testCal = butler.get('fgcm_photoCalib',
-                                 dataId={visitDataRefName: int(rec['visit']),
-                                         ccdDataRefName: int(rec['detector']),
-                                         'filter': rec['filtername']})
+        good = (zptCat['fgcmFlag'] < 16)
+        bad = (zptCat['fgcmFlag'] >= 16)
+
+        # Check that all the good photocalibs are output.
+        for rec in zptCat[good]:
+            testCal = None
+            try:
+                testCal = butler.get('fgcm_photoCalib',
+                                     dataId={visitDataRefName: int(rec['visit']),
+                                             ccdDataRefName: int(rec['detector']),
+                                             'filter': rec['filtername']})
+            except dafPersist.NoResults:
+                pass
+
             self.assertIsNotNone(testCal)
+
+        # Check that none of the bad photocalibs are output.
+        for rec in zptCat[bad]:
+            testCal = None
+            try:
+                testCal = butler.get('fgcm_photoCalib',
+                                     dataId={visitDataRefName: int(rec['visit']),
+                                             ccdDataRefName: int(rec['detector']),
+                                             'filter': rec['filtername']})
+            except dafPersist.NoResults:
+                pass
+            self.assertIsNone(testCal)
 
         # We do round-trip value checking on just the final one (chosen arbitrarily)
         testCal = butler.get('fgcm_photoCalib',

@@ -43,6 +43,7 @@ import fgcm
 
 FGCM_EXP_FIELD = 'VISIT'
 FGCM_CCD_FIELD = 'DETECTOR'
+FGCM_ILLEGAL_VALUE = -9999.0
 
 
 def makeConfigDict(config, log, camera, maxIter,
@@ -167,7 +168,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'refStarSnMin': config.refStarSnMin,
                   'refStarOutlierNSig': config.refStarOutlierNSig,
                   'applyRefStarColorCuts': config.applyRefStarColorCuts,
-                  'illegalValue': -9999.0,  # internally used by fgcm.
+                  'illegalValue': FGCM_ILLEGAL_VALUE,  # internally used by fgcm.
                   'starColorCuts': starColorCutList,
                   'aperCorrFitNBins': config.aperCorrFitNBins,
                   'aperCorrInputSlopeDict': dict(config.aperCorrInputSlopeDict),
