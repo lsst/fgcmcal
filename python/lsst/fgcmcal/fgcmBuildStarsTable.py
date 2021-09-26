@@ -487,7 +487,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # The "visit" name in the parquet table is hard-coded.
             tempCat[visitKey][:] = df['visit'].values[use]
             tempCat[ccdKey][:] = df[detColumn].values[use]
-            tempCat['psf_candidate'] = df['Calib_psf_candidate'].values[use]
+            tempCat['psf_candidate'] = df[self.config.psfCandidateName].values[use]
 
             if self.config.doSubtractLocalBackground:
                 # At the moment we only adjust the flux and not the flux
