@@ -60,6 +60,8 @@ class FgcmApertureTest(lsst.utils.tests.TestCase):
 
         self.assertEqual(computeApertureRadiusFromName('ApFlux_12_0_instFlux'), 12.0)
         self.assertEqual(computeApertureRadiusFromName('ApFlux_4_5_instFlux'), 4.5)
+        self.assertEqual(computeApertureRadiusFromName('apFlux_12_0_instFlux'), 12.0)
+        self.assertEqual(computeApertureRadiusFromName('apFlux_4_5_instFlux'), 4.5)
         self.assertRaises(RuntimeError, computeApertureRadiusFromName, 'not_a_field')
 
 

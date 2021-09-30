@@ -825,7 +825,7 @@ def computeApertureRadiusFromDataRef(dataRef, fluxField):
     Raises
     ------
     RuntimeError: Raised if flux field is not a CircularApertureFlux, ApFlux,
-       or associated slot.
+       apFlux, or associated slot.
     """
     # TODO: Move this method to more general stack method in DM-25775
     if isinstance(dataRef, dafPersist.ButlerDataRef):
@@ -866,11 +866,11 @@ def computeApertureRadiusFromName(fluxField):
 
     Raises
     ------
-     RuntimeError: Raised if flux field is not a CircularApertureFlux
-       or ApFlux.
+     RuntimeError: Raised if flux field is not a CircularApertureFlux,
+       ApFlux, or apFlux.
     """
     # TODO: Move this method to more general stack method in DM-25775
-    m = re.search(r'(CircularApertureFlux|ApFlux)_(\d+)_(\d+)_', fluxField)
+    m = re.search(r'(CircularApertureFlux|ApFlux|apFlux)_(\d+)_(\d+)_', fluxField)
 
     if m is None:
         raise RuntimeError(f"Flux field {fluxField} does not correspond to a CircularApertureFlux or ApFlux")

@@ -179,24 +179,24 @@ class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase, pipeBase.PipelineTaskC
         # sourceTable_visit catalogs, which differ from the raw src
         # catalogs.  Therefore, all field and flag names cannot
         # be derived from the base config class.
-        self.instFluxField = 'ApFlux_12_0_instFlux'
-        self.localBackgroundFluxField = 'LocalBackground_instFlux'
-        self.apertureInnerInstFluxField = 'ApFlux_12_0_instFlux'
-        self.apertureOuterInstFluxField = 'ApFlux_17_0_instFlux'
-        self.psfCandidateName = 'Calib_psf_candidate'
+        self.instFluxField = 'apFlux_12_0_instFlux'
+        self.localBackgroundFluxField = 'localBackground_instFlux'
+        self.apertureInnerInstFluxField = 'apFlux_12_0_instFlux'
+        self.apertureOuterInstFluxField = 'apFlux_17_0_instFlux'
+        self.psfCandidateName = 'calib_psf_candidate'
 
         sourceSelector = self.sourceSelector["science"]
 
         fluxFlagName = self.instFluxField[0: -len('instFlux')] + 'flag'
 
-        sourceSelector.flags.bad = ['PixelFlags_edge',
-                                    'PixelFlags_interpolatedCenter',
-                                    'PixelFlags_saturatedCenter',
-                                    'PixelFlags_crCenter',
-                                    'PixelFlags_bad',
-                                    'PixelFlags_interpolated',
-                                    'PixelFlags_saturated',
-                                    'Centroid_flag',
+        sourceSelector.flags.bad = ['pixelFlags_edge',
+                                    'pixelFlags_interpolatedCenter',
+                                    'pixelFlags_saturatedCenter',
+                                    'pixelFlags_crCenter',
+                                    'pixelFlags_bad',
+                                    'pixelFlags_interpolated',
+                                    'pixelFlags_saturated',
+                                    'centroid_flag',
                                     fluxFlagName]
 
         if self.doSubtractLocalBackground:
@@ -207,7 +207,7 @@ class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase, pipeBase.PipelineTaskC
         sourceSelector.signalToNoise.errField = self.instFluxField + 'Err'
 
         sourceSelector.isolated.parentName = 'parentSourceId'
-        sourceSelector.isolated.nChildName = 'Deblend_nChild'
+        sourceSelector.isolated.nChildName = 'deblend_nChild'
 
         sourceSelector.unresolved.name = 'extendedness'
 
@@ -487,7 +487,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # The "visit" name in the parquet table is hard-coded.
             tempCat[visitKey][:] = df['visit'].values[use]
             tempCat[ccdKey][:] = df[detColumn].values[use]
-            tempCat['psf_candidate'] = df['Calib_psf_candidate'].values[use]
+            tempCat['psf_candidate'] = df[self.config.psfCandidateName].values[use]
 
             if self.config.doSubtractLocalBackground:
                 # At the moment we only adjust the flux and not the flux
