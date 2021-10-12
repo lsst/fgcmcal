@@ -34,6 +34,7 @@ matplotlib.use("Agg")
 
 import lsst.utils  # noqa: E402
 import lsst.pipe.tasks  # noqa: E402
+import lsst.daf.butler  # noqa: E402
 
 import fgcmcalTestBase  # noqa: E402
 
@@ -52,6 +53,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
             lsst.utils.getPackageDir('obs_subaru')
         except LookupError:
             raise unittest.SkipTest("obs_subaru not setup")
+
+        lsst.daf.butler.cli.cliLog.CliLog.initLog(longlog=False)
 
         cls.testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
 
