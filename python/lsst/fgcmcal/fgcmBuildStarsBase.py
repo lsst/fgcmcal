@@ -36,6 +36,7 @@ import lsst.geom as geom
 from lsst.daf.base import PropertyList
 from lsst.daf.base.dateTime import DateTime
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
+from lsst.utils.timer import timeMethod
 
 from .utilities import computeApertureRadiusFromDataRef
 from .fgcmLoadReferenceCatalog import FgcmLoadReferenceCatalogTask
@@ -291,7 +292,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
     def _getMetadataName(self):
         return None
 
-    @pipeBase.timeMethod
+    @timeMethod
     def runDataRef(self, butler, dataRefs):
         """
         Cross-match and make star list for FGCM Input

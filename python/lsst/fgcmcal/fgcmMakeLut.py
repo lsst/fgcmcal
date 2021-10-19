@@ -42,6 +42,7 @@ import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
 import lsst.afw.cameraGeom as afwCameraGeom
+from lsst.utils.timer import timeMethod
 from .utilities import lookupStaticCalibrations
 
 import fgcm
@@ -364,7 +365,7 @@ class FgcmMakeLutTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
     def _getMetadataName(self):
         return None
 
-    @pipeBase.timeMethod
+    @timeMethod
     def runDataRef(self, butler):
         """
         Make a Look-Up Table for FGCM
