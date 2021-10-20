@@ -31,6 +31,7 @@ import numpy as np
 import lsst.daf.persistence as dafPersist
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
+from lsst.utils.timer import timeMethod
 
 from .fgcmBuildStars import FgcmBuildStarsTask, FgcmBuildStarsConfig
 from .fgcmFitCycle import FgcmFitCycleConfig
@@ -190,7 +191,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, ab
     def _getMetadataName(self):
         return None
 
-    @pipeBase.timeMethod
+    @timeMethod
     def runDataRef(self, butler, dataRefs):
         """
         Run full FGCM calibration on a single tract, including building star list,

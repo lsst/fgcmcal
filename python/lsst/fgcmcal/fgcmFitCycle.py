@@ -43,6 +43,7 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
+from lsst.utils.timer import timeMethod
 
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
 from .utilities import extractReferenceMags
@@ -946,7 +947,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             if self.outputStandards:
                 butlerQC.put(fgcmDatasetDict['fgcmStandardStars'], outputRefs.fgcmStandardStars)
 
-    @pipeBase.timeMethod
+    @timeMethod
     def runDataRef(self, butler):
         """
         Run a single fit cycle for FGCM

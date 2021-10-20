@@ -55,6 +55,7 @@ import lsst.afw.table as afwTable
 from lsst.meas.algorithms import IndexerRegistry
 from lsst.meas.algorithms import DatasetConfig
 from lsst.meas.algorithms.ingestIndexReferenceTask import addRefCatMetadata
+from lsst.utils.timer import timeMethod
 
 from .utilities import computeApproxPixelAreaFields
 from .utilities import lookupStaticCalibrations
@@ -437,7 +438,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         return
 
-    @pipeBase.timeMethod
+    @timeMethod
     def runDataRef(self, butler):
         """
         Make FGCM output products for use in the stack
