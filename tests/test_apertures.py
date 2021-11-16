@@ -44,7 +44,7 @@ class FgcmApertureTest(lsst.utils.tests.TestCase):
         """
         lsst.log.setLevel("HscMapper", lsst.log.FATAL)
 
-        butler = dafPersist.Butler(os.path.join(self.dataDir, 'hsc'))
+        butler = dafPersist.Butler(os.path.join(self.dataDir, 'hsc/repo'))
 
         dataRef = butler.dataRef('src', visit=34648, ccd=51)
 

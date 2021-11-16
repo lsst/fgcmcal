@@ -56,7 +56,7 @@ class FgcmcalTestHSCGen2(fgcmcalTestBaseGen2.FgcmcalTestBaseGen2, lsst.utils.tes
             raise unittest.SkipTest("obs_subaru not setup")
 
     def setUp(self):
-        inputDir = os.path.join(self.dataDir, 'hsc')
+        inputDir = os.path.join(self.dataDir, 'hsc/repo')
 
         self.testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
 

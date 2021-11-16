@@ -50,7 +50,7 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
             raise unittest.SkipTest("obs_subaru not setup")
 
     def setUp(self):
-        self.inputDir = os.path.join(self.dataDir, 'hsc')
+        self.inputDir = os.path.join(self.dataDir, 'hsc/repo')
 
         lsst.log.setLevel("HscMapper", lsst.log.FATAL)
 
