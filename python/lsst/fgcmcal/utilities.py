@@ -27,6 +27,7 @@ and do not need to be part of a task.
 import numpy as np
 import os
 import re
+from deprecated.sphinx import deprecated
 
 from lsst.daf.base import PropertyList
 import lsst.daf.persistence as dafPersist
@@ -153,6 +154,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'coatingMJDs': config.coatingMjds,
                   'minObsPerBand': config.minObsPerBand,
                   'latitude': config.latitude,
+                  'defaultCameraOrientation': config.defaultCameraOrientation,
                   'brightObsGrayMax': config.brightObsGrayMax,
                   'minStarPerCCD': config.minStarPerCcd,
                   'minCCDPerExp': config.minCcdPerExp,
@@ -396,6 +398,8 @@ def translateVisitCatalog(visitCat):
     return fgcmExpInfo
 
 
+@deprecated(reason="This method is no longer used in fgcmcal.  It will be removed after v23.",
+            version="v23.0", category=FutureWarning)
 def computeCcdOffsets(camera, defaultOrientation):
     """
     Compute the CCD offsets in ra/dec and x/y space

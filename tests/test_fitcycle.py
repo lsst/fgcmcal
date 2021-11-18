@@ -56,6 +56,7 @@ class FgcmcalTestFitCycleConfig(lsst.utils.tests.TestCase):
         config.sigFgcmMaxEGrayDict = {'r': 0.05, 'i': 0.05}
         config.approxThroughputDict = {'r': 1.0, 'i': 1.0}
         config.useRepeatabilityForExpGrayCutsDict = {'r': False, 'i': False}
+        config.defaultCameraOrientation = 0.0
 
         # Ensure that it validates
         config.validate()
