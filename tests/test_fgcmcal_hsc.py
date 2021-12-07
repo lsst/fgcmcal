@@ -59,7 +59,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         cls.testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
 
         cls._importRepository('lsst.obs.subaru.HyperSuprimeCam',
-                              os.path.join(cls.dataDir, 'hsc'),
+                              os.path.join(cls.dataDir, 'hsc/repo'),
                               os.path.join(cls.dataDir, 'hsc', 'exports.yaml'))
 
     def test_fgcmcalPipeline(self):
