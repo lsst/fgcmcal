@@ -1493,7 +1493,21 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                                       ('COMPRETRIEVEDLNPWVFLAG', 'i2',
                                        (parCat['compRetrievedLnPwvFlag'].size, )),
                                       ('COMPRETRIEVEDTAUNIGHT', 'f8',
-                                       (parCat['compRetrievedTauNight'].size, ))])
+                                       (parCat['compRetrievedTauNight'].size, )),
+                                      ('COMPEPSILON', 'f8',
+                                       (parCat['compEpsilon'].size, )),
+                                      ('COMPMEDDELTAAPER', 'f8',
+                                       (parCat['compMedDeltaAper'].size, )),
+                                      ('COMPGLOBALEPSILON', 'f4',
+                                       (parCat['compGlobalEpsilon'].size, )),
+                                      ('COMPEPSILONMAP', 'f4',
+                                       (parCat['compEpsilonMap'].size, )),
+                                      ('COMPEPSILONNSTARMAP', 'i4',
+                                       (parCat['compEpsilonNStarMap'].size, )),
+                                      ('COMPEPSILONCCDMAP', 'f4',
+                                       (parCat['compEpsilonCcdMap'].size, )),
+                                      ('COMPEPSILONCCDNSTARMAP', 'i4',
+                                       (parCat['compEpsilonCcdNStarMap'].size, ))])
 
         inParams['PARALPHA'][:] = parCat['parAlpha'][0, :]
         inParams['PARO3'][:] = parCat['parO3'][0, :]
@@ -1533,6 +1547,13 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         inParams['COMPRETRIEVEDLNPWVRAW'][:] = parCat['compRetrievedLnPwvRaw'][0, :]
         inParams['COMPRETRIEVEDLNPWVFLAG'][:] = parCat['compRetrievedLnPwvFlag'][0, :]
         inParams['COMPRETRIEVEDTAUNIGHT'][:] = parCat['compRetrievedTauNight'][0, :]
+        inParams['COMPEPSILON'][:] = parCat['compEpsilon'][0, :]
+        inParams['COMPMEDDELTAAPER'][:] = parCat['compMedDeltaAper'][0, :]
+        inParams['COMPGLOBALEPSILON'][:] = parCat['compGlobalEpsilon'][0, :]
+        inParams['COMPEPSILONMAP'][:] = parCat['compEpsilonMap'][0, :]
+        inParams['COMPEPSILONNSTARMAP'][:] = parCat['compEpsilonNStarMap'][0, :]
+        inParams['COMPEPSILONCCDMAP'][:] = parCat['compEpsilonCcdMap'][0, :]
+        inParams['COMPEPSILONCCDNSTARMAP'][:] = parCat['compEpsilonCcdNStarMap'][0, :]
 
         inSuperStar = np.zeros(parCat['superstarSize'][0, :], dtype='f8')
         inSuperStar[:, :, :, :] = parCat['superstar'][0, :].reshape(inSuperStar.shape)
@@ -1741,6 +1762,27 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                            size=pars['COMPRETRIEVEDLNPWVFLAG'].size)
         parSchema.addField('compRetrievedTauNight', type='ArrayD', doc='Retrieved tau (per night)',
                            size=pars['COMPRETRIEVEDTAUNIGHT'].size)
+        parSchema.addField('compEpsilon', type='ArrayD',
+                           doc='Computed epsilon background offset per visit (nJy/arcsec2)',
+                           size=pars['COMPEPSILON'].size)
+        parSchema.addField('compMedDeltaAper', type='ArrayD',
+                           doc='Median delta mag aper per visit',
+                           size=pars['COMPMEDDELTAAPER'].size)
+        parSchema.addField('compGlobalEpsilon', type='ArrayD',
+                           doc='Computed epsilon bkg offset (global) (nJy/arcsec2)',
+                           size=pars['COMPGLOBALEPSILON'].size)
+        parSchema.addField('compEpsilonMap', type='ArrayD',
+                           doc='Computed epsilon maps (nJy/arcsec2)',
+                           size=pars['COMPEPSILONMAP'].size)
+        parSchema.addField('compEpsilonNStarMap', type='ArrayI',
+                           doc='Number of stars per pixel in computed epsilon maps',
+                           size=pars['COMPEPSILONNSTARMAP'].size)
+        parSchema.addField('compEpsilonCcdMap', type='ArrayD',
+                           doc='Computed epsilon ccd maps (nJy/arcsec2)',
+                           size=pars['COMPEPSILONCCDMAP'].size)
+        parSchema.addField('compEpsilonCcdNStarMap', type='ArrayI',
+                           doc='Number of stars per ccd bin in epsilon ccd maps',
+                           size=pars['COMPEPSILONCCDNSTARMAP'].size)
         # superstarflat section
         parSchema.addField('superstarSize', type='ArrayI', doc='Superstar matrix size',
                            size=4)
@@ -1805,7 +1847,9 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                     'compExpGray', 'compVarGray', 'compNGoodStarPerExp', 'compSigFgcm',
                     'compSigmaCal', 'compExpDeltaMagBkg', 'compMedianSedSlope',
                     'compRetrievedLnPwv', 'compRetrievedLnPwvRaw', 'compRetrievedLnPwvFlag',
-                    'compRetrievedTauNight']
+                    'compRetrievedTauNight', 'compEpsilon', 'compMedDeltaAper',
+                    'compGlobalEpsilon', 'compEpsilonMap', 'compEpsilonNStarMap',
+                    'compEpsilonCcdMap', 'compEpsilonCcdNStarMap']
 
         for scalarName in scalarNames:
             rec[scalarName] = pars[scalarName.upper()]
@@ -1815,7 +1859,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         # superstar section
         rec['superstarSize'][:] = parSuperStarFlat.shape
-        rec['superstar'][:] = parSuperStarFlat.flatten()
+        rec['superstar'][:] = parSuperStarFlat.ravel()
 
         return parCat
 
