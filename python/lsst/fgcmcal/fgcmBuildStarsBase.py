@@ -681,6 +681,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
             "jacobian", type=np.float32, doc="Relative pixel scale from wcs jacobian")
         sourceMapper.editOutputSchema().addField(
             "deltaMagBkg", type=np.float32, doc="Change in magnitude due to local background offset")
+        sourceMapper.editOutputSchema().addField(
+            "deltaMagAper", type=np.float32, doc="Change in magnitude from larger to smaller aperture")
 
         return sourceMapper
 

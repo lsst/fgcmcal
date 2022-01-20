@@ -757,6 +757,62 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         default=None,
         optional=True,
     )
+    deltaAperFitMinNgoodObs = pexConfig.Field(
+        doc="Minimum number of good observations to use mean delta-aper values in fits.",
+        dtype=int,
+        default=2,
+    )
+    deltaAperFitPerCcdNx = pexConfig.Field(
+        doc=("Number of x bins per ccd when computing delta-aper background offsets. "
+             "Only used when ``doComputeDeltaAperPerCcd`` is True."),
+        dtype=int,
+        default=10,
+    )
+    deltaAperFitPerCcdNy = pexConfig.Field(
+        doc=("Number of y bins per ccd when computing delta-aper background offsets. "
+             "Only used when ``doComputeDeltaAperPerCcd`` is True."),
+        dtype=int,
+        default=10,
+    )
+    deltaAperFitSpatialNside = pexConfig.Field(
+        doc="Healpix nside to compute spatial delta-aper background offset maps.",
+        dtype=int,
+        default=64,
+    )
+    deltaAperInnerRadiusArcsec = pexConfig.Field(
+        doc=("Inner radius used to compute deltaMagAper (arcseconds). "
+             "If set to 0.0 then output will be ``unnormalized`` units."),
+        dtype=float,
+        default=0.0,
+    )
+    deltaAperOuterRadiusArcsec = pexConfig.Field(
+        doc=("Outer radius used to compute deltaMagAper (arcseconds). "
+             "If set to 0.0 then output will be ``unnormalized`` units."),
+        dtype=float,
+        default=0.0,
+    )
+    doComputeDeltaAperPerVisit = pexConfig.Field(
+        doc=("Do the computation of delta-aper background offsets per visit? "
+             "Note: this option can be very slow when there are many visits."),
+        dtype=bool,
+        default=False,
+    )
+    doComputeDeltaAperPerStar = pexConfig.Field(
+        doc="Do the computation of delta-aper mean values per star?",
+        dtype=bool,
+        default=True,
+    )
+    doComputeDeltaAperMap = pexConfig.Field(
+        doc=("Do the computation of delta-aper spatial maps? "
+             "This is only used if ``doComputeDeltaAperPerStar`` is True,"),
+        dtype=bool,
+        default=False,
+    )
+    doComputeDeltaAperPerCcd = pexConfig.Field(
+        doc="Do the computation of per-ccd delta-aper background offsets?",
+        dtype=bool,
+        default=False,
+    )
 
     def validate(self):
         super().validate()
@@ -1203,6 +1259,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                             obsX=starObs['x'][starIndices['obsIndex']],
                             obsY=starObs['y'][starIndices['obsIndex']],
                             obsDeltaMagBkg=starObs['deltaMagBkg'][starIndices['obsIndex']],
+                            obsDeltaAper=starObs['deltaMagAper'][starIndices['obsIndex']],
                             psfCandidate=starObs['psf_candidate'][starIndices['obsIndex']],
                             refID=refId,
                             refMag=refMag,
