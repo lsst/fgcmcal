@@ -781,13 +781,17 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
     )
     deltaAperInnerRadiusArcsec = pexConfig.Field(
         doc=("Inner radius used to compute deltaMagAper (arcseconds). "
-             "If set to 0.0 then output will be ``unnormalized`` units."),
+             "Must be positive and less than ``deltaAperOuterRadiusArcsec`` if "
+             "any of ``doComputeDeltaAperPerVisit``, ``doComputeDeltaAperPerStar``, "
+             "``doComputeDeltaAperMap``, ``doComputeDeltaAperPerCcd`` are set."),
         dtype=float,
         default=0.0,
     )
     deltaAperOuterRadiusArcsec = pexConfig.Field(
         doc=("Outer radius used to compute deltaMagAper (arcseconds). "
-             "If set to 0.0 then output will be ``unnormalized`` units."),
+             "Must be positive and greater than ``deltaAperInnerRadiusArcsec`` if "
+             "any of ``doComputeDeltaAperPerVisit``, ``doComputeDeltaAperPerStar``, "
+             "``doComputeDeltaAperMap``, ``doComputeDeltaAperPerCcd`` are set."),
         dtype=float,
         default=0.0,
     )
@@ -868,6 +872,22 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
             if band not in self.useRepeatabilityForExpGrayCutsDict:
                 msg = 'band %s not in useRepeatabilityForExpGrayCutsDict' % (band)
                 raise pexConfig.FieldValidationError(FgcmFitCycleConfig.useRepeatabilityForExpGrayCutsDict,
+                                                     self, msg)
+
+        if self.doComputeDeltaAperPerVisit or self.doComputeDeltaAperMap \
+           or self.doComputeDeltaAperPerCcd:
+            if self.deltaAperInnerRadiusArcsec <= 0.0:
+                msg = 'deltaAperInnerRadiusArcsec must be positive if deltaAper computations are turned on.'
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.deltaAperInnerRadiusArcsec,
+                                                     self, msg)
+            if self.deltaAperOuterRadiusArcsec <= 0.0:
+                msg = 'deltaAperOuterRadiusArcsec must be positive if deltaAper computations are turned on.'
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.deltaAperOuterRadiusArcsec,
+                                                     self, msg)
+            if self.deltaAperOuterRadiusArcsec <= self.deltaAperInnerRadiusArcsec:
+                msg = ('deltaAperOuterRadiusArcsec must be greater than deltaAperInnerRadiusArcsec if '
+                       'deltaAper computations are turned on.')
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.deltaAperOuterRadiusArcsec,
                                                      self, msg)
 
 

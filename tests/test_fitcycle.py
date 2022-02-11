@@ -73,6 +73,12 @@ class FgcmcalTestFitCycleConfig(lsst.utils.tests.TestCase):
         self._test_misconfig(config, 'approxThroughputDict', {'r': 1.0})
         self._test_misconfig(config, 'useRepeatabilityForExpGrayCutsDict', {'r': False})
 
+        config.doComputeDeltaAperMap = True
+        self._test_misconfig(config, 'deltaAperInnerRadiusArcsec', 0.0)
+        config.deltaAperInnerRadiusArcsec = 1.0
+        self._test_misconfig(config, 'deltaAperOuterRadiusArcsec', 0.0)
+        self._test_misconfig(config, 'deltaAperOuterRadiusArcsec', 1.0)
+
     def _test_misconfig(self, config, field, value):
         """
         Test misconfigured field.
