@@ -118,7 +118,7 @@ class FgcmcalTestHSCGen2(fgcmcalTestBaseGen2.FgcmcalTestBaseGen2, lsst.utils.tes
         nOkZp = 27
         nBadZp = 1093
         nStdStars = 235
-        nPlots = 35
+        nPlots = 43
 
         self._testFgcmFitCycle(nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
 

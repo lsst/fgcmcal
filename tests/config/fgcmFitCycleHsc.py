@@ -94,3 +94,11 @@ config.sigFgcmMaxEGrayDict = {'g': 0.05,
 config.approxThroughputDict = {'g': 1.0,
                               'r': 1.0,
                               'i': 1.0}
+
+config.deltaAperFitPerCcdNx = 2
+config.deltaAperFitPerCcdNy = 4
+config.deltaAperInnerRadiusArcsec = 2.04
+config.deltaAperOuterRadiusArcsec = 2.89
+config.doComputeDeltaAperPerVisit = True
+config.doComputeDeltaAperMap = True
+config.doComputeDeltaAperPerCcd = True

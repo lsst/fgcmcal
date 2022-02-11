@@ -202,6 +202,16 @@ def makeConfigDict(config, log, camera, maxIter,
                   'useRepeatabilityForExpGrayCutsDict': dict(config.useRepeatabilityForExpGrayCutsDict),
                   'autoPhotometricCutNSig': config.autoPhotometricCutNSig,
                   'autoHighCutNSig': config.autoHighCutNSig,
+                  'deltaAperInnerRadiusArcsec': config.deltaAperInnerRadiusArcsec,
+                  'deltaAperOuterRadiusArcsec': config.deltaAperOuterRadiusArcsec,
+                  'deltaAperFitMinNgoodObs': config.deltaAperFitMinNgoodObs,
+                  'deltaAperFitPerCcdNx': config.deltaAperFitPerCcdNx,
+                  'deltaAperFitPerCcdNy': config.deltaAperFitPerCcdNy,
+                  'deltaAperFitSpatialNside': config.deltaAperFitSpatialNside,
+                  'doComputeDeltaAperExposures': config.doComputeDeltaAperPerVisit,
+                  'doComputeDeltaAperStars': config.doComputeDeltaAperPerStar,
+                  'doComputeDeltaAperMap': config.doComputeDeltaAperMap,
+                  'doComputeDeltaAperPerCcd': config.doComputeDeltaAperPerCcd,
                   'printOnly': False,
                   'quietMode': config.quietMode,
                   'randomSeed': config.randomSeed,
@@ -767,6 +777,9 @@ def makeStdSchema(nBands):
     stdSchema.addField('npsfcand', type='ArrayI',
                        doc='Number of observations flagged as psf candidates',
                        size=nBands)
+    stdSchema.addField('delta_aper', type='ArrayF',
+                       doc='Delta mag (small - large aperture)',
+                       size=nBands)
 
     return stdSchema
 
@@ -801,6 +814,7 @@ def makeStdCat(stdSchema, stdStruct, goodBands):
     stdCat['mag_std_noabs'][:, :] = stdStruct['MAG_STD'][:, :]
     stdCat['magErr_std'][:, :] = stdStruct['MAGERR_STD'][:, :]
     stdCat['npsfcand'][:, :] = stdStruct['NPSFCAND'][:, :]
+    stdCat['delta_aper'][:, :] = stdStruct['DELTA_APER'][:, :]
 
     md = PropertyList()
     md.set("BANDS", list(goodBands))

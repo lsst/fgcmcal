@@ -83,7 +83,7 @@ class FocalPlaneProjector(object):
 
         return wcsDict
 
-    def __call__(self, orientation, nstep=50, use_cache=True):
+    def __call__(self, orientation, nstep=100, use_cache=True):
         """
         Make a focal plane projection mapping for use with fgcm.
 

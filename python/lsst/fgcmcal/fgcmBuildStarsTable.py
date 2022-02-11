@@ -437,6 +437,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         ccdKey = outputSchema['ccd'].asKey()
         instMagKey = outputSchema['instMag'].asKey()
         instMagErrKey = outputSchema['instMagErr'].asKey()
+        deltaMagAperKey = outputSchema['deltaMagAper'].asKey()
 
         # Prepare local background if desired
         if self.config.doSubtractLocalBackground:
@@ -489,6 +490,20 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             tempCat[ccdKey][:] = df[detColumn].values[use]
             tempCat['psf_candidate'] = df[self.config.psfCandidateName].values[use]
 
+            with np.warnings.catch_warnings():
+                # Ignore warnings, we will filter infinites and nans below
+                np.warnings.simplefilter("ignore")
+
+                instMagInner = -2.5*np.log10(df[self.config.apertureInnerInstFluxField].values[use])
+                instMagErrInner = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values[use]
+                                     / df[self.config.apertureInnerInstFluxField].values[use])
+                instMagOuter = -2.5*np.log10(df[self.config.apertureOuterInstFluxField].values[use])
+                instMagErrOuter = k*(df[self.config.apertureOuterInstFluxField + 'Err'].values[use]
+                                     / df[self.config.apertureOuterInstFluxField].values[use])
+                tempCat[deltaMagAperKey][:] = instMagInner - instMagOuter
+                # Set bad values to illegal values for fgcm.
+                tempCat[deltaMagAperKey][~np.isfinite(tempCat[deltaMagAperKey][:])] = 99.0
+
             if self.config.doSubtractLocalBackground:
                 # At the moment we only adjust the flux and not the flux
                 # error by the background because the error on
@@ -531,22 +546,10 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
             fullCatalog.extend(tempCat)
 
-            # Now do the aperture information
-            with np.warnings.catch_warnings():
-                # Ignore warnings, we will filter infinites and nans below
-                np.warnings.simplefilter("ignore")
+            deltaOk = (np.isfinite(instMagInner) & np.isfinite(instMagErrInner)
+                       & np.isfinite(instMagOuter) & np.isfinite(instMagErrOuter))
 
-                instMagIn = -2.5*np.log10(df[self.config.apertureInnerInstFluxField].values[use])
-                instMagErrIn = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values[use]
-                                  / df[self.config.apertureInnerInstFluxField].values[use])
-                instMagOut = -2.5*np.log10(df[self.config.apertureOuterInstFluxField].values[use])
-                instMagErrOut = k*(df[self.config.apertureOuterInstFluxField + 'Err'].values[use]
-                                   / df[self.config.apertureOuterInstFluxField].values[use])
-
-            ok = (np.isfinite(instMagIn) & np.isfinite(instMagErrIn)
-                  & np.isfinite(instMagOut) & np.isfinite(instMagErrOut))
-
-            visit['deltaAper'] = np.median(instMagIn[ok] - instMagOut[ok])
+            visit['deltaAper'] = np.median(instMagInner[deltaOk] - instMagOuter[deltaOk])
             visit['sources_read'] = True
 
             self.log.info("  Found %d good stars in visit %d (deltaAper = %0.3f)",

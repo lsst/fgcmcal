@@ -757,6 +757,66 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         default=None,
         optional=True,
     )
+    deltaAperFitMinNgoodObs = pexConfig.Field(
+        doc="Minimum number of good observations to use mean delta-aper values in fits.",
+        dtype=int,
+        default=2,
+    )
+    deltaAperFitPerCcdNx = pexConfig.Field(
+        doc=("Number of x bins per ccd when computing delta-aper background offsets. "
+             "Only used when ``doComputeDeltaAperPerCcd`` is True."),
+        dtype=int,
+        default=10,
+    )
+    deltaAperFitPerCcdNy = pexConfig.Field(
+        doc=("Number of y bins per ccd when computing delta-aper background offsets. "
+             "Only used when ``doComputeDeltaAperPerCcd`` is True."),
+        dtype=int,
+        default=10,
+    )
+    deltaAperFitSpatialNside = pexConfig.Field(
+        doc="Healpix nside to compute spatial delta-aper background offset maps.",
+        dtype=int,
+        default=64,
+    )
+    deltaAperInnerRadiusArcsec = pexConfig.Field(
+        doc=("Inner radius used to compute deltaMagAper (arcseconds). "
+             "Must be positive and less than ``deltaAperOuterRadiusArcsec`` if "
+             "any of ``doComputeDeltaAperPerVisit``, ``doComputeDeltaAperPerStar``, "
+             "``doComputeDeltaAperMap``, ``doComputeDeltaAperPerCcd`` are set."),
+        dtype=float,
+        default=0.0,
+    )
+    deltaAperOuterRadiusArcsec = pexConfig.Field(
+        doc=("Outer radius used to compute deltaMagAper (arcseconds). "
+             "Must be positive and greater than ``deltaAperInnerRadiusArcsec`` if "
+             "any of ``doComputeDeltaAperPerVisit``, ``doComputeDeltaAperPerStar``, "
+             "``doComputeDeltaAperMap``, ``doComputeDeltaAperPerCcd`` are set."),
+        dtype=float,
+        default=0.0,
+    )
+    doComputeDeltaAperPerVisit = pexConfig.Field(
+        doc=("Do the computation of delta-aper background offsets per visit? "
+             "Note: this option can be very slow when there are many visits."),
+        dtype=bool,
+        default=False,
+    )
+    doComputeDeltaAperPerStar = pexConfig.Field(
+        doc="Do the computation of delta-aper mean values per star?",
+        dtype=bool,
+        default=True,
+    )
+    doComputeDeltaAperMap = pexConfig.Field(
+        doc=("Do the computation of delta-aper spatial maps? "
+             "This is only used if ``doComputeDeltaAperPerStar`` is True,"),
+        dtype=bool,
+        default=False,
+    )
+    doComputeDeltaAperPerCcd = pexConfig.Field(
+        doc="Do the computation of per-ccd delta-aper background offsets?",
+        dtype=bool,
+        default=False,
+    )
 
     def validate(self):
         super().validate()
@@ -812,6 +872,22 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
             if band not in self.useRepeatabilityForExpGrayCutsDict:
                 msg = 'band %s not in useRepeatabilityForExpGrayCutsDict' % (band)
                 raise pexConfig.FieldValidationError(FgcmFitCycleConfig.useRepeatabilityForExpGrayCutsDict,
+                                                     self, msg)
+
+        if self.doComputeDeltaAperPerVisit or self.doComputeDeltaAperMap \
+           or self.doComputeDeltaAperPerCcd:
+            if self.deltaAperInnerRadiusArcsec <= 0.0:
+                msg = 'deltaAperInnerRadiusArcsec must be positive if deltaAper computations are turned on.'
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.deltaAperInnerRadiusArcsec,
+                                                     self, msg)
+            if self.deltaAperOuterRadiusArcsec <= 0.0:
+                msg = 'deltaAperOuterRadiusArcsec must be positive if deltaAper computations are turned on.'
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.deltaAperOuterRadiusArcsec,
+                                                     self, msg)
+            if self.deltaAperOuterRadiusArcsec <= self.deltaAperInnerRadiusArcsec:
+                msg = ('deltaAperOuterRadiusArcsec must be greater than deltaAperInnerRadiusArcsec if '
+                       'deltaAper computations are turned on.')
+                raise pexConfig.FieldValidationError(FgcmFitCycleConfig.deltaAperOuterRadiusArcsec,
                                                      self, msg)
 
 
@@ -1203,6 +1279,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                             obsX=starObs['x'][starIndices['obsIndex']],
                             obsY=starObs['y'][starIndices['obsIndex']],
                             obsDeltaMagBkg=starObs['deltaMagBkg'][starIndices['obsIndex']],
+                            obsDeltaAper=starObs['deltaMagAper'][starIndices['obsIndex']],
                             psfCandidate=starObs['psf_candidate'][starIndices['obsIndex']],
                             refID=refId,
                             refMag=refMag,
@@ -1436,7 +1513,21 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                                       ('COMPRETRIEVEDLNPWVFLAG', 'i2',
                                        (parCat['compRetrievedLnPwvFlag'].size, )),
                                       ('COMPRETRIEVEDTAUNIGHT', 'f8',
-                                       (parCat['compRetrievedTauNight'].size, ))])
+                                       (parCat['compRetrievedTauNight'].size, )),
+                                      ('COMPEPSILON', 'f8',
+                                       (parCat['compEpsilon'].size, )),
+                                      ('COMPMEDDELTAAPER', 'f8',
+                                       (parCat['compMedDeltaAper'].size, )),
+                                      ('COMPGLOBALEPSILON', 'f4',
+                                       (parCat['compGlobalEpsilon'].size, )),
+                                      ('COMPEPSILONMAP', 'f4',
+                                       (parCat['compEpsilonMap'].size, )),
+                                      ('COMPEPSILONNSTARMAP', 'i4',
+                                       (parCat['compEpsilonNStarMap'].size, )),
+                                      ('COMPEPSILONCCDMAP', 'f4',
+                                       (parCat['compEpsilonCcdMap'].size, )),
+                                      ('COMPEPSILONCCDNSTARMAP', 'i4',
+                                       (parCat['compEpsilonCcdNStarMap'].size, ))])
 
         inParams['PARALPHA'][:] = parCat['parAlpha'][0, :]
         inParams['PARO3'][:] = parCat['parO3'][0, :]
@@ -1476,6 +1567,13 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         inParams['COMPRETRIEVEDLNPWVRAW'][:] = parCat['compRetrievedLnPwvRaw'][0, :]
         inParams['COMPRETRIEVEDLNPWVFLAG'][:] = parCat['compRetrievedLnPwvFlag'][0, :]
         inParams['COMPRETRIEVEDTAUNIGHT'][:] = parCat['compRetrievedTauNight'][0, :]
+        inParams['COMPEPSILON'][:] = parCat['compEpsilon'][0, :]
+        inParams['COMPMEDDELTAAPER'][:] = parCat['compMedDeltaAper'][0, :]
+        inParams['COMPGLOBALEPSILON'][:] = parCat['compGlobalEpsilon'][0, :]
+        inParams['COMPEPSILONMAP'][:] = parCat['compEpsilonMap'][0, :]
+        inParams['COMPEPSILONNSTARMAP'][:] = parCat['compEpsilonNStarMap'][0, :]
+        inParams['COMPEPSILONCCDMAP'][:] = parCat['compEpsilonCcdMap'][0, :]
+        inParams['COMPEPSILONCCDNSTARMAP'][:] = parCat['compEpsilonCcdNStarMap'][0, :]
 
         inSuperStar = np.zeros(parCat['superstarSize'][0, :], dtype='f8')
         inSuperStar[:, :, :, :] = parCat['superstar'][0, :].reshape(inSuperStar.shape)
@@ -1684,6 +1782,27 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                            size=pars['COMPRETRIEVEDLNPWVFLAG'].size)
         parSchema.addField('compRetrievedTauNight', type='ArrayD', doc='Retrieved tau (per night)',
                            size=pars['COMPRETRIEVEDTAUNIGHT'].size)
+        parSchema.addField('compEpsilon', type='ArrayD',
+                           doc='Computed epsilon background offset per visit (nJy/arcsec2)',
+                           size=pars['COMPEPSILON'].size)
+        parSchema.addField('compMedDeltaAper', type='ArrayD',
+                           doc='Median delta mag aper per visit',
+                           size=pars['COMPMEDDELTAAPER'].size)
+        parSchema.addField('compGlobalEpsilon', type='ArrayD',
+                           doc='Computed epsilon bkg offset (global) (nJy/arcsec2)',
+                           size=pars['COMPGLOBALEPSILON'].size)
+        parSchema.addField('compEpsilonMap', type='ArrayD',
+                           doc='Computed epsilon maps (nJy/arcsec2)',
+                           size=pars['COMPEPSILONMAP'].size)
+        parSchema.addField('compEpsilonNStarMap', type='ArrayI',
+                           doc='Number of stars per pixel in computed epsilon maps',
+                           size=pars['COMPEPSILONNSTARMAP'].size)
+        parSchema.addField('compEpsilonCcdMap', type='ArrayD',
+                           doc='Computed epsilon ccd maps (nJy/arcsec2)',
+                           size=pars['COMPEPSILONCCDMAP'].size)
+        parSchema.addField('compEpsilonCcdNStarMap', type='ArrayI',
+                           doc='Number of stars per ccd bin in epsilon ccd maps',
+                           size=pars['COMPEPSILONCCDNSTARMAP'].size)
         # superstarflat section
         parSchema.addField('superstarSize', type='ArrayI', doc='Superstar matrix size',
                            size=4)
@@ -1748,7 +1867,9 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
                     'compExpGray', 'compVarGray', 'compNGoodStarPerExp', 'compSigFgcm',
                     'compSigmaCal', 'compExpDeltaMagBkg', 'compMedianSedSlope',
                     'compRetrievedLnPwv', 'compRetrievedLnPwvRaw', 'compRetrievedLnPwvFlag',
-                    'compRetrievedTauNight']
+                    'compRetrievedTauNight', 'compEpsilon', 'compMedDeltaAper',
+                    'compGlobalEpsilon', 'compEpsilonMap', 'compEpsilonNStarMap',
+                    'compEpsilonCcdMap', 'compEpsilonCcdNStarMap']
 
         for scalarName in scalarNames:
             rec[scalarName] = pars[scalarName.upper()]
@@ -1758,7 +1879,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
 
         # superstar section
         rec['superstarSize'][:] = parSuperStarFlat.shape
-        rec['superstar'][:] = parSuperStarFlat.flatten()
+        rec['superstar'][:] = parSuperStarFlat.ravel()
 
         return parCat
 
