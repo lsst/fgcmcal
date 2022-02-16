@@ -747,6 +747,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, pipeBase.CmdLineTask, abc.AB
 
         # make the fgcm starConfig dict
         starConfig = {'logger': self.log,
+                      'useHtm': True,
                       'filterToBand': self.config.physicalFilterMap,
                       'requiredBands': self.config.requiredBands,
                       'minPerBand': self.config.minPerBand,
