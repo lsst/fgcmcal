@@ -29,15 +29,20 @@ import os
 import numpy as np
 import healpy as hp
 import esutil
+import tempfile
 
 import lsst.utils
 import lsst.pipe.tasks
-import lsst.daf.persistence as dafPersist
+from lsst.meas.algorithms import ReferenceObjectLoader
 
 import lsst.fgcmcal as fgcmcal
 
+import fgcmcalTestBase
 
-class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
+ROOT = os.path.abspath(os.path.dirname(__file__))
+
+
+class FgcmLoadReferenceTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase):
     @classmethod
     def setUpClass(cls):
         try:
@@ -49,10 +54,13 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         except LookupError:
             raise unittest.SkipTest("obs_subaru not setup")
 
-    def setUp(self):
-        self.inputDir = os.path.join(self.dataDir, 'hsc/repo')
+        lsst.daf.butler.cli.cliLog.CliLog.initLog(longlog=False)
 
-        lsst.log.setLevel("HscMapper", lsst.log.FATAL)
+        cls.testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
+
+        cls._importRepository('lsst.obs.subaru.HyperSuprimeCam',
+                              os.path.join(cls.dataDir, 'hsc/repo'),
+                              os.path.join(cls.dataDir, 'hsc', 'exports.yaml'))
 
     def test_fgcmLoadReference(self):
         """
@@ -81,8 +89,15 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         config.colorterms.data['ps1*'].data['HSC-I'].c1 = -0.130078
         config.colorterms.data['ps1*'].data['HSC-I'].c2 = -0.006855
 
-        butler = dafPersist.Butler(self.inputDir)
-        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler=butler, config=config)
+        butler = lsst.daf.butler.Butler(self.repo, instrument='HSC', collections=['HSC/testdata',
+                                                                                  'refcats/gen2'])
+        refs = set(butler.registry.queryDatasets(config.refObjLoader.ref_dataset_name))
+        dataIds = [butler.registry.expandDataId(ref.dataId) for ref in refs]
+        refCats = [butler.getDirectDeferred(ref) for ref in refs]
+
+        refObjLoader = ReferenceObjectLoader(dataIds=dataIds, refCats=refCats, config=config.refObjLoader)
+
+        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(refObjLoader=refObjLoader, config=config)
 
         ra = 337.656174
         dec = 0.823595
@@ -141,8 +156,15 @@ class FgcmLoadReferenceTestHSC(lsst.utils.tests.TestCase):
         config.colorterms.data['ps1*'].data['HSC-I2'].c1 = -0.200406
         config.colorterms.data['ps1*'].data['HSC-I2'].c2 = -0.013666
 
-        butler = dafPersist.Butler(self.inputDir)
-        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(butler=butler, config=config)
+        butler = lsst.daf.butler.Butler(self.repo, instrument='HSC', collections=['HSC/testdata',
+                                                                                  'refcats/gen2'])
+        refs = set(butler.registry.queryDatasets(config.refObjLoader.ref_dataset_name))
+        dataIds = [butler.registry.expandDataId(ref.dataId) for ref in refs]
+        refCats = [butler.getDirectDeferred(ref) for ref in refs]
+
+        refObjLoader = ReferenceObjectLoader(dataIds=dataIds, refCats=refCats, config=config.refObjLoader)
+
+        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(refObjLoader=refObjLoader, config=config)
 
         ra = 337.656174
         dec = 0.823595
