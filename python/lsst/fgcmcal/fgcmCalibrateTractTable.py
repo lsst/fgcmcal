@@ -29,9 +29,8 @@ from lsst.pipe.base import connectionTypes
 from lsst.meas.algorithms import ReferenceObjectLoader
 import lsst.afw.table as afwTable
 
-from .dataIds import TractCheckDataIdContainer
 from .fgcmBuildStarsTable import FgcmBuildStarsTableTask
-from .fgcmCalibrateTractBase import (FgcmCalibrateTractConfigBase, FgcmCalibrateTractRunner,
+from .fgcmCalibrateTractBase import (FgcmCalibrateTractConfigBase,
                                      FgcmCalibrateTractBaseTask)
 from .utilities import lookupStaticCalibrations
 
@@ -169,7 +168,6 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
     input catalogs.
     """
     ConfigClass = FgcmCalibrateTractTableConfig
-    RunnerClass = FgcmCalibrateTractRunner
     _DefaultName = "fgcmCalibrateTractTable"
 
     canMultiprocess = False
@@ -257,12 +255,3 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
         butlerQC.put(repeatabilityCat, outputRefs.fgcmRepeatability)
 
         return
-
-    @classmethod
-    def _makeArgumentParser(cls):
-        parser = pipeBase.ArgumentParser(name=cls._DefaultName)
-        parser.add_id_argument("--id", "sourceTable_visit",
-                               help="Data ID, e.g. --id visit=6789 tract=9617",
-                               ContainerClass=TractCheckDataIdContainer)
-
-        return parser

@@ -30,7 +30,6 @@ import re
 from deprecated.sphinx import deprecated
 
 from lsst.daf.base import PropertyList
-import lsst.daf.persistence as dafPersist
 import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
@@ -830,8 +829,7 @@ def computeApertureRadiusFromDataRef(dataRef, fluxField):
 
     Parameters
     ----------
-    dataRef : `lsst.daf.persistence.ButlerDataRef` or
-              `lsst.daf.butler.DeferredDatasetHandle`
+    dataRef : `lsst.daf.butler.DeferredDatasetHandle`
     fluxField : `str`
        CircularApertureFlux or associated slot.
 
@@ -846,12 +844,7 @@ def computeApertureRadiusFromDataRef(dataRef, fluxField):
        apFlux, or associated slot.
     """
     # TODO: Move this method to more general stack method in DM-25775
-    if isinstance(dataRef, dafPersist.ButlerDataRef):
-        # Gen2 dataRef
-        datasetType = dataRef.butlerSubset.datasetType
-    else:
-        # Gen3 dataRef
-        datasetType = dataRef.ref.datasetType.name
+    datasetType = dataRef.ref.datasetType.name
 
     if datasetType == 'src':
         schema = dataRef.get(datasetType='src_schema').schema

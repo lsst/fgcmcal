@@ -33,8 +33,6 @@ be inspected to set parameters for outlier rejection on the following
 cycle.  Please see the fgcmcal Cookbook for details.
 """
 
-import sys
-import traceback
 import copy
 
 import numpy as np
@@ -43,7 +41,6 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
-from lsst.utils.timer import timeMethod
 
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
 from .utilities import extractReferenceMags
@@ -55,7 +52,7 @@ from .focalPlaneProjector import FocalPlaneProjector
 
 import fgcm
 
-__all__ = ['FgcmFitCycleConfig', 'FgcmFitCycleTask', 'FgcmFitCycleRunner']
+__all__ = ['FgcmFitCycleConfig', 'FgcmFitCycleTask']
 
 MULTIPLE_CYCLES_MAX = 10
 
@@ -891,89 +888,16 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
                                                      self, msg)
 
 
-class FgcmFitCycleRunner(pipeBase.ButlerInitializedTaskRunner):
-    """Subclass of TaskRunner for fgcmFitCycleTask
-
-    fgcmFitCycleTask.run() takes one argument, the butler, and uses
-    stars and visits previously extracted from dataRefs by
-    fgcmBuildStars.
-    This Runner does not perform any dataRef parallelization, but the FGCM
-    code called by the Task uses python multiprocessing (see the "ncores"
-    config option).
-    """
-
-    @staticmethod
-    def getTargetList(parsedCmd):
-        """
-        Return a list with one element, the butler.
-        """
-        return [parsedCmd.butler]
-
-    def __call__(self, butler):
-        """
-        Parameters
-        ----------
-        butler: `lsst.daf.persistence.Butler`
-
-        Returns
-        -------
-        exitStatus: `list` with `pipeBase.Struct`
-           exitStatus (0: success; 1: failure)
-        """
-
-        task = self.TaskClass(config=self.config, log=self.log)
-
-        exitStatus = 0
-        if self.doRaise:
-            task.runDataRef(butler)
-        else:
-            try:
-                task.runDataRef(butler)
-            except Exception as e:
-                exitStatus = 1
-                task.log.fatal("Failed: %s" % e)
-                if not isinstance(e, pipeBase.TaskError):
-                    traceback.print_exc(file=sys.stderr)
-
-        task.writeMetadata(butler)
-
-        # The task does not return any results:
-        return [pipeBase.Struct(exitStatus=exitStatus)]
-
-    def run(self, parsedCmd):
-        """
-        Run the task, with no multiprocessing
-
-        Parameters
-        ----------
-        parsedCmd: ArgumentParser parsed command line
-        """
-
-        resultList = []
-
-        if self.precall(parsedCmd):
-            targetList = self.getTargetList(parsedCmd)
-            # make sure that we only get 1
-            resultList = self(targetList[0])
-
-        return resultList
-
-
-class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
+class FgcmFitCycleTask(pipeBase.PipelineTask):
     """
     Run Single fit cycle for FGCM global calibration
     """
 
     ConfigClass = FgcmFitCycleConfig
-    RunnerClass = FgcmFitCycleRunner
     _DefaultName = "fgcmFitCycle"
 
-    def __init__(self, butler=None, initInputs=None, **kwargs):
+    def __init__(self, initInputs=None, **kwargs):
         super().__init__(**kwargs)
-
-    # no saving of metadata for now
-    def _getMetadataName(self):
-        return None
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         camera = butlerQC.get(inputRefs.camera)
@@ -1029,88 +953,6 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
             if self.outputStandards:
                 butlerQC.put(fgcmDatasetDict['fgcmStandardStars'], outputRefs.fgcmStandardStars)
 
-    @timeMethod
-    def runDataRef(self, butler):
-        """
-        Run a single fit cycle for FGCM
-
-        Parameters
-        ----------
-        butler:  `lsst.daf.persistence.Butler`
-        """
-        self._checkDatasetsExist(butler)
-
-        dataRefDict = {}
-        dataRefDict['fgcmLookUpTable'] = butler.dataRef('fgcmLookUpTable')
-        dataRefDict['fgcmVisitCatalog'] = butler.dataRef('fgcmVisitCatalog')
-        dataRefDict['fgcmStarObservations'] = butler.dataRef('fgcmStarObservations')
-        dataRefDict['fgcmStarIds'] = butler.dataRef('fgcmStarIds')
-        dataRefDict['fgcmStarIndices'] = butler.dataRef('fgcmStarIndices')
-        if self.config.doReferenceCalibration:
-            dataRefDict['fgcmReferenceStars'] = butler.dataRef('fgcmReferenceStars')
-        if self.config.cycleNumber > 0:
-            lastCycle = self.config.cycleNumber - 1
-            dataRefDict['fgcmFlaggedStars'] = butler.dataRef('fgcmFlaggedStars',
-                                                             fgcmcycle=lastCycle)
-            dataRefDict['fgcmFitParameters'] = butler.dataRef('fgcmFitParameters',
-                                                              fgcmcycle=lastCycle)
-
-        camera = butler.get('camera')
-        fgcmDatasetDict, _ = self._fgcmFitCycle(camera, dataRefDict)
-
-        butler.put(fgcmDatasetDict['fgcmFitParameters'], 'fgcmFitParameters',
-                   fgcmcycle=self.config.cycleNumber)
-        butler.put(fgcmDatasetDict['fgcmFlaggedStars'], 'fgcmFlaggedStars',
-                   fgcmcycle=self.config.cycleNumber)
-        if self.outputZeropoints:
-            butler.put(fgcmDatasetDict['fgcmZeropoints'], 'fgcmZeropoints',
-                       fgcmcycle=self.config.cycleNumber)
-            butler.put(fgcmDatasetDict['fgcmAtmosphereParameters'], 'fgcmAtmosphereParameters',
-                       fgcmcycle=self.config.cycleNumber)
-        if self.outputStandards:
-            butler.put(fgcmDatasetDict['fgcmStandardStars'], 'fgcmStandardStars',
-                       fgcmcycle=self.config.cycleNumber)
-
-    def writeConfig(self, butler, clobber=False, doBackup=True):
-        """Write the configuration used for processing the data, or check that an existing
-        one is equal to the new one if present.  This is an override of the regular
-        version from pipe_base that knows about fgcmcycle.
-
-        Parameters
-        ----------
-        butler : `lsst.daf.persistence.Butler`
-            Data butler used to write the config. The config is written to dataset type
-            `CmdLineTask._getConfigName`.
-        clobber : `bool`, optional
-            A boolean flag that controls what happens if a config already has been saved:
-            - `True`: overwrite or rename the existing config, depending on ``doBackup``.
-            - `False`: raise `TaskError` if this config does not match the existing config.
-        doBackup : `bool`, optional
-            Set to `True` to backup the config files if clobbering.
-        """
-        configName = self._getConfigName()
-        if configName is None:
-            return
-        if clobber:
-            butler.put(self.config, configName, doBackup=doBackup, fgcmcycle=self.config.cycleNumber)
-        elif butler.datasetExists(configName, write=True, fgcmcycle=self.config.cycleNumber):
-            # this may be subject to a race condition; see #2789
-            try:
-                oldConfig = butler.get(configName, immediate=True, fgcmcycle=self.config.cycleNumber)
-            except Exception as exc:
-                raise type(exc)("Unable to read stored config file %s (%s); consider using --clobber-config" %
-                                (configName, exc))
-
-            def logConfigMismatch(msg):
-                self.log.fatal("Comparing configuration: %s", msg)
-
-            if not self.config.compare(oldConfig, shortcut=False, output=logConfigMismatch):
-                raise pipeBase.TaskError(
-                    f"Config does not match existing task config {configName!r} on disk; tasks configurations"
-                    " must be consistent within the same output repo (override with --clobber-config)")
-        else:
-            butler.put(self.config, configName, fgcmcycle=self.config.cycleNumber)
-
     def _fgcmFitCycle(self, camera, dataRefDict, config=None):
         """
         Run the fit cycle
@@ -1119,8 +961,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         ----------
         camera : `lsst.afw.cameraGeom.Camera`
         dataRefDict : `dict`
-            All dataRefs are `lsst.daf.persistence.ButlerDataRef` (gen2) or
-            `lsst.daf.butler.DeferredDatasetHandle` (gen3)
+            All dataRefs are `lsst.daf.butler.DeferredDatasetHandle`
             dataRef dictionary with keys:
 
             ``"fgcmLookUpTable"``
@@ -1353,51 +1194,6 @@ class FgcmFitCycleTask(pipeBase.PipelineTask, pipeBase.CmdLineTask):
         fgcmFitCycle.freeSharedMemory()
 
         return fgcmDatasetDict, outConfig
-
-    def _checkDatasetsExist(self, butler):
-        """
-        Check if necessary datasets exist to run fgcmFitCycle
-
-        Parameters
-        ----------
-        butler: `lsst.daf.persistence.Butler`
-
-        Raises
-        ------
-        RuntimeError
-           If any of fgcmVisitCatalog, fgcmStarObservations, fgcmStarIds,
-           fgcmStarIndices, fgcmLookUpTable datasets do not exist.
-           If cycleNumber > 0, then also checks for fgcmFitParameters,
-           fgcmFlaggedStars.
-        """
-
-        if not butler.datasetExists('fgcmVisitCatalog'):
-            raise RuntimeError("Could not find fgcmVisitCatalog in repo!")
-        if not butler.datasetExists('fgcmStarObservations'):
-            raise RuntimeError("Could not find fgcmStarObservations in repo!")
-        if not butler.datasetExists('fgcmStarIds'):
-            raise RuntimeError("Could not find fgcmStarIds in repo!")
-        if not butler.datasetExists('fgcmStarIndices'):
-            raise RuntimeError("Could not find fgcmStarIndices in repo!")
-        if not butler.datasetExists('fgcmLookUpTable'):
-            raise RuntimeError("Could not find fgcmLookUpTable in repo!")
-
-        # Need additional datasets if we are not the initial cycle
-        if (self.config.cycleNumber > 0):
-            if not butler.datasetExists('fgcmFitParameters',
-                                        fgcmcycle=self.config.cycleNumber-1):
-                raise RuntimeError("Could not find fgcmFitParameters for previous cycle (%d) in repo!" %
-                                   (self.config.cycleNumber-1))
-            if not butler.datasetExists('fgcmFlaggedStars',
-                                        fgcmcycle=self.config.cycleNumber-1):
-                raise RuntimeError("Could not find fgcmFlaggedStars for previous cycle (%d) in repo!" %
-                                   (self.config.cycleNumber-1))
-
-        # And additional dataset if we want reference calibration
-        if self.config.doReferenceCalibration:
-            if not butler.datasetExists('fgcmReferenceStars'):
-                raise RuntimeError("Could not find fgcmReferenceStars in repo, and "
-                                   "doReferenceCalibration is True.")
 
     def _loadParameters(self, parCat):
         """

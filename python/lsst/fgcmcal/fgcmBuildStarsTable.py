@@ -34,14 +34,13 @@ import time
 import numpy as np
 import collections
 
-import lsst.daf.persistence as dafPersist
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
 from lsst.meas.algorithms import ReferenceObjectLoader
 
-from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsRunner, FgcmBuildStarsBaseTask
+from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsBaseTask
 from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromDataRef
 from .utilities import lookupStaticCalibrations
 
@@ -217,7 +216,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
     Build stars for the FGCM global calibration, using sourceTable_visit catalogs.
     """
     ConfigClass = FgcmBuildStarsTableConfig
-    RunnerClass = FgcmBuildStarsRunner
     _DefaultName = "fgcmBuildStarsTable"
 
     canMultiprocess = False
@@ -281,23 +279,15 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         else:
             bkgDataRefDict = None
 
-        # Gen3 does not currently allow "checkpoint" saving of datasets,
-        # so we need to have this all in one go.
         visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs,
-                                             bkgDataRefDict=bkgDataRefDict,
-                                             visitCatDataRef=None,
-                                             inVisitCat=None)
+                                             bkgDataRefDict=bkgDataRefDict)
 
         rad = calibFluxApertureRadius
-        # sourceSchemaDataRef = inputRefDict['sourceSchema']
         fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
                                                                   visitCat,
                                                                   self.sourceSchema,
                                                                   camera,
-                                                                  calibFluxApertureRadius=rad,
-                                                                  starObsDataRef=None,
-                                                                  visitCatDataRef=None,
-                                                                  inStarObsCat=None)
+                                                                  calibFluxApertureRadius=rad)
 
         butlerQC.put(visitCat, outputRefs.fgcmVisitCatalog)
         butlerQC.put(fgcmStarObservationCat, outputRefs.fgcmStarObservations)
@@ -311,16 +301,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         if fgcmRefCat is not None:
             butlerQC.put(fgcmRefCat, outputRefs.fgcmReferenceStars)
 
-    @classmethod
-    def _makeArgumentParser(cls):
-        """Create an argument parser"""
-        parser = pipeBase.ArgumentParser(name=cls._DefaultName)
-        parser.add_id_argument("--id", "sourceTable_visit", help="Data ID, e.g. --id visit=6789")
-
-        return parser
-
     def _groupDataRefs(self, sourceTableDataRefDict, visitSummaryDataRefDict):
-        """Group sourceTable and visitSummary dataRefs (gen3 only).
+        """Group sourceTable and visitSummary dataRefs.
 
         Parameters
         ----------
@@ -346,73 +328,16 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         return groupedDataRefs
 
-    def _findAndGroupDataRefsGen2(self, butler, camera, dataRefs):
-        self.log.info("Grouping dataRefs by %s", (self.config.visitDataRefName))
-
-        ccdIds = []
-        for detector in camera:
-            ccdIds.append(detector.getId())
-        # Insert our preferred referenceCCD first:
-        # It is fine that this is listed twice, because we only need
-        # the first calexp that is found.
-        ccdIds.insert(0, self.config.referenceCCD)
-
-        # The visitTable building code expects a dictionary of groupedDataRefs
-        # keyed by visit, the first element as the "primary" calexp dataRef.
-        # We then append the sourceTable_visit dataRef at the end for the
-        # code which does the data reading (fgcmMakeAllStarObservations).
-
-        groupedDataRefs = collections.defaultdict(list)
-        for dataRef in dataRefs:
-            visit = dataRef.dataId[self.config.visitDataRefName]
-
-            # Find an existing calexp (we need for psf and metadata)
-            # and make the relevant dataRef
-            for ccdId in ccdIds:
-                try:
-                    calexpRef = butler.dataRef('calexp', dataId={self.config.visitDataRefName: visit,
-                                                                 self.config.ccdDataRefName: ccdId})
-                except RuntimeError:
-                    # Not found
-                    continue
-
-                # Make sure the dataset exists
-                if not calexpRef.datasetExists():
-                    continue
-
-                # It was found.  Add and quit out, since we only
-                # need one calexp per visit.
-                groupedDataRefs[visit].append(calexpRef)
-                break
-
-            # And append this dataRef
-            groupedDataRefs[visit].append(dataRef)
-
-        # This should be sorted by visit (the key)
-        return dict(sorted(groupedDataRefs.items()))
-
     def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
                                     sourceSchema,
                                     camera,
-                                    calibFluxApertureRadius=None,
-                                    visitCatDataRef=None,
-                                    starObsDataRef=None,
-                                    inStarObsCat=None):
+                                    calibFluxApertureRadius=None):
         startTime = time.time()
-
-        # If both dataRefs are None, then we assume the caller does not
-        # want to store checkpoint files.  If both are set, we will
-        # do checkpoint files.  And if only one is set, this is potentially
-        # unintentional and we will warn.
-        if (visitCatDataRef is not None and starObsDataRef is None
-           or visitCatDataRef is None and starObsDataRef is not None):
-            self.log.warning("Only one of visitCatDataRef and starObsDataRef are set, so "
-                             "no checkpoint files will be persisted.")
 
         if self.config.doSubtractLocalBackground and calibFluxApertureRadius is None:
             raise RuntimeError("Must set calibFluxApertureRadius if doSubtractLocalBackground is True.")
 
-        # To get the correct output schema, we use similar code as fgcmBuildStarsTask
+        # To get the correct output schema, we use the legacy code.
         # We are not actually using this mapper, except to grab the outputSchema
         sourceMapper = self._makeSourceMapper(sourceSchema)
         outputSchema = sourceMapper.getOutputSchema()
@@ -424,14 +349,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         approxPixelAreaFields = computeApproxPixelAreaFields(camera)
 
-        if inStarObsCat is not None:
-            fullCatalog = inStarObsCat
-            comp1 = fullCatalog.schema.compare(outputSchema, outputSchema.EQUAL_KEYS)
-            comp2 = fullCatalog.schema.compare(outputSchema, outputSchema.EQUAL_NAMES)
-            if not comp1 or not comp2:
-                raise RuntimeError("Existing fgcmStarObservations file found with mismatched schema.")
-        else:
-            fullCatalog = afwTable.BaseCatalog(outputSchema)
+        fullCatalog = afwTable.BaseCatalog(outputSchema)
 
         visitKey = outputSchema['visit'].asKey()
         ccdKey = outputSchema['ccd'].asKey()
@@ -448,24 +366,14 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         k = 2.5/np.log(10.)
 
         for counter, visit in enumerate(visitCat):
-            # Check if these sources have already been read and stored in the checkpoint file
-            if visit['sources_read']:
-                continue
-
             expTime = visit['exptime']
 
             dataRef = groupedDataRefs[visit['visit']][-1]
 
-            if isinstance(dataRef, dafPersist.ButlerDataRef):
-                srcTable = dataRef.get()
-                if columns is None:
-                    columns, detColumn = self._get_sourceTable_visit_columns(srcTable.columns)
-                df = srcTable.toDataFrame(columns)
-            else:
-                if columns is None:
-                    inColumns = dataRef.get(component='columns')
-                    columns, detColumn = self._get_sourceTable_visit_columns(inColumns)
-                df = dataRef.get(parameters={'columns': columns})
+            if columns is None:
+                inColumns = dataRef.get(component='columns')
+                columns, detColumn = self._get_sourceTable_visit_columns(inColumns)
+            df = dataRef.get(parameters={'columns': columns})
 
             goodSrc = self.sourceSelector.selectSources(df)
 
@@ -555,13 +463,6 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             self.log.info("  Found %d good stars in visit %d (deltaAper = %0.3f)",
                           use.size, visit['visit'], visit['deltaAper'])
 
-            if ((counter % self.config.nVisitsPerCheckpoint) == 0
-               and starObsDataRef is not None and visitCatDataRef is not None):
-                # We need to persist both the stars and the visit catalog which gets
-                # additional metadata from each visit.
-                starObsDataRef.put(fullCatalog)
-                visitCatDataRef.put(visitCat)
-
         self.log.info("Found all good star observations in %.2f s" %
                       (time.time() - startTime))
 
@@ -587,7 +488,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # Default name for Gen3.
             detectorColumn = 'detector'
         else:
-            # Default name for Gen2 and Gen2 conversions.
+            # Default name for Gen2 conversions (including test data).
             detectorColumn = 'ccd'
         # Some names are hard-coded in the parquet table.
         columns = ['visit', detectorColumn,

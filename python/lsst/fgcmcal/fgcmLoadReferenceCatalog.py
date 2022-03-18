@@ -89,25 +89,17 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
 
     Parameters
     ----------
-    butler: `lsst.daf.persistence.Butler`
-       Data butler for reading catalogs
+    refObjLoader : `lsst.meas.algorithms.ReferenceObjectLoader`
+        Reference object loader.
     """
     ConfigClass = FgcmLoadReferenceCatalogConfig
     _DefaultName = 'fgcmLoadReferenceCatalog'
 
-    def __init__(self, butler=None, refObjLoader=None, **kwargs):
+    def __init__(self, refObjLoader=None, **kwargs):
         """Construct an FgcmLoadReferenceCatalogTask
-
-        Parameters
-        ----------
-        butler: `lsst.daf.persistence.Buter`
-           Data butler for reading catalogs.
         """
         pipeBase.Task.__init__(self, **kwargs)
-        if refObjLoader is None and butler is not None:
-            self.makeSubtask('refObjLoader', butler=butler)
-        else:
-            self.refObjLoader = refObjLoader
+        self.refObjLoader = refObjLoader
 
         self.makeSubtask('referenceSelector')
         self._fluxFilters = None

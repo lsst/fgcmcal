@@ -36,7 +36,7 @@ import fgcmcalTestBase
 ROOT = os.path.abspath(os.path.dirname(__file__))
 
 
-class FgcmApertureTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase):
+class FgcmApertureTestHsc(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase):
     @classmethod
     def setUpClass(cls):
         try:
