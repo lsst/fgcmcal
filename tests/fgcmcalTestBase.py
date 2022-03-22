@@ -33,7 +33,7 @@ import glob
 import esutil
 
 import lsst.daf.butler as dafButler
-import lsst.obs.base as obsBase
+import lsst.pipe.base as pipeBase
 import lsst.geom as geom
 from lsst.pipe.base import Pipeline
 from lsst.ctrl.mpexec import SimplePipelineExecutor
@@ -67,7 +67,7 @@ class FgcmcalTestBase(object):
         _ = dafButler.Butler.makeRepo(cls.repo)
         butler = dafButler.Butler(cls.repo, writeable=True)
         # Register the instrument
-        instrInstance = obsBase.utils.getInstrument(instrument)
+        instrInstance = pipeBase.Instrument.from_string(instrument)
         instrInstance.register(butler.registry)
         # Import the exportFile
         butler.import_(directory=exportPath, filename=exportFile,
