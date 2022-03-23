@@ -37,7 +37,7 @@ import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom as geom
 from lsst.obs.base import createInitialSkyWcs
-from lsst.obs.base import Instrument
+from lsst.pipe.base import Instrument
 
 import fgcm
 
