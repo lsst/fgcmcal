@@ -822,45 +822,6 @@ def makeStdCat(stdSchema, stdStruct, goodBands):
     return stdCat
 
 
-def computeApertureRadiusFromDataRef(dataRef, fluxField):
-    """
-    Compute the radius associated with a CircularApertureFlux field or
-    associated slot.
-
-    Parameters
-    ----------
-    dataRef : `lsst.daf.butler.DeferredDatasetHandle`
-    fluxField : `str`
-       CircularApertureFlux or associated slot.
-
-    Returns
-    -------
-    apertureRadius : `float`
-       Radius of the aperture field, in pixels.
-
-    Raises
-    ------
-    RuntimeError: Raised if flux field is not a CircularApertureFlux, ApFlux,
-       apFlux, or associated slot.
-    """
-    # TODO: Move this method to more general stack method in DM-25775
-    datasetType = dataRef.ref.datasetType.name
-
-    if datasetType == 'src':
-        schema = dataRef.get(datasetType='src_schema').schema
-        try:
-            fluxFieldName = schema[fluxField].asField().getName()
-        except LookupError:
-            raise RuntimeError("Could not find %s or associated slot in schema." % (fluxField))
-        # This may also raise a RuntimeError
-        apertureRadius = computeApertureRadiusFromName(fluxFieldName)
-    else:
-        # This is a sourceTable_visit
-        apertureRadius = computeApertureRadiusFromName(fluxField)
-
-    return apertureRadius
-
-
 def computeApertureRadiusFromName(fluxField):
     """
     Compute the radius associated with a CircularApertureFlux or ApFlux field.

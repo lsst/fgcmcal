@@ -91,9 +91,6 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
         dtype=int,
         default=8,
     )
-    # The following config will not be necessary after Gen2 retirement.
-    # In the meantime, obs packages should set to 'filterDefinitions.filter_to_band'
-    # which is easiest to access in the config file.
     physicalFilterMap = pexConfig.DictField(
         doc="Mapping from 'physicalFilter' to band.",
         keytype=str,
@@ -115,12 +112,14 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
     visitDataRefName = pexConfig.Field(
         doc="dataRef name for the 'visit' field, usually 'visit'.",
         dtype=str,
-        default="visit"
+        default="visit",
+        deprecated="The visitDataRefname was only used for gen2; this config will be removed after v24."
     )
     ccdDataRefName = pexConfig.Field(
         doc="dataRef name for the 'ccd' field, usually 'ccd' or 'detector'.",
         dtype=str,
-        default="ccd"
+        default="ccd",
+        deprecated="The ccdDataRefname was only used for gen2; this config will be removed after v24."
     )
     doApplyWcsJacobian = pexConfig.Field(
         doc="Apply the jacobian of the WCS to the star observations prior to fit?",
@@ -208,29 +207,25 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         self.sourceSelector.log.setLevel(self.sourceSelector.log.WARN)
 
     @abc.abstractmethod
-    def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
+    def fgcmMakeAllStarObservations(self, groupedHandles, visitCat,
                                     sourceSchema,
                                     camera,
-                                    calibFluxApertureRadius=None,
-                                    visitCatDataRef=None,
-                                    starObsDataRef=None,
-                                    inStarObsCat=None):
+                                    calibFluxApertureRadius=None):
         """
-        Compile all good star observations from visits in visitCat.  Checkpoint files
-        will be stored if both visitCatDataRef and starObsDataRef are not None.
+        Compile all good star observations from visits in visitCat.
 
         Parameters
         ----------
-        groupedDataRefs : `dict` of `list`s
-            Lists of `~lsst.daf.butler.DeferredDatasetHandle`, grouped by visit.
-        visitCat : `~afw.table.BaseCatalog`
+        groupedHandles : `dict` [`list` [`lsst.daf.butler.DeferredDatasetHandle`]]
+            Dataset handles, grouped by visit.
+        visitCat : `afw.table.BaseCatalog`
             Catalog with visit data for FGCM
-        sourceSchema : `~lsst.afw.table.Schema`
+        sourceSchema : `lsst.afw.table.Schema`
             Schema for the input src catalogs.
-        camera : `~lsst.afw.cameraGeom.Camera`
+        camera : `lsst.afw.cameraGeom.Camera`
         calibFluxApertureRadius : `float`, optional
             Aperture radius for calibration flux.
-        inStarObsCat : `~afw.table.BaseCatalog`
+        inStarObsCat : `afw.table.BaseCatalog`
             Input observation catalog.  If this is incomplete, observations
             will be appended from when it was cut off.
 
@@ -246,7 +241,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         """
         raise NotImplementedError("fgcmMakeAllStarObservations not implemented.")
 
-    def fgcmMakeVisitCatalog(self, camera, groupedDataRefs, bkgDataRefDict=None):
+    def fgcmMakeVisitCatalog(self, camera, groupedHandles, bkgHandleDict=None):
         """
         Make a visit catalog with all the keys from each visit
 
@@ -254,40 +249,38 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         ----------
         camera: `lsst.afw.cameraGeom.Camera`
            Camera from the butler
-        groupedDataRefs: `dict`
-           Dictionary with visit keys, and `list`s of
-           `lsst.daf.persistence.ButlerDataRef`
-        bkgDataRefDict: `dict`, optional
-           Dictionary of gen3 dataRefHandles for background info.
+        groupedHandles: `dict` [`list` [`lsst.daf.butler.DeferredDatasetHandle`]]
+            Dataset handles, grouped by visit.
+        bkgHandleDict: `dict`, optional
+           Dictionary of `lsst.daf.butler.DeferredDatasetHandle` for background info.
 
         Returns
         -------
         visitCat: `afw.table.BaseCatalog`
         """
 
-        self.log.info("Assembling visitCatalog from %d %ss" %
-                      (len(groupedDataRefs), self.config.visitDataRefName))
+        self.log.info("Assembling visitCatalog from %d visits", len(groupedHandles))
 
         nCcd = len(camera)
 
         schema = self._makeFgcmVisitSchema(nCcd)
 
         visitCat = afwTable.BaseCatalog(schema)
-        visitCat.reserve(len(groupedDataRefs))
-        visitCat.resize(len(groupedDataRefs))
+        visitCat.reserve(len(groupedHandles))
+        visitCat.resize(len(groupedHandles))
 
-        visitCat['visit'] = list(groupedDataRefs.keys())
+        visitCat['visit'] = list(groupedHandles.keys())
         visitCat['used'] = 0
         visitCat['sources_read'] = False
 
         # No matter what, fill the catalog. This will check if it was
         # already read.
-        self._fillVisitCatalog(visitCat, groupedDataRefs,
-                               bkgDataRefDict=bkgDataRefDict)
+        self._fillVisitCatalog(visitCat, groupedHandles,
+                               bkgHandleDict=bkgHandleDict)
 
         return visitCat
 
-    def _fillVisitCatalog(self, visitCat, groupedDataRefs, bkgDataRefDict=None):
+    def _fillVisitCatalog(self, visitCat, groupedHandles, bkgHandleDict=None):
         """
         Fill the visit catalog with visit metadata
 
@@ -295,29 +288,18 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         ----------
         visitCat : `afw.table.BaseCatalog`
             Visit catalog.  See _makeFgcmVisitSchema() for schema definition.
-        groupedDataRefs : `dict`
-            Dictionary with visit keys, and `list`s of
-            `lsst.daf.butler.DeferredDatasetHandle`
-        bkgDataRefDict : `dict`, optional
-            Dictionary of Gen3 `lsst.daf.butler.DeferredDatasetHandle`
+        groupedHandles : `dict` [`list` [`lsst.daf.butler.DeferredDatasetHandle`]]
+            Dataset handles, grouped by visit.
+        bkgHandleDict : `dict`, optional
+            Dictionary of `lsst.daf.butler.DeferredDatasetHandle`
             for background info.
         """
-        for i, visit in enumerate(groupedDataRefs):
-            # We don't use the bypasses since we need the psf info which does
-            # not have a bypass
-            # TODO: When DM-15500 is implemented in the Gen3 Butler, this
-            # can be fixed
-
-            # Do not read those that have already been read
-            if visitCat['used'][i]:
-                continue
-
+        for i, visit in enumerate(groupedHandles):
             if (i % self.config.nVisitsPerCheckpoint) == 0:
-                self.log.info("Retrieving metadata for %s %d (%d/%d)" %
-                              (self.config.visitDataRefName, visit, i, len(groupedDataRefs)))
+                self.log.info("Retrieving metadata for visit %d (%d/%d)", visit, i, len(groupedHandles))
 
-            dataRef = groupedDataRefs[visit][0]
-            summary = dataRef.get()
+            handle = groupedHandles[visit][0]
+            summary = handle.get()
 
             summaryRow = summary.find(self.config.referenceCCD)
             if summaryRow is None:
@@ -334,14 +316,13 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             elif goodSigma > 0:
                 psfSigma = np.mean(summary['psfSigma'][goodSigma])
             else:
+                self.log.warning("Could not find any good summary psfSigma for visit %d", visit)
                 psfSigma = 0.0
 
             rec = visitCat[i]
             rec['visit'] = visit
             rec['physicalFilter'] = physicalFilter
-            # TODO DM-26991: when gen2 is removed, gen3 workflow will make it
-            # much easier to get the wcs's necessary to recompute the pointing
-            # ra/dec at the center of the camera.
+            # TODO DM-26991: Use the wcs to refine the focal-plane center.
             radec = visitInfo.getBoresightRaDec()
             rec['telra'] = radec.getRa().asDegrees()
             rec['teldec'] = radec.getDec().asDegrees()
@@ -362,8 +343,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
 
             if self.config.doModelErrorsWithBackground:
                 # Use the same detector used from the summary.
-                bkgRef = bkgDataRefDict[(visit, summaryDetector)]
-                bgList = bkgRef.get()
+                bkgHandle = bkgHandleDict[(visit, summaryDetector)]
+                bgList = bkgHandle.get()
 
                 bgStats = (bg[0].getStatsImage().getImage().array
                            for bg in bgList)
@@ -427,7 +408,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
 
         return sourceMapper
 
-    def fgcmMatchStars(self, visitCat, obsCat, lutDataRef=None):
+    def fgcmMatchStars(self, visitCat, obsCat, lutHandle=None):
         """
         Use FGCM code to match observations into unique stars.
 
@@ -437,7 +418,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
            Catalog with visit data for fgcm
         obsCat: `afw.table.BaseCatalog`
            Full catalog of star observations for fgcm
-        lutDataRef: `lsst.daf.butler.DeferredDatasetHandle`, optional
+        lutHandle: `lsst.daf.butler.DeferredDatasetHandle`, optional
            Data reference to fgcm look-up table (used if matching reference stars).
 
         Returns
@@ -464,7 +445,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
 
         if self.config.doReferenceMatches:
             # Get the reference filter names, using the LUT
-            lutCat = lutDataRef.get()
+            lutCat = lutHandle.get()
 
             stdFilterDict = {filterName: stdFilter for (filterName, stdFilter) in
                              zip(lutCat[0]['physicalFilters'].split(','),

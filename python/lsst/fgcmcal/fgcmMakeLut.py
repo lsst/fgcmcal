@@ -294,24 +294,24 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         camera = butlerQC.get(inputRefs.camera)
 
-        opticsDataRef = butlerQC.get(inputRefs.transmission_optics)
+        opticsHandle = butlerQC.get(inputRefs.transmission_optics)
 
-        sensorRefs = butlerQC.get(inputRefs.transmission_sensor)
-        sensorDataRefDict = {sensorRef.dataId.byName()['detector']: sensorRef for
-                             sensorRef in sensorRefs}
+        sensorHandles = butlerQC.get(inputRefs.transmission_sensor)
+        sensorHandleDict = {sensorHandle.dataId.byName()['detector']: sensorHandle for
+                            sensorHandle in sensorHandles}
 
-        filterRefs = butlerQC.get(inputRefs.transmission_filter)
-        filterDataRefDict = {filterRef.dataId['physical_filter']: filterRef for
-                             filterRef in filterRefs}
+        filterHandles = butlerQC.get(inputRefs.transmission_filter)
+        filterHandleDict = {filterHandle.dataId['physical_filter']: filterHandle for
+                            filterHandle in filterHandles}
 
         lutCat = self._fgcmMakeLut(camera,
-                                   opticsDataRef,
-                                   sensorDataRefDict,
-                                   filterDataRefDict)
+                                   opticsHandle,
+                                   sensorHandleDict,
+                                   filterHandleDict)
         butlerQC.put(lutCat, outputRefs.fgcmLookUpTable)
 
-    def _fgcmMakeLut(self, camera, opticsDataRef, sensorDataRefDict,
-                     filterDataRefDict):
+    def _fgcmMakeLut(self, camera, opticsHandle, sensorHandleDict,
+                     filterHandleDict):
         """
         Make a FGCM Look-up Table
 
@@ -319,12 +319,12 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
         ----------
         camera : `lsst.afw.cameraGeom.Camera`
             Camera from the butler.
-        opticsDataRef : `lsst.daf.butler.DeferredDatasetHandle`
+        opticsHandle : `lsst.daf.butler.DeferredDatasetHandle`
             Reference to optics transmission curve.
-        sensorDataRefDict : `dict` of [`int`, `lsst.daf.butler.DeferredDatasetHandle`]
+        sensorHandleDict : `dict` of [`int`, `lsst.daf.butler.DeferredDatasetHandle`]
             Dictionary of references to sensor transmission curves.  Key will
             be detector id.
-        filterDataRefDict : `dict` of [`str`, `lsst.daf.butler.DeferredDatasetHandle`]
+        filterHandleDict : `dict` of [`str`, `lsst.daf.butler.DeferredDatasetHandle`]
             Dictionary of references to filter transmission curves.  Key will
             be physical filter label.
 
@@ -339,9 +339,9 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
 
         # Load in optics, etc.
         self._loadThroughputs(camera,
-                              opticsDataRef,
-                              sensorDataRefDict,
-                              filterDataRefDict)
+                              opticsHandle,
+                              sensorHandleDict,
+                              filterHandleDict)
 
         lutConfig = self._createLutConfig(nCcd)
 
@@ -454,19 +454,19 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
 
         return lutConfig
 
-    def _loadThroughputs(self, camera, opticsDataRef, sensorDataRefDict, filterDataRefDict):
+    def _loadThroughputs(self, camera, opticsHandle, sensorHandleDict, filterHandleDict):
         """Internal method to load throughput data for filters
 
         Parameters
         ----------
         camera: `lsst.afw.cameraGeom.Camera`
             Camera from the butler
-        opticsDataRef : `lsst.daf.butler.DeferredDatasetHandle`
+        opticsHandle : `lsst.daf.butler.DeferredDatasetHandle`
             Reference to optics transmission curve.
-        sensorDataRefDict : `dict` of [`int`, `lsst.daf.butler.DeferredDatasetHandle`]
+        sensorHandleDict : `dict` of [`int`, `lsst.daf.butler.DeferredDatasetHandle`]
             Dictionary of references to sensor transmission curves.  Key will
             be detector id.
-        filterDataRefDict : `dict` of [`str`, `lsst.daf.butler.DeferredDatasetHandle`]
+        filterHandleDict : `dict` of [`str`, `lsst.daf.butler.DeferredDatasetHandle`]
             Dictionary of references to filter transmission curves.  Key will
             be physical filter label.
 
@@ -475,15 +475,15 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
         ValueError : Raised if configured filter name does not match any of the
             available filter transmission curves.
         """
-        self._opticsTransmission = opticsDataRef.get()
+        self._opticsTransmission = opticsHandle.get()
 
         self._sensorsTransmission = {}
         for detector in camera:
-            self._sensorsTransmission[detector.getId()] = sensorDataRefDict[detector.getId()].get()
+            self._sensorsTransmission[detector.getId()] = sensorHandleDict[detector.getId()].get()
 
         self._filtersTransmission = {}
         for physicalFilter in self.config.physicalFilters:
-            self._filtersTransmission[physicalFilter] = filterDataRefDict[physicalFilter].get()
+            self._filtersTransmission[physicalFilter] = filterHandleDict[physicalFilter].get()
 
     def _getThroughputDetector(self, detector, physicalFilter, throughputLambda):
         """Internal method to get throughput for a detector.

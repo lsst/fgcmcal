@@ -10,7 +10,6 @@ config.fgcmBuildStars.load(os.path.join(configDir, 'fgcmBuildStarsTableHsc.py'))
 config.fgcmFitCycle.load(os.path.join(configDir, 'fgcmFitCycleHsc.py'))
 
 config.maxFitCycles = 3
-config.fgcmOutputProducts.doRefcatOutput = True
 config.fgcmFitCycle.aperCorrFitNBins = 0
 config.fgcmFitCycle.useRepeatabilityForExpGrayCutsDict = {'g': True,
                                                           'r': True,

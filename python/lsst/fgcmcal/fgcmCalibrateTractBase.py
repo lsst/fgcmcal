@@ -33,7 +33,7 @@ from .fgcmBuildStarsTable import FgcmBuildStarsTableTask
 from .fgcmFitCycle import FgcmFitCycleConfig
 from .fgcmOutputProducts import FgcmOutputProductsTask
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
-from .utilities import computeApertureRadiusFromDataRef, extractReferenceMags
+from .utilities import computeApertureRadiusFromName, extractReferenceMags
 from .utilities import makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat
 from .utilities import makeStdSchema, makeStdCat
@@ -103,33 +103,33 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
         self.makeSubtask("fgcmBuildStars", initInputs=initInputs)
         self.makeSubtask("fgcmOutputProducts")
 
-    def run(self, dataRefDict, tract,
+    def run(self, handleDict, tract,
             buildStarsRefObjLoader=None, returnCatalogs=True):
         """Run the calibrations for a single tract with fgcm.
 
         Parameters
         ----------
-        dataRefDict : `dict`
-            All dataRefs are `lsst.daf.butler.DeferredDatasetHandle`
-            dataRef dictionary with the following keys.  Note that all
+        handleDict : `dict`
+            All handles are `lsst.daf.butler.DeferredDatasetHandle`
+            handle dictionary with the following keys.  Note that all
             keys need not be set based on config parameters.
 
             ``"camera"``
                 Camera object (`lsst.afw.cameraGeom.Camera`)
             ``"source_catalogs"``
-                `list` of dataRefs for input source catalogs.
+                `list` of handles for input source catalogs.
             ``"sourceSchema"``
                 Schema for the source catalogs.
             ``"fgcmLookUpTable"``
-                dataRef for the FGCM look-up table.
+                handle for the FGCM look-up table.
             ``"calexps"``
-                `list` of dataRefs for the input calexps
+                `list` of handles for the input calexps
             ``"fgcmPhotoCalibs"``
-                `dict` of output photoCalib dataRefs.  Key is
+                `dict` of output photoCalib handles.  Key is
                 (tract, visit, detector).
                 Present if doZeropointOutput is True.
             ``"fgcmTransmissionAtmospheres"``
-                `dict` of output atmosphere transmission dataRefs.
+                `dict` of output atmosphere transmission handles.
                 Key is (tract, visit).
                 Present if doAtmosphereOutput is True.
         tract : `int`
@@ -165,8 +165,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
         if self.config.fgcmBuildStars.doSubtractLocalBackground:
             try:
                 field = self.config.fgcmBuildStars.instFluxField
-                calibFluxApertureRadius = computeApertureRadiusFromDataRef(dataRefDict['source_catalogs'][0],
-                                                                           field)
+                calibFluxApertureRadius = computeApertureRadiusFromName(field)
             except RuntimeError:
                 raise RuntimeError("Could not determine aperture radius from %s. "
                                    "Cannot use doSubtractLocalBackground." %
@@ -175,30 +174,30 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
         # Run the build stars tasks
 
         # Note that we will need visitCat at the end of the procedure for the outputs
-        groupedDataRefs = self.fgcmBuildStars._groupDataRefs(dataRefDict['sourceTableDataRefDict'],
-                                                             dataRefDict['visitSummaryDataRefDict'])
-        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(dataRefDict['camera'], groupedDataRefs)
+        groupedHandles = self.fgcmBuildStars._groupHandles(handleDict['sourceTableHandleDict'],
+                                                           handleDict['visitSummaryHandleDict'])
+        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(handleDict['camera'], groupedHandles)
         rad = calibFluxApertureRadius
-        fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedDataRefs,
+        fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedHandles,
                                                                                  visitCat,
-                                                                                 dataRefDict['sourceSchema'],
-                                                                                 dataRefDict['camera'],
+                                                                                 handleDict['sourceSchema'],
+                                                                                 handleDict['camera'],
                                                                                  calibFluxApertureRadius=rad)
 
         if self.fgcmBuildStars.config.doReferenceMatches:
-            lutDataRef = dataRefDict['fgcmLookUpTable']
+            lutHandle = handleDict['fgcmLookUpTable']
             self.fgcmBuildStars.makeSubtask("fgcmLoadReferenceCatalog",
                                             refObjLoader=buildStarsRefObjLoader)
         else:
-            lutDataRef = None
+            lutHandle = None
 
         fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = \
             self.fgcmBuildStars.fgcmMatchStars(visitCat,
                                                fgcmStarObservationCat,
-                                               lutDataRef=lutDataRef)
+                                               lutHandle=lutHandle)
 
         # Load the LUT
-        lutCat = dataRefDict['fgcmLookUpTable'].get()
+        lutCat = handleDict['fgcmLookUpTable'].get()
         fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat,
                                                          dict(self.config.fgcmFitCycle.physicalFilterMap))
         del lutCat
@@ -206,12 +205,12 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
         # Translate the visit catalog into fgcm format
         fgcmExpInfo = translateVisitCatalog(visitCat)
 
-        configDict = makeConfigDict(self.config.fgcmFitCycle, self.log, dataRefDict['camera'],
+        configDict = makeConfigDict(self.config.fgcmFitCycle, self.log, handleDict['camera'],
                                     self.config.fgcmFitCycle.maxIterBeforeFinalCycle,
                                     True, False, lutIndexVals[0]['FILTERNAMES'],
                                     tract=tract)
 
-        focalPlaneProjector = FocalPlaneProjector(dataRefDict['camera'],
+        focalPlaneProjector = FocalPlaneProjector(handleDict['camera'],
                                                   self.config.fgcmFitCycle.defaultCameraOrientation)
 
         # Set up the fit cycle task
@@ -392,7 +391,7 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
         stdSchema = makeStdSchema(len(goodBands))
         stdCat = makeStdCat(stdSchema, stdStruct, goodBands)
 
-        outStruct = self.fgcmOutputProducts.generateTractOutputProducts(dataRefDict,
+        outStruct = self.fgcmOutputProducts.generateTractOutputProducts(handleDict,
                                                                         tract,
                                                                         visitCat,
                                                                         zptCat, atmCat, stdCat,

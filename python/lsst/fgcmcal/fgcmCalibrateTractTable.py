@@ -178,36 +178,36 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
             self.sourceSchema = initInputs["sourceSchema"].schema
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
-        dataRefDict = butlerQC.get(inputRefs)
+        handleDict = butlerQC.get(inputRefs)
 
-        self.log.info("Running with %d sourceTable_visit dataRefs", (len(dataRefDict['source_catalogs'])))
+        self.log.info("Running with %d sourceTable_visit handles", (len(handleDict['source_catalogs'])))
 
         # Run the build stars tasks
         tract = butlerQC.quantum.dataId['tract']
 
-        dataRefDict['sourceSchema'] = self.sourceSchema
+        handleDict['sourceSchema'] = self.sourceSchema
 
-        sourceTableRefs = dataRefDict['source_catalogs']
-        sourceTableDataRefDict = {sourceTableRef.dataId['visit']: sourceTableRef for
-                                  sourceTableRef in sourceTableRefs}
+        sourceTableHandles = handleDict['source_catalogs']
+        sourceTableHandleDict = {sourceTableHandle.dataId['visit']: sourceTableHandle for
+                                 sourceTableHandle in sourceTableHandles}
 
-        visitSummaryRefs = dataRefDict['visitSummary']
-        visitSummaryDataRefDict = {visitSummaryRef.dataId['visit']: visitSummaryRef for
-                                   visitSummaryRef in visitSummaryRefs}
+        visitSummaryHandles = handleDict['visitSummary']
+        visitSummaryHandleDict = {visitSummaryHandle.dataId['visit']: visitSummaryHandle for
+                                  visitSummaryHandle in visitSummaryHandles}
 
-        dataRefDict['sourceTableDataRefDict'] = sourceTableDataRefDict
-        dataRefDict['visitSummaryDataRefDict'] = visitSummaryDataRefDict
+        handleDict['sourceTableHandleDict'] = sourceTableHandleDict
+        handleDict['visitSummaryHandleDict'] = visitSummaryHandleDict
 
         # And the outputs
         if self.config.fgcmOutputProducts.doZeropointOutput:
             photoCalibRefDict = {photoCalibRef.dataId.byName()['visit']:
                                  photoCalibRef for photoCalibRef in outputRefs.fgcmPhotoCalib}
-            dataRefDict['fgcmPhotoCalibs'] = photoCalibRefDict
+            handleDict['fgcmPhotoCalibs'] = photoCalibRefDict
 
         if self.config.fgcmOutputProducts.doAtmosphereOutput:
             atmRefDict = {atmRef.dataId.byName()['visit']: atmRef for
                           atmRef in outputRefs.fgcmTransmissionAtmosphere}
-            dataRefDict['fgcmTransmissionAtmospheres'] = atmRefDict
+            handleDict['fgcmTransmissionAtmospheres'] = atmRefDict
 
         if self.config.fgcmBuildStars.doReferenceMatches:
             refConfig = self.config.fgcmBuildStars.fgcmLoadReferenceCatalog.refObjLoader
@@ -229,7 +229,7 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
                                            log=self.log)
             self.fgcmOutputProducts.refObjLoader = loader
 
-        struct = self.run(dataRefDict, tract,
+        struct = self.run(handleDict, tract,
                           buildStarsRefObjLoader=buildStarsRefObjLoader)
 
         if struct.photoCalibCatalogs is not None:

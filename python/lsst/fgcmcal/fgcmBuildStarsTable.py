@@ -41,7 +41,7 @@ import lsst.afw.table as afwTable
 from lsst.meas.algorithms import ReferenceObjectLoader
 
 from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsBaseTask
-from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromDataRef
+from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromName
 from .utilities import lookupStaticCalibrations
 
 __all__ = ['FgcmBuildStarsTableConfig', 'FgcmBuildStarsTableTask']
@@ -228,17 +228,17 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         inputRefDict = butlerQC.get(inputRefs)
 
-        sourceTableRefs = inputRefDict['sourceTable_visit']
+        sourceTableHandles = inputRefDict['sourceTable_visit']
 
-        self.log.info("Running with %d sourceTable_visit dataRefs",
-                      len(sourceTableRefs))
+        self.log.info("Running with %d sourceTable_visit handles",
+                      len(sourceTableHandles))
 
-        sourceTableDataRefDict = {sourceTableRef.dataId['visit']: sourceTableRef for
-                                  sourceTableRef in sourceTableRefs}
+        sourceTableHandleDict = {sourceTableHandle.dataId['visit']: sourceTableHandle for
+                                 sourceTableHandle in sourceTableHandles}
 
         if self.config.doReferenceMatches:
-            # Get the LUT dataRef
-            lutDataRef = inputRefDict['fgcmLookUpTable']
+            # Get the LUT handle
+            lutHandle = inputRefDict['fgcmLookUpTable']
 
             # Prepare the refCat loader
             refConfig = self.config.fgcmLoadReferenceCatalog.refObjLoader
@@ -249,41 +249,40 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
                                                  log=self.log)
             self.makeSubtask('fgcmLoadReferenceCatalog', refObjLoader=refObjLoader)
         else:
-            lutDataRef = None
+            lutHandle = None
 
         # Compute aperture radius if necessary.  This is useful to do now before
         # any heave lifting has happened (fail early).
         calibFluxApertureRadius = None
         if self.config.doSubtractLocalBackground:
             try:
-                calibFluxApertureRadius = computeApertureRadiusFromDataRef(sourceTableRefs[0],
-                                                                           self.config.instFluxField)
+                calibFluxApertureRadius = computeApertureRadiusFromName(self.config.instFluxField)
             except RuntimeError as e:
                 raise RuntimeError("Could not determine aperture radius from %s. "
                                    "Cannot use doSubtractLocalBackground." %
                                    (self.config.instFluxField)) from e
 
-        visitSummaryRefs = inputRefDict['visitSummary']
-        visitSummaryDataRefDict = {visitSummaryRef.dataId['visit']: visitSummaryRef for
-                                   visitSummaryRef in visitSummaryRefs}
+        visitSummaryHandles = inputRefDict['visitSummary']
+        visitSummaryHandleDict = {visitSummaryHandle.dataId['visit']: visitSummaryHandle for
+                                  visitSummaryHandle in visitSummaryHandles}
 
         camera = inputRefDict['camera']
-        groupedDataRefs = self._groupDataRefs(sourceTableDataRefDict,
-                                              visitSummaryDataRefDict)
+        groupedHandles = self._groupHandles(sourceTableHandleDict,
+                                            visitSummaryHandleDict)
 
         if self.config.doModelErrorsWithBackground:
-            bkgRefs = inputRefDict['background']
-            bkgDataRefDict = {(bkgRef.dataId.byName()['visit'],
-                               bkgRef.dataId.byName()['detector']): bkgRef for
-                              bkgRef in bkgRefs}
+            bkgHandles = inputRefDict['background']
+            bkgHandleDict = {(bkgHandle.dataId.byName()['visit'],
+                              bkgHandle.dataId.byName()['detector']): bkgHandle for
+                             bkgHandle in bkgHandles}
         else:
-            bkgDataRefDict = None
+            bkgHandleDict = None
 
-        visitCat = self.fgcmMakeVisitCatalog(camera, groupedDataRefs,
-                                             bkgDataRefDict=bkgDataRefDict)
+        visitCat = self.fgcmMakeVisitCatalog(camera, groupedHandles,
+                                             bkgHandleDict=bkgHandleDict)
 
         rad = calibFluxApertureRadius
-        fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedDataRefs,
+        fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedHandles,
                                                                   visitCat,
                                                                   self.sourceSchema,
                                                                   camera,
@@ -294,41 +293,41 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
         fgcmStarIdCat, fgcmStarIndicesCat, fgcmRefCat = self.fgcmMatchStars(visitCat,
                                                                             fgcmStarObservationCat,
-                                                                            lutDataRef=lutDataRef)
+                                                                            lutHandle=lutHandle)
 
         butlerQC.put(fgcmStarIdCat, outputRefs.fgcmStarIds)
         butlerQC.put(fgcmStarIndicesCat, outputRefs.fgcmStarIndices)
         if fgcmRefCat is not None:
             butlerQC.put(fgcmRefCat, outputRefs.fgcmReferenceStars)
 
-    def _groupDataRefs(self, sourceTableDataRefDict, visitSummaryDataRefDict):
-        """Group sourceTable and visitSummary dataRefs.
+    def _groupHandles(self, sourceTableHandleDict, visitSummaryHandleDict):
+        """Group sourceTable and visitSummary handles.
 
         Parameters
         ----------
-        sourceTableDataRefDict : `dict` [`int`, `str`]
+        sourceTableHandleDict : `dict` [`int`, `str`]
             Dict of source tables, keyed by visit.
-        visitSummaryDataRefDict : `dict` [int, `str`]
+        visitSummaryHandleDict : `dict` [int, `str`]
             Dict of visit summary catalogs, keyed by visit.
 
         Returns
         -------
-        groupedDataRefs : `dict` [`int`, `list`]
+        groupedHandles : `dict` [`int`, `list`]
             Dictionary with sorted visit keys, and `list`s with
             `lsst.daf.butler.DeferredDataSetHandle`.  The first
             item in the list will be the visitSummary ref, and
             the second will be the source table ref.
         """
-        groupedDataRefs = collections.defaultdict(list)
-        visits = sorted(sourceTableDataRefDict.keys())
+        groupedHandles = collections.defaultdict(list)
+        visits = sorted(sourceTableHandleDict.keys())
 
         for visit in visits:
-            groupedDataRefs[visit] = [visitSummaryDataRefDict[visit],
-                                      sourceTableDataRefDict[visit]]
+            groupedHandles[visit] = [visitSummaryHandleDict[visit],
+                                     sourceTableHandleDict[visit]]
 
-        return groupedDataRefs
+        return groupedHandles
 
-    def fgcmMakeAllStarObservations(self, groupedDataRefs, visitCat,
+    def fgcmMakeAllStarObservations(self, groupedHandles, visitCat,
                                     sourceSchema,
                                     camera,
                                     calibFluxApertureRadius=None):
@@ -368,12 +367,12 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         for counter, visit in enumerate(visitCat):
             expTime = visit['exptime']
 
-            dataRef = groupedDataRefs[visit['visit']][-1]
+            handle = groupedHandles[visit['visit']][-1]
 
             if columns is None:
-                inColumns = dataRef.get(component='columns')
+                inColumns = handle.get(component='columns')
                 columns, detColumn = self._get_sourceTable_visit_columns(inColumns)
-            df = dataRef.get(parameters={'columns': columns})
+            df = handle.get(parameters={'columns': columns})
 
             goodSrc = self.sourceSelector.selectSources(df)
 

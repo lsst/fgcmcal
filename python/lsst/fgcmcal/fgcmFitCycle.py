@@ -306,9 +306,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=str,
         default=[],
     )
-    # The following config will not be necessary after Gen2 retirement.
-    # In the meantime, it is set to 'filterDefinitions.filter_to_band' which
-    # is easiest to access in the config file.
     physicalFilterMap = pexConfig.DictField(
         doc="Mapping from 'physicalFilter' to band.",
         keytype=str,
@@ -902,18 +899,18 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         camera = butlerQC.get(inputRefs.camera)
 
-        dataRefDict = {}
+        handleDict = {}
 
-        dataRefDict['fgcmLookUpTable'] = butlerQC.get(inputRefs.fgcmLookUpTable)
-        dataRefDict['fgcmVisitCatalog'] = butlerQC.get(inputRefs.fgcmVisitCatalog)
-        dataRefDict['fgcmStarObservations'] = butlerQC.get(inputRefs.fgcmStarObservations)
-        dataRefDict['fgcmStarIds'] = butlerQC.get(inputRefs.fgcmStarIds)
-        dataRefDict['fgcmStarIndices'] = butlerQC.get(inputRefs.fgcmStarIndices)
+        handleDict['fgcmLookUpTable'] = butlerQC.get(inputRefs.fgcmLookUpTable)
+        handleDict['fgcmVisitCatalog'] = butlerQC.get(inputRefs.fgcmVisitCatalog)
+        handleDict['fgcmStarObservations'] = butlerQC.get(inputRefs.fgcmStarObservations)
+        handleDict['fgcmStarIds'] = butlerQC.get(inputRefs.fgcmStarIds)
+        handleDict['fgcmStarIndices'] = butlerQC.get(inputRefs.fgcmStarIndices)
         if self.config.doReferenceCalibration:
-            dataRefDict['fgcmReferenceStars'] = butlerQC.get(inputRefs.fgcmReferenceStars)
+            handleDict['fgcmReferenceStars'] = butlerQC.get(inputRefs.fgcmReferenceStars)
         if self.config.cycleNumber > 0:
-            dataRefDict['fgcmFlaggedStars'] = butlerQC.get(inputRefs.fgcmFlaggedStarsInput)
-            dataRefDict['fgcmFitParameters'] = butlerQC.get(inputRefs.fgcmFitParametersInput)
+            handleDict['fgcmFlaggedStars'] = butlerQC.get(inputRefs.fgcmFlaggedStarsInput)
+            handleDict['fgcmFitParameters'] = butlerQC.get(inputRefs.fgcmFitParametersInput)
 
         fgcmDatasetDict = None
         if self.config.doMultipleCycles:
@@ -925,10 +922,10 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                     config.update(isFinalCycle=True)
 
                 if cycle > 0:
-                    dataRefDict['fgcmFlaggedStars'] = fgcmDatasetDict['fgcmFlaggedStars']
-                    dataRefDict['fgcmFitParameters'] = fgcmDatasetDict['fgcmFitParameters']
+                    handleDict['fgcmFlaggedStars'] = fgcmDatasetDict['fgcmFlaggedStars']
+                    handleDict['fgcmFitParameters'] = fgcmDatasetDict['fgcmFitParameters']
 
-                fgcmDatasetDict, config = self._fgcmFitCycle(camera, dataRefDict, config=config)
+                fgcmDatasetDict, config = self._fgcmFitCycle(camera, handleDict, config=config)
                 butlerQC.put(fgcmDatasetDict['fgcmFitParameters'],
                              getattr(outputRefs, f'fgcmFitParameters{cycle}'))
                 butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'],
@@ -943,7 +940,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                                  getattr(outputRefs, f'fgcmStandardStars{cycle}'))
         else:
             # Run a single cycle
-            fgcmDatasetDict, _ = self._fgcmFitCycle(camera, dataRefDict)
+            fgcmDatasetDict, _ = self._fgcmFitCycle(camera, handleDict)
 
             butlerQC.put(fgcmDatasetDict['fgcmFitParameters'], outputRefs.fgcmFitParameters)
             butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'], outputRefs.fgcmFlaggedStars)
@@ -953,33 +950,33 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             if self.outputStandards:
                 butlerQC.put(fgcmDatasetDict['fgcmStandardStars'], outputRefs.fgcmStandardStars)
 
-    def _fgcmFitCycle(self, camera, dataRefDict, config=None):
+    def _fgcmFitCycle(self, camera, handleDict, config=None):
         """
         Run the fit cycle
 
         Parameters
         ----------
         camera : `lsst.afw.cameraGeom.Camera`
-        dataRefDict : `dict`
-            All dataRefs are `lsst.daf.butler.DeferredDatasetHandle`
-            dataRef dictionary with keys:
+        handleDict : `dict`
+            All handles are `lsst.daf.butler.DeferredDatasetHandle`
+            handle dictionary with keys:
 
             ``"fgcmLookUpTable"``
-                dataRef for the FGCM look-up table.
+                handle for the FGCM look-up table.
             ``"fgcmVisitCatalog"``
-                dataRef for visit summary catalog.
+                handle for visit summary catalog.
             ``"fgcmStarObservations"``
-                dataRef for star observation catalog.
+                handle for star observation catalog.
             ``"fgcmStarIds"``
-                dataRef for star id catalog.
+                handle for star id catalog.
             ``"fgcmStarIndices"``
-                dataRef for star index catalog.
+                handle for star index catalog.
             ``"fgcmReferenceStars"``
-                dataRef for matched reference star catalog.
+                handle for matched reference star catalog.
             ``"fgcmFlaggedStars"``
-                dataRef for flagged star catalog.
+                handle for flagged star catalog.
             ``"fgcmFitParameters"``
-                dataRef for fit parameter catalog.
+                handle for fit parameter catalog.
         config : `lsst.pex.config.Config`, optional
             Configuration to use to override self.config.
 
@@ -1008,7 +1005,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             self.outputZeropoints = True
             self.resetFitParameters = False
 
-        lutCat = dataRefDict['fgcmLookUpTable'].get()
+        lutCat = handleDict['fgcmLookUpTable'].get()
         fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat,
                                                          dict(_config.physicalFilterMap))
         del lutCat
@@ -1019,7 +1016,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                                     lutIndexVals[0]['FILTERNAMES'])
 
         # next we need the exposure/visit information
-        visitCat = dataRefDict['fgcmVisitCatalog'].get()
+        visitCat = handleDict['fgcmVisitCatalog'].get()
         fgcmExpInfo = translateVisitCatalog(visitCat)
         del visitCat
 
@@ -1042,10 +1039,10 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                                                              fgcmLut,
                                                              fgcmExpInfo)
         else:
-            if isinstance(dataRefDict['fgcmFitParameters'], afwTable.BaseCatalog):
-                parCat = dataRefDict['fgcmFitParameters']
+            if isinstance(handleDict['fgcmFitParameters'], afwTable.BaseCatalog):
+                parCat = handleDict['fgcmFitParameters']
             else:
-                parCat = dataRefDict['fgcmFitParameters'].get()
+                parCat = handleDict['fgcmFitParameters'].get()
             inParInfo, inParams, inSuperStar = self._loadParameters(parCat)
             del parCat
             fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
@@ -1057,16 +1054,16 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         # set up the stars...
         fgcmStars = fgcm.FgcmStars(fgcmFitCycle.fgcmConfig)
 
-        starObs = dataRefDict['fgcmStarObservations'].get()
-        starIds = dataRefDict['fgcmStarIds'].get()
-        starIndices = dataRefDict['fgcmStarIndices'].get()
+        starObs = handleDict['fgcmStarObservations'].get()
+        starIds = handleDict['fgcmStarIds'].get()
+        starIndices = handleDict['fgcmStarIndices'].get()
 
         # grab the flagged stars if available
-        if 'fgcmFlaggedStars' in dataRefDict:
-            if isinstance(dataRefDict['fgcmFlaggedStars'], afwTable.BaseCatalog):
-                flaggedStars = dataRefDict['fgcmFlaggedStars']
+        if 'fgcmFlaggedStars' in handleDict:
+            if isinstance(handleDict['fgcmFlaggedStars'], afwTable.BaseCatalog):
+                flaggedStars = handleDict['fgcmFlaggedStars']
             else:
-                flaggedStars = dataRefDict['fgcmFlaggedStars'].get()
+                flaggedStars = handleDict['fgcmFlaggedStars'].get()
             flagId = flaggedStars['objId'][:]
             flagFlag = flaggedStars['objFlag'][:]
         else:
@@ -1075,7 +1072,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             flagFlag = None
 
         if _config.doReferenceCalibration:
-            refStars = dataRefDict['fgcmReferenceStars'].get()
+            refStars = handleDict['fgcmReferenceStars'].get()
 
             refMag, refMagErr = extractReferenceMags(refStars,
                                                      _config.bands,
