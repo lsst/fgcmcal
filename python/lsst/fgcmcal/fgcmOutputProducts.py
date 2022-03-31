@@ -159,9 +159,6 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         if config.connections.refCat != config.refObjLoader.ref_dataset_name:
             raise ValueError("connections.refCat must be the same as refObjLoader.ref_dataset_name")
 
-        if config.doRefcatOutput:
-            raise ValueError("FgcmOutputProductsTask (Gen3) does not support doRefcatOutput")
-
         if not config.doReferenceCalibration:
             self.prerequisiteInputs.remove("refCat")
         if not config.doAtmosphereOutput:
@@ -200,6 +197,7 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
         doc="Output standard stars in reference catalog format",
         dtype=bool,
         default=False,
+        deprecated="doRefcatOutput is no longer supported; this config will be removed after v24"
     )
     doAtmosphereOutput = pexConfig.Field(
         doc="Output atmospheres in transmission_atmosphere_fgcm format",

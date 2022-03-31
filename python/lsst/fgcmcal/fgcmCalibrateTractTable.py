@@ -141,8 +141,6 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         if not config.fgcmBuildStars.doModelErrorsWithBackground:
             self.inputs.remove("background")
 
-        if config.fgcmOutputProducts.doRefcatOutput:
-            raise ValueError("FgcmCalibrateTractTableTask (Gen3) does not support doRefcatOutput")
         if not config.fgcmOutputProducts.doAtmosphereOutput:
             self.prerequisiteInputs.remove("fgcmAtmosphereParameters")
         if not config.fgcmOutputProducts.doZeropointOutput:
