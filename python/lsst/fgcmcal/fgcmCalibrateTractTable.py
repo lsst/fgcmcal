@@ -26,7 +26,7 @@ import numpy as np
 
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
-from lsst.meas.algorithms import ReferenceObjectLoader
+from lsst.meas.algorithms import ReferenceObjectLoader, LoadReferenceObjectsConfig
 import lsst.afw.table as afwTable
 
 from .fgcmBuildStarsTable import FgcmBuildStarsTableTask
@@ -208,7 +208,8 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
             handleDict['fgcmTransmissionAtmospheres'] = atmRefDict
 
         if self.config.fgcmBuildStars.doReferenceMatches:
-            refConfig = self.config.fgcmBuildStars.fgcmLoadReferenceCatalog.refObjLoader
+            refConfig = LoadReferenceObjectsConfig()
+            refConfig.filterMap = self.config.fgcmBuildStars.fgcmLoadReferenceCatalog.filterMap
             loader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
                                                     for ref in inputRefs.refCat],
                                            refCats=butlerQC.get(inputRefs.refCat),

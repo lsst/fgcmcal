@@ -407,8 +407,6 @@ class FgcmcalTestBase(object):
                           configFiles=configFiles,
                           inputCollections=[inputCollection],
                           outputCollection=outputCollection,
-                          configOptions={'fgcmOutputProducts':
-                                         {'doRefcatOutput': 'False'}},
                           registerDatasetTypes=True)
 
         butler = dafButler.Butler(self.repo)

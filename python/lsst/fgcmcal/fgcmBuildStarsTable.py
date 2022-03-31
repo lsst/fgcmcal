@@ -38,7 +38,7 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
-from lsst.meas.algorithms import ReferenceObjectLoader
+from lsst.meas.algorithms import ReferenceObjectLoader, LoadReferenceObjectsConfig
 
 from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsBaseTask
 from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromName
@@ -240,14 +240,17 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             # Get the LUT handle
             lutHandle = inputRefDict['fgcmLookUpTable']
 
-            # Prepare the refCat loader
-            refConfig = self.config.fgcmLoadReferenceCatalog.refObjLoader
+            # Prepare the reference catalog loader
+            refConfig = LoadReferenceObjectsConfig()
+            refConfig.filterMap = self.config.fgcmLoadReferenceCatalog.filterMap
             refObjLoader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
                                                           for ref in inputRefs.refCat],
                                                  refCats=butlerQC.get(inputRefs.refCat),
-                                                 config=refConfig,
-                                                 log=self.log)
-            self.makeSubtask('fgcmLoadReferenceCatalog', refObjLoader=refObjLoader)
+                                                 log=self.log,
+                                                 config=refConfig)
+            self.makeSubtask('fgcmLoadReferenceCatalog',
+                             refObjLoader=refObjLoader,
+                             refCatName=self.config.connections.refCat)
         else:
             lutHandle = None
 

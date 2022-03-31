@@ -81,7 +81,6 @@ class FgcmCalibrateTractConfigBase(pexConfig.Config):
         self.fgcmFitCycle.quietMode = True
         self.fgcmFitCycle.doPlots = False
         self.fgcmOutputProducts.doReferenceCalibration = False
-        self.fgcmOutputProducts.doRefcatOutput = False
         self.fgcmOutputProducts.cycleNumber = 0
         self.fgcmOutputProducts.photoCal.applyColorTerms = False
 
@@ -187,7 +186,8 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
         if self.fgcmBuildStars.config.doReferenceMatches:
             lutHandle = handleDict['fgcmLookUpTable']
             self.fgcmBuildStars.makeSubtask("fgcmLoadReferenceCatalog",
-                                            refObjLoader=buildStarsRefObjLoader)
+                                            refObjLoader=buildStarsRefObjLoader,
+                                            refCatName=self.fgcmBuildStars.config.connections.refCat)
         else:
             lutHandle = None
 

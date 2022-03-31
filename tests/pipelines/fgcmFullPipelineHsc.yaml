@@ -10,5 +10,3 @@ tasks:
       multipleCyclesFinalCycleNumber: 2
   fgcmOutputProducts:
     class: lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask
-    config:
-      doRefcatOutput: false

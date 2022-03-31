@@ -44,7 +44,7 @@ import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 from lsst.afw.image import TransmissionCurve
 from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask
-from lsst.meas.algorithms import ReferenceObjectLoader
+from lsst.meas.algorithms import ReferenceObjectLoader, LoadReferenceObjectsConfig
 from lsst.pipe.tasks.photoCal import PhotoCalTask
 import lsst.geom
 import lsst.afw.image as afwImage
@@ -156,8 +156,6 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
 
         if str(int(config.connections.cycleNumber)) != config.connections.cycleNumber:
             raise ValueError("cycleNumber must be of integer format")
-        if config.connections.refCat != config.refObjLoader.ref_dataset_name:
-            raise ValueError("connections.refCat must be the same as refObjLoader.ref_dataset_name")
 
         if not config.doReferenceCalibration:
             self.prerequisiteInputs.remove("refCat")
@@ -222,6 +220,7 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
     refObjLoader = pexConfig.ConfigurableField(
         target=LoadIndexedReferenceObjectsTask,
         doc="reference object loader for 'absolute' photometric calibration",
+        deprecated="refObjLoader is deprecated, and will be removed after v24",
     )
     photoCal = pexConfig.ConfigurableField(
         target=PhotoCalTask,
@@ -281,8 +280,6 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
         self.photoCal.match.sourceSelection.flags.good = []
         self.photoCal.match.sourceSelection.flags.bad = ['flag_badStar']
         self.photoCal.match.sourceSelection.doUnresolved = False
-        self.datasetConfig.ref_dataset_name = 'fgcm_stars'
-        self.datasetConfig.format_version = 1
 
     def validate(self):
         super().validate()
@@ -320,12 +317,12 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
                           atmRef in outputRefs.fgcmTransmissionAtmosphere}
 
         if self.config.doReferenceCalibration:
-            refConfig = self.config.refObjLoader
+            refConfig = LoadReferenceObjectsConfig()
             self.refObjLoader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
                                                                for ref in inputRefs.refCat],
                                                       refCats=butlerQC.get(inputRefs.refCat),
-                                                      config=refConfig,
-                                                      log=self.log)
+                                                      log=self.log,
+                                                      config=refConfig)
         else:
             self.refObjLoader = None
 

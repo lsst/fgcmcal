@@ -38,7 +38,6 @@ from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask, ReferenceSourc
 from lsst.meas.algorithms import getRefFluxField
 from lsst.pipe.tasks.colorterms import ColortermLibrary
 from lsst.afw.image import abMagErrFromFluxErr
-from lsst.meas.algorithms import ReferenceObjectLoader
 
 import lsst.geom
 
@@ -51,6 +50,7 @@ class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
     refObjLoader = pexConfig.ConfigurableField(
         target=LoadIndexedReferenceObjectsTask,
         doc="Reference object loader for photometry",
+        deprecated="refObjLoader is deprecated, and will be removed after v24.",
     )
     filterMap = pexConfig.DictField(
         doc="Mapping from physicalFilter label to reference filter name.",
@@ -91,15 +91,21 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
     ----------
     refObjLoader : `lsst.meas.algorithms.ReferenceObjectLoader`
         Reference object loader.
+    refCatName : `str`
+        Name of reference catalog (for color term lookups).
     """
     ConfigClass = FgcmLoadReferenceCatalogConfig
     _DefaultName = 'fgcmLoadReferenceCatalog'
 
-    def __init__(self, refObjLoader=None, **kwargs):
+    def __init__(self, refObjLoader=None, refCatName=None, **kwargs):
         """Construct an FgcmLoadReferenceCatalogTask
         """
         pipeBase.Task.__init__(self, **kwargs)
         self.refObjLoader = refObjLoader
+        self.refCatName = refCatName
+
+        if refObjLoader is None or refCatName is None:
+            raise RuntimeError("FgcmLoadReferenceCatalogTask requires a refObjLoader and refCatName.")
 
         self.makeSubtask('referenceSelector')
         self._fluxFilters = None
@@ -234,20 +240,13 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         fgcmRefCat['refMagErr'][:, :] = 99.0
 
         if self.config.applyColorTerms:
-            if isinstance(self.refObjLoader, ReferenceObjectLoader):
-                # Gen3
-                refCatName = self.refObjLoader.config.value.ref_dataset_name
-            else:
-                # Gen2
-                refCatName = self.refObjLoader.ref_dataset_name
-
             for i, (filterName, fluxField) in enumerate(zip(self._fluxFilters, self._fluxFields)):
                 if fluxField is None:
                     continue
 
                 self.log.debug("Applying color terms for filtername=%r" % (filterName))
 
-                colorterm = self.config.colorterms.getColorterm(filterName, refCatName, doRaise=True)
+                colorterm = self.config.colorterms.getColorterm(filterName, self.refCatName, doRaise=True)
 
                 refMag, refMagErr = colorterm.getCorrectedMagnitudes(refCat)
 

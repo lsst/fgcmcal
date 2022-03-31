@@ -33,7 +33,7 @@ import tempfile
 
 import lsst.utils
 import lsst.pipe.tasks
-from lsst.meas.algorithms import ReferenceObjectLoader
+from lsst.meas.algorithms import ReferenceObjectLoader, LoadReferenceObjectsConfig
 
 import lsst.fgcmcal as fgcmcal
 
@@ -71,7 +71,6 @@ class FgcmLoadReferenceTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests
 
         config = fgcmcal.FgcmLoadReferenceCatalogConfig()
         config.applyColorTerms = True
-        config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
         config.filterMap = {'HSC-R': 'r', 'HSC-I': 'i'}
         config.colorterms.data = {}
         config.colorterms.data['ps1*'] = lsst.pipe.tasks.colorterms.ColortermDict()
@@ -89,15 +88,22 @@ class FgcmLoadReferenceTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests
         config.colorterms.data['ps1*'].data['HSC-I'].c1 = -0.130078
         config.colorterms.data['ps1*'].data['HSC-I'].c2 = -0.006855
 
+        refCatName = 'ps1_pv3_3pi_20170110'
+
         butler = lsst.daf.butler.Butler(self.repo, instrument='HSC', collections=['HSC/testdata',
                                                                                   'refcats/gen2'])
-        refs = set(butler.registry.queryDatasets(config.refObjLoader.ref_dataset_name))
+        refs = set(butler.registry.queryDatasets(refCatName))
         dataIds = [butler.registry.expandDataId(ref.dataId) for ref in refs]
         refCats = [butler.getDirectDeferred(ref) for ref in refs]
 
-        refObjLoader = ReferenceObjectLoader(dataIds=dataIds, refCats=refCats, config=config.refObjLoader)
+        refConfig = LoadReferenceObjectsConfig()
+        refConfig.filterMap = config.filterMap
 
-        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(refObjLoader=refObjLoader, config=config)
+        refObjLoader = ReferenceObjectLoader(dataIds=dataIds, refCats=refCats, config=refConfig)
+
+        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(refObjLoader=refObjLoader,
+                                                       refCatName=refCatName,
+                                                       config=config)
 
         ra = 337.656174
         dec = 0.823595
@@ -138,7 +144,6 @@ class FgcmLoadReferenceTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests
 
         config = fgcmcal.FgcmLoadReferenceCatalogConfig()
         config.applyColorTerms = True
-        config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
         config.filterMap = {'HSC-R2': 'r', 'HSC-I2': 'i'}
         config.colorterms.data = {}
         config.colorterms.data['ps1*'] = lsst.pipe.tasks.colorterms.ColortermDict()
@@ -156,15 +161,22 @@ class FgcmLoadReferenceTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests
         config.colorterms.data['ps1*'].data['HSC-I2'].c1 = -0.200406
         config.colorterms.data['ps1*'].data['HSC-I2'].c2 = -0.013666
 
+        refCatName = 'ps1_pv3_3pi_20170110'
+
         butler = lsst.daf.butler.Butler(self.repo, instrument='HSC', collections=['HSC/testdata',
                                                                                   'refcats/gen2'])
-        refs = set(butler.registry.queryDatasets(config.refObjLoader.ref_dataset_name))
+        refs = set(butler.registry.queryDatasets(refCatName))
         dataIds = [butler.registry.expandDataId(ref.dataId) for ref in refs]
         refCats = [butler.getDirectDeferred(ref) for ref in refs]
 
-        refObjLoader = ReferenceObjectLoader(dataIds=dataIds, refCats=refCats, config=config.refObjLoader)
+        refConfig = LoadReferenceObjectsConfig()
+        refConfig.filterMap = config.filterMap
 
-        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(refObjLoader=refObjLoader, config=config)
+        refObjLoader = ReferenceObjectLoader(dataIds=dataIds, refCats=refCats, config=refConfig)
+
+        loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(refObjLoader=refObjLoader,
+                                                       refCatName=refCatName,
+                                                       config=config)
 
         ra = 337.656174
         dec = 0.823595
