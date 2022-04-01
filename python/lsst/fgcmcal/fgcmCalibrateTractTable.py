@@ -26,12 +26,11 @@ import numpy as np
 
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
-from lsst.meas.algorithms import ReferenceObjectLoader
+from lsst.meas.algorithms import ReferenceObjectLoader, LoadReferenceObjectsConfig
 import lsst.afw.table as afwTable
 
-from .dataIds import TractCheckDataIdContainer
 from .fgcmBuildStarsTable import FgcmBuildStarsTableTask
-from .fgcmCalibrateTractBase import (FgcmCalibrateTractConfigBase, FgcmCalibrateTractRunner,
+from .fgcmCalibrateTractBase import (FgcmCalibrateTractConfigBase,
                                      FgcmCalibrateTractBaseTask)
 from .utilities import lookupStaticCalibrations
 
@@ -142,8 +141,6 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         if not config.fgcmBuildStars.doModelErrorsWithBackground:
             self.inputs.remove("background")
 
-        if config.fgcmOutputProducts.doRefcatOutput:
-            raise ValueError("FgcmCalibrateTractTableTask (Gen3) does not support doRefcatOutput")
         if not config.fgcmOutputProducts.doAtmosphereOutput:
             self.prerequisiteInputs.remove("fgcmAtmosphereParameters")
         if not config.fgcmOutputProducts.doZeropointOutput:
@@ -169,7 +166,6 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
     input catalogs.
     """
     ConfigClass = FgcmCalibrateTractTableConfig
-    RunnerClass = FgcmCalibrateTractRunner
     _DefaultName = "fgcmCalibrateTractTable"
 
     canMultiprocess = False
@@ -180,39 +176,40 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
             self.sourceSchema = initInputs["sourceSchema"].schema
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
-        dataRefDict = butlerQC.get(inputRefs)
+        handleDict = butlerQC.get(inputRefs)
 
-        self.log.info("Running with %d sourceTable_visit dataRefs", (len(dataRefDict['source_catalogs'])))
+        self.log.info("Running with %d sourceTable_visit handles", (len(handleDict['source_catalogs'])))
 
         # Run the build stars tasks
         tract = butlerQC.quantum.dataId['tract']
 
-        dataRefDict['sourceSchema'] = self.sourceSchema
+        handleDict['sourceSchema'] = self.sourceSchema
 
-        sourceTableRefs = dataRefDict['source_catalogs']
-        sourceTableDataRefDict = {sourceTableRef.dataId['visit']: sourceTableRef for
-                                  sourceTableRef in sourceTableRefs}
+        sourceTableHandles = handleDict['source_catalogs']
+        sourceTableHandleDict = {sourceTableHandle.dataId['visit']: sourceTableHandle for
+                                 sourceTableHandle in sourceTableHandles}
 
-        visitSummaryRefs = dataRefDict['visitSummary']
-        visitSummaryDataRefDict = {visitSummaryRef.dataId['visit']: visitSummaryRef for
-                                   visitSummaryRef in visitSummaryRefs}
+        visitSummaryHandles = handleDict['visitSummary']
+        visitSummaryHandleDict = {visitSummaryHandle.dataId['visit']: visitSummaryHandle for
+                                  visitSummaryHandle in visitSummaryHandles}
 
-        dataRefDict['sourceTableDataRefDict'] = sourceTableDataRefDict
-        dataRefDict['visitSummaryDataRefDict'] = visitSummaryDataRefDict
+        handleDict['sourceTableHandleDict'] = sourceTableHandleDict
+        handleDict['visitSummaryHandleDict'] = visitSummaryHandleDict
 
         # And the outputs
         if self.config.fgcmOutputProducts.doZeropointOutput:
             photoCalibRefDict = {photoCalibRef.dataId.byName()['visit']:
                                  photoCalibRef for photoCalibRef in outputRefs.fgcmPhotoCalib}
-            dataRefDict['fgcmPhotoCalibs'] = photoCalibRefDict
+            handleDict['fgcmPhotoCalibs'] = photoCalibRefDict
 
         if self.config.fgcmOutputProducts.doAtmosphereOutput:
             atmRefDict = {atmRef.dataId.byName()['visit']: atmRef for
                           atmRef in outputRefs.fgcmTransmissionAtmosphere}
-            dataRefDict['fgcmTransmissionAtmospheres'] = atmRefDict
+            handleDict['fgcmTransmissionAtmospheres'] = atmRefDict
 
         if self.config.fgcmBuildStars.doReferenceMatches:
-            refConfig = self.config.fgcmBuildStars.fgcmLoadReferenceCatalog.refObjLoader
+            refConfig = LoadReferenceObjectsConfig()
+            refConfig.filterMap = self.config.fgcmBuildStars.fgcmLoadReferenceCatalog.filterMap
             loader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
                                                     for ref in inputRefs.refCat],
                                            refCats=butlerQC.get(inputRefs.refCat),
@@ -231,7 +228,7 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
                                            log=self.log)
             self.fgcmOutputProducts.refObjLoader = loader
 
-        struct = self.run(dataRefDict, tract,
+        struct = self.run(handleDict, tract,
                           buildStarsRefObjLoader=buildStarsRefObjLoader)
 
         if struct.photoCalibCatalogs is not None:
@@ -257,12 +254,3 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
         butlerQC.put(repeatabilityCat, outputRefs.fgcmRepeatability)
 
         return
-
-    @classmethod
-    def _makeArgumentParser(cls):
-        parser = pipeBase.ArgumentParser(name=cls._DefaultName)
-        parser.add_id_argument("--id", "sourceTable_visit",
-                               help="Data ID, e.g. --id visit=6789 tract=9617",
-                               ContainerClass=TractCheckDataIdContainer)
-
-        return parser

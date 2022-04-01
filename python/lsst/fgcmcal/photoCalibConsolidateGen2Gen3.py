@@ -70,9 +70,6 @@ class PhotoCalibConsolidateGen2Gen3Task(pipeBase.PipelineTask):
     def __init__(self, butler=None, **kwargs):
         super().__init__(**kwargs)
 
-    def _getMetadataName(self):
-        return None
-
     @utils.inheritDoc(pipeBase.PipelineTask)
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         visit = butlerQC.quantum.dataId['visit']
@@ -134,9 +131,6 @@ class SkyWcsConsolidateGen2Gen3Task(pipeBase.PipelineTask):
 
     def __init__(self, butler=None, **kwargs):
         super().__init__(**kwargs)
-
-    def _getMetadataName(self):
-        return None
 
     @utils.inheritDoc(pipeBase.PipelineTask)
     def runQuantum(self, butlerQC, inputRefs, outputRefs):

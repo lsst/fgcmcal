@@ -23,41 +23,43 @@
 
 import unittest
 import os
+import tempfile
 
+import lsst.daf.butler
 import lsst.utils
-import lsst.daf.persistence as dafPersist
 
-from lsst.fgcmcal.utilities import computeApertureRadiusFromDataRef, computeApertureRadiusFromName
+from lsst.fgcmcal.utilities import computeApertureRadiusFromName
+
+import fgcmcalTestBase
 
 
-class FgcmApertureTest(lsst.utils.tests.TestCase):
+ROOT = os.path.abspath(os.path.dirname(__file__))
+
+
+class FgcmApertureTestHsc(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase):
     @classmethod
     def setUpClass(cls):
         try:
             cls.dataDir = lsst.utils.getPackageDir('testdata_jointcal')
         except LookupError:
             raise unittest.SkipTest("testdata_jointcal not setup")
+        try:
+            lsst.utils.getPackageDir('obs_subaru')
+        except LookupError:
+            raise unittest.SkipTest("obs_subaru not setup")
 
-    def test_fgcmApertureHsc(self):
+        lsst.daf.butler.cli.cliLog.CliLog.initLog(longlog=False)
+
+        cls.testDir = tempfile.mkdtemp(dir=ROOT, prefix="TestFgcm-")
+
+        cls._importRepository('lsst.obs.subaru.HyperSuprimeCam',
+                              os.path.join(cls.dataDir, 'hsc/repo'),
+                              os.path.join(cls.dataDir, 'hsc', 'exports.yaml'))
+
+    def test_fgcmAperture(self):
         """
         Test computeApertureRadius for HSC.
         """
-        lsst.log.setLevel("HscMapper", lsst.log.FATAL)
-
-        butler = dafPersist.Butler(os.path.join(self.dataDir, 'hsc/repo'))
-
-        dataRef = butler.dataRef('src', visit=34648, ccd=51)
-
-        self.assertRaises(RuntimeError, computeApertureRadiusFromDataRef, dataRef, 'base_PsfFlux_instFlux')
-        self.assertRaises(RuntimeError, computeApertureRadiusFromDataRef, dataRef, 'not_a_field')
-        self.assertEqual(computeApertureRadiusFromDataRef(dataRef, 'slot_CalibFlux_instFlux'), 12.0)
-        self.assertEqual(computeApertureRadiusFromDataRef(dataRef,
-                                                          'base_CircularApertureFlux_12_0_instFlux'),
-                         12.0)
-        self.assertEqual(computeApertureRadiusFromDataRef(dataRef,
-                                                          'base_CircularApertureFlux_4_5_instFlux'),
-                         4.5)
-
         self.assertEqual(computeApertureRadiusFromName('ApFlux_12_0_instFlux'), 12.0)
         self.assertEqual(computeApertureRadiusFromName('ApFlux_4_5_instFlux'), 4.5)
         self.assertEqual(computeApertureRadiusFromName('apFlux_12_0_instFlux'), 12.0)

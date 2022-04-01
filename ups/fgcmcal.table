@@ -8,15 +8,13 @@
 
 setupRequired(sconsUtils)
 setupRequired(afw)
-setupRequired(daf_persistence)
 setupRequired(daf_butler)
 setupRequired(obs_base)
 setupRequired(pipe_base)
 setupRequired(pex_config)
 setupRequired(pipe_tasks)
+setupRequired(ctrl_mpexec)
 setupRequired(fgcm)
-# uses jointcal's PerTractCcdDataIdContainer to bundle visits in a tract in gen2
-setupRequired(jointcal)
 
 # data files for the unittests, and the obs package for that data
 setupOptional(testdata_jointcal)

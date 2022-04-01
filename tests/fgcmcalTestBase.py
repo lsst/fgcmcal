@@ -242,8 +242,6 @@ class FgcmcalTestBase(object):
                           inputCollections=[f'{instName}/{testName}/lut',
                                             'refcats/gen2'],
                           outputCollection=outputCollection,
-                          configOptions={'fgcmBuildStarsTable':
-                                         {'ccdDataRefName': 'detector'}},
                           queryString=queryString,
                           registerDatasetTypes=True)
 
@@ -409,8 +407,6 @@ class FgcmcalTestBase(object):
                           configFiles=configFiles,
                           inputCollections=[inputCollection],
                           outputCollection=outputCollection,
-                          configOptions={'fgcmOutputProducts':
-                                         {'doRefcatOutput': 'False'}},
                           registerDatasetTypes=True)
 
         butler = dafButler.Butler(self.repo)
@@ -618,8 +614,6 @@ class FgcmcalTestBase(object):
                           inputCollections=[f'{instName}/{testName}/lut',
                                             'refcats/gen2'],
                           outputCollection=outputCollection,
-                          configOptions={'fgcmBuildStarsTable':
-                                         {'ccdDataRefName': 'detector'}},
                           queryString=queryString,
                           registerDatasetTypes=True)
 
@@ -632,7 +626,7 @@ class FgcmcalTestBase(object):
         offsets = offsetCat['offset'][:]
         self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-6)
 
-    def _getMatchedVisitCat(self, butler, srcRefs, photoCals,
+    def _getMatchedVisitCat(self, butler, srcHandles, photoCals,
                             rawStars, bandIndex, offsets):
         """
         Get a list of matched magnitudes and deltas from calibrated src catalogs.
@@ -640,12 +634,10 @@ class FgcmcalTestBase(object):
         Parameters
         ----------
         butler : `lsst.daf.butler.Butler`
-        srcRefs : `list`
-           dataRefs of source catalogs
-        photoCalibRefs : `list`
-           dataRefs of photoCalib files, matched to srcRefs.
+        srcHandles : `list`
+           handles of source catalogs
         photoCals : `list`
-           photoCalib objects, matched to srcRefs.
+           photoCalib objects, matched to srcHandles.
         rawStars : `lsst.afw.table.SourceCatalog`
            Fgcm standard stars
         bandIndex : `int`
@@ -664,9 +656,8 @@ class FgcmcalTestBase(object):
                                      np.rad2deg(rawStars['coord_dec']))
 
         matchDelta = None
-        # for dataRef in dataRefs:
-        for srcRef, photoCal in zip(srcRefs, photoCals):
-            src = butler.getDirect(srcRef)
+        for srcHandle, photoCal in zip(srcHandles, photoCals):
+            src = butler.getDirect(srcHandle)
             src = photoCal.calibrateCatalog(src)
 
             gdSrc, = np.where(np.nan_to_num(src['slot_CalibFlux_flux']) > 0.0)
@@ -721,8 +712,6 @@ class FgcmcalTestBase(object):
 
         inputCollections = [f'{instName}/{testName}/lut',
                             'refcats/gen2']
-        configOptions = {'fgcmCalibrateTractTable':
-                         {'fgcmOutputProducts.doRefcatOutput': 'False'}}
 
         queryString = f"tract={tract:d} and skymap='{skymapName:s}'"
 
@@ -734,7 +723,6 @@ class FgcmcalTestBase(object):
                           configFiles=configFiles,
                           inputCollections=inputCollections,
                           outputCollection=outputCollection,
-                          configOptions=configOptions,
                           registerDatasetTypes=True)
 
         butler = dafButler.Butler(self.repo)
