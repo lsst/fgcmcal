@@ -568,7 +568,7 @@ def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
 
     zptSchema = afwTable.Schema()
 
-    zptSchema.addField('visit', type=np.int32, doc='Visit number')
+    zptSchema.addField('visit', type=np.int64, doc='Visit number')
     zptSchema.addField('detector', type=np.int32, doc='Detector ID number')
     zptSchema.addField('fgcmFlag', type=np.int32, doc=('FGCM flag value: '
                                                        '1: Photometric, used in fit; '

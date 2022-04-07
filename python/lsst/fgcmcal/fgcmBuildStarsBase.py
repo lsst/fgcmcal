@@ -392,7 +392,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
 
         # and add the fields we want
         sourceMapper.editOutputSchema().addField(
-            "visit", type=np.int32, doc="Visit number")
+            "visit", type=np.int64, doc="Visit number")
         sourceMapper.editOutputSchema().addField(
             "ccd", type=np.int32, doc="CCD number")
         sourceMapper.editOutputSchema().addField(
@@ -569,7 +569,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         """
 
         schema = afwTable.Schema()
-        schema.addField('visit', type=np.int32, doc="Visit number")
+        schema.addField('visit', type=np.int64, doc="Visit number")
         schema.addField('physicalFilter', type=str, size=30, doc="Physical filter")
         schema.addField('telra', type=np.float64, doc="Pointing RA (deg)")
         schema.addField('teldec', type=np.float64, doc="Pointing Dec (deg)")
