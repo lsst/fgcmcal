@@ -879,7 +879,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
                 else:
                     # We need to create a new schema
                     zptExpCatSchema = afwTable.ExposureTable.makeMinimalSchema()
-                    zptExpCatSchema.addField('visit', type='I', doc='Visit number')
+                    zptExpCatSchema.addField('visit', type='L', doc='Visit number')
 
                 # And start a new one
                 zptVisitCatalog = afwTable.ExposureCatalog(zptExpCatSchema)

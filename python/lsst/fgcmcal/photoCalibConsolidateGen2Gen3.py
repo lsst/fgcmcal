@@ -75,7 +75,7 @@ class PhotoCalibConsolidateGen2Gen3Task(pipeBase.PipelineTask):
         visit = butlerQC.quantum.dataId['visit']
 
         schema = afwTable.ExposureTable.makeMinimalSchema()
-        schema.addField('visit', type='I', doc='visit number')
+        schema.addField('visit', type='L', doc='visit number')
 
         metadata = dafBase.PropertyList()
         metadata.add("COMMENT", "Catalog id is detector id, sorted")
@@ -137,7 +137,7 @@ class SkyWcsConsolidateGen2Gen3Task(pipeBase.PipelineTask):
         visit = butlerQC.quantum.dataId['visit']
 
         schema = afwTable.ExposureTable.makeMinimalSchema()
-        schema.addField('visit', type='I', doc='visit number')
+        schema.addField('visit', type='L', doc='visit number')
 
         metadata = dafBase.PropertyList()
         metadata.add("COMMENT", "Catalog id is detector id, sorted")
