@@ -51,6 +51,8 @@ config.sedterms.data['i'] = fgcmcal.Sedterm(primaryTerm='ri', secondaryTerm=None
                                             extrapolated=False, constant=0.75)
 # Define good stars with an r-i color cut.
 config.starColorCuts = ('r,i,-0.50,2.25',)
+config.refStarColorCuts = ('r, i, 0.0, 2.0',)
+config.useExposureReferenceOffset = True
 config.precomputeSuperStarInitialCycle = False
 config.superStarSubCcdDict = {'g': True,
                               'r': True,
