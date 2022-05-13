@@ -97,7 +97,7 @@ class FgcmChebyshevTest(lsst.utils.tests.TestCase):
         field = afwMath.ChebyshevBoundedField(bbox, self.pars)
         fieldValues = field.evaluate(xPos, yPos)
 
-        self.assertFloatsAlmostEqual(fieldValues, fgcmValues, rtol=5e-15)
+        self.assertFloatsAlmostEqual(fieldValues, fgcmValues, rtol=1e-14)
 
     def test_chebyshev_fit(self, seed=1000):
         """
@@ -138,7 +138,7 @@ class FgcmChebyshevTest(lsst.utils.tests.TestCase):
         # The tolerance here must be looser than the application, I believe
         # because of rounding errors in the fit implementations.  But the
         # good news is that a tolerance of 1e-9 in parameters in these
-        # tests yields a recovered tolerance of < 5e-15.
+        # tests yields a recovered tolerance of < 1e-14.
         self.assertFloatsAlmostEqual(fgcmField.pars, field.getCoefficients(),
                                      rtol=1e-9)
 
@@ -146,8 +146,8 @@ class FgcmChebyshevTest(lsst.utils.tests.TestCase):
         fgcmValues2 = fgcmField.evaluate(xPos, yPos)
         fieldValues2 = field.evaluate(xPos, yPos)
 
-        self.assertFloatsAlmostEqual(fgcmValues, fgcmValues2, rtol=5e-15)
-        self.assertFloatsAlmostEqual(fgcmValues2, fieldValues2, rtol=5e-15)
+        self.assertFloatsAlmostEqual(fgcmValues, fgcmValues2, rtol=1e-14)
+        self.assertFloatsAlmostEqual(fgcmValues2, fieldValues2, rtol=1e-14)
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
