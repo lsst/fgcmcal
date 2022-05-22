@@ -83,8 +83,20 @@ def makeConfigDict(config, log, camera, maxIter,
     # process the starColorCuts
     starColorCutList = []
     for ccut in config.starColorCuts:
+        if ccut == 'NO_DATA':
+            # No color cuts to apply.
+            break
         parts = ccut.split(',')
         starColorCutList.append([parts[0], parts[1], float(parts[2]), float(parts[3])])
+
+    # process the refStarColorCuts
+    refStarColorCutList = []
+    for ccut in config.refStarColorCuts:
+        if ccut == 'NO_DATA':
+            # No color cuts to apply.
+            break
+        parts = ccut.split(',')
+        refStarColorCutList.append([parts[0], parts[1], float(parts[2]), float(parts[3])])
 
     # TODO: Having direct access to the mirror area from the camera would be
     #  useful.  See DM-16489.
@@ -169,8 +181,10 @@ def makeConfigDict(config, log, camera, maxIter,
                   'refStarSnMin': config.refStarSnMin,
                   'refStarOutlierNSig': config.refStarOutlierNSig,
                   'applyRefStarColorCuts': config.applyRefStarColorCuts,
+                  'useExposureReferenceOffset': config.useExposureReferenceOffset,
                   'illegalValue': FGCM_ILLEGAL_VALUE,  # internally used by fgcm.
                   'starColorCuts': starColorCutList,
+                  'refStarColorCuts': refStarColorCutList,
                   'aperCorrFitNBins': config.aperCorrFitNBins,
                   'aperCorrInputSlopeDict': dict(config.aperCorrInputSlopeDict),
                   'sedBoundaryTermDict': config.sedboundaryterms.toDict()['data'],

@@ -329,9 +329,16 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         default=4.0,
     )
     applyRefStarColorCuts = pexConfig.Field(
-        doc="Apply color cuts to reference stars?",
+        doc=("Apply color cuts defined in ``starColorCuts`` to reference stars? "
+             "These cuts are in addition to any cuts defined in ``refStarColorCuts``"),
         dtype=bool,
         default=True,
+    )
+    useExposureReferenceOffset = pexConfig.Field(
+        doc=("Use per-exposure (visit) offsets between calibrated stars and reference stars "
+             "for final zeropoints? This may help uniformity for disjoint surveys."),
+        dtype=bool,
+        default=False,
     )
     nCore = pexConfig.Field(
         doc="Number of cores to use",
@@ -659,7 +666,18 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         default=None,
     )
     starColorCuts = pexConfig.ListField(
-        doc="Encoded star-color cuts (to be cleaned up)",
+        doc=("Encoded star-color cuts (using calibration star colors). "
+             "This is a list with each entry a string of the format "
+             "``band1,band2,low,high`` such that only stars of color "
+             "low < band1 - band2 < high will be used for calibration."),
+        dtype=str,
+        default=("NO_DATA",),
+    )
+    refStarColorCuts = pexConfig.ListField(
+        doc=("Encoded star color cuts specifically to apply to reference stars. "
+             "This is a list with each entry a string of the format "
+             "``band1,band2,low,high`` such that only stars of color "
+             "low < band1 - band2 < high will be used as reference stars."),
         dtype=str,
         default=("NO_DATA",),
     )
@@ -1295,6 +1313,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                                        (parCat['compExpDeltaMagBkg'].size, )),
                                       ('COMPNGOODSTARPEREXP', 'i4',
                                        (parCat['compNGoodStarPerExp'].size, )),
+                                      ('COMPEXPREFOFFSET', 'f8',
+                                       (parCat['compExpRefOffset'].size, )),
                                       ('COMPSIGFGCM', 'f8',
                                        (parCat['compSigFgcm'].size, )),
                                       ('COMPSIGMACAL', 'f8',
@@ -1354,6 +1374,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         inParams['COMPVARGRAY'][:] = parCat['compVarGray'][0, :]
         inParams['COMPEXPDELTAMAGBKG'][:] = parCat['compExpDeltaMagBkg'][0, :]
         inParams['COMPNGOODSTARPEREXP'][:] = parCat['compNGoodStarPerExp'][0, :]
+        inParams['COMPEXPREFOFFSET'][:] = parCat['compExpRefOffset'][0, :]
         inParams['COMPSIGFGCM'][:] = parCat['compSigFgcm'][0, :]
         inParams['COMPSIGMACAL'][:] = parCat['compSigmaCal'][0, :]
         inParams['COMPRETRIEVEDLNPWV'][:] = parCat['compRetrievedLnPwv'][0, :]
@@ -1563,6 +1584,9 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         parSchema.addField('compNGoodStarPerExp', type='ArrayI',
                            doc='Computed number of good stars per exposure',
                            size=pars['COMPNGOODSTARPEREXP'].size)
+        parSchema.addField('compExpRefOffset', type='ArrayD',
+                           doc='Computed per-visit median offset between standard stars and ref stars.',
+                           size=pars['COMPEXPREFOFFSET'].size)
         parSchema.addField('compSigFgcm', type='ArrayD', doc='Computed sigma_fgcm (intrinsic repeatability)',
                            size=pars['COMPSIGFGCM'].size)
         parSchema.addField('compSigmaCal', type='ArrayD', doc='Computed sigma_cal (systematic error floor)',
@@ -1662,7 +1686,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                     'compRetrievedLnPwv', 'compRetrievedLnPwvRaw', 'compRetrievedLnPwvFlag',
                     'compRetrievedTauNight', 'compEpsilon', 'compMedDeltaAper',
                     'compGlobalEpsilon', 'compEpsilonMap', 'compEpsilonNStarMap',
-                    'compEpsilonCcdMap', 'compEpsilonCcdNStarMap']
+                    'compEpsilonCcdMap', 'compEpsilonCcdNStarMap', 'compExpRefOffset']
 
         for scalarName in scalarNames:
             rec[scalarName] = pars[scalarName.upper()]
