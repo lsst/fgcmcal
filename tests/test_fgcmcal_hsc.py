@@ -92,7 +92,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nOkZp = 27
         nBadZp = 1093
         nStdStars = 235
-        nPlots = 43
+        nPlots = 48
 
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -100,17 +100,19 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                                1, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
 
         # We need to create an extra config file to turn on "sub-ccd gray" for testing.
+        # We also want to exercise the code path setting useExposureReferenceOffset = False.
         extraConfigFile = os.path.join(self.testDir, "cycle03_patch_config.py")
         with open(extraConfigFile, "w") as f:
             f.write("config.isFinalCycle = True\n")
             f.write("config.ccdGraySubCcdDict = {'g': True, 'r': True, 'i': True}\n")
+            f.write("config.useExposureReferenceOffset = False")
 
         self._testFgcmFitCycle(instName, testName,
                                2, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
                                extraConfig=extraConfigFile)
 
-        zpOffsets = np.array([-0.0008161436999216676,
-                              0.006149172317236662])
+        zpOffsets = np.array([-0.0008051003096625209,
+                              0.0072303167544305325])
 
         self._testFgcmOutputProducts(instName, testName,
                                      zpOffsets, 36236, 87, 'i', 1)
@@ -135,8 +137,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # These are slightly different from above due to the configuration change
         # mid-way in the separate fits.
-        zpOffsets = np.array([-0.0007102462113834918,
-                              0.005907602142542601])
+        zpOffsets = np.array([-0.0006988655077293515,
+                              0.004102597013115883])
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I')",
@@ -159,8 +161,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         rawRepeatability = np.array([0.0,
-                                     0.004436014222072738,
-                                     0.00451764656339253])
+                                     0.0025195920941720683,
+                                     0.004095912225403857])
         filterNCalibMap = {'HSC-R': 12,
                            'HSC-I': 15}
 
