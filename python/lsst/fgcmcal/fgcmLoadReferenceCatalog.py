@@ -29,7 +29,7 @@ the task can be called by third-party code.
 """
 
 import numpy as np
-import healpy as hp
+import hpgeom as hpg
 from astropy import units
 
 import lsst.pex.config as pexConfig
@@ -143,11 +143,10 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
         """
 
         # Determine the size of the sky circle to load
-        theta, phi = hp.pix2ang(nside, pixel, nest=nest)
-        center = lsst.geom.SpherePoint(phi * lsst.geom.radians, (np.pi/2. - theta) * lsst.geom.radians)
+        lon, lat = hpg.pixel_to_angle(nside, pixel, nest=nest, degrees=False)
+        center = lsst.geom.SpherePoint(lon * lsst.geom.degrees, lat * lsst.geom.radians)
 
-        corners = hp.boundaries(nside, pixel, step=1, nest=nest)
-        theta_phi = hp.vec2ang(np.transpose(corners))
+        theta_phi = hpg.boundaries(nside, pixel, step=1, nest=nest, lonlat=False)
 
         radius = 0.0 * lsst.geom.radians
         for ctheta, cphi in zip(*theta_phi):
@@ -161,8 +160,7 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
                                                          center.getDec().asDegrees(),
                                                          radius.asDegrees(),
                                                          filterList)
-        catPix = hp.ang2pix(nside, np.radians(90.0 - fgcmRefCat['dec']),
-                            np.radians(fgcmRefCat['ra']), nest=nest)
+        catPix = hpg.angle_to_pixel(nside, fgcmRefCat['ra'], fgcmRefCat['dec'], nest=nest)
 
         inPix, = np.where(catPix == pixel)
 
