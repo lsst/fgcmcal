@@ -34,7 +34,7 @@ offset per band.
 import copy
 
 import numpy as np
-import healpy as hp
+import hpgeom as hpg
 import esutil
 from astropy import units
 
@@ -582,10 +582,12 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
         # Note that there is an assumption here that the ra/dec coords stored
         # on-disk are in radians, and therefore that starObs['coord_ra'] /
         # starObs['coord_dec'] return radians when used as an array of numpy float64s.
-        theta = np.pi/2. - stdCat['coord_dec']
-        phi = stdCat['coord_ra']
-
-        ipring = hp.ang2pix(self.config.referencePixelizationNside, theta, phi)
+        ipring = hpg.angle_to_pixel(
+            self.config.referencePixelizationNside,
+            stdCat['coord_ra'],
+            stdCat['coord_dec'],
+            degrees=False,
+        )
         h, rev = esutil.stat.histogram(ipring, rev=True)
 
         gdpix, = np.where(h >= self.config.referencePixelizationMinStars)
@@ -685,7 +687,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
             rec.set(badStarKey, True)
 
         exposure = afwImage.ExposureF()
-        exposure.setFilterLabel(filterLabel)
+        exposure.setFilter(filterLabel)
 
         if refFluxFields[b_index] is None:
             # Need to find the flux field in the reference catalog

@@ -27,7 +27,7 @@
 import unittest
 import os
 import numpy as np
-import healpy as hp
+import hpgeom as hpg
 import esutil
 import tempfile
 
@@ -131,7 +131,7 @@ class FgcmLoadReferenceTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests
 
         refCat = loadCat.getFgcmReferenceStarsHealpix(nside, pixel, filterList)
 
-        ipring = hp.ang2pix(nside, np.radians(90.0 - refCat['dec']), np.radians(refCat['ra']))
+        ipring = hpg.angle_to_pixel(nside, refCat['ra'], refCat['dec'], nest=False)
         self.assertEqual(pixel, np.max(ipring))
         self.assertEqual(pixel, np.min(ipring))
 
