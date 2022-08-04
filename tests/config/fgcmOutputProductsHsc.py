@@ -4,7 +4,7 @@
 import os.path
 
 
-config.cycleNumber = 2
+config.connections.cycleNumber = 2
 
 config.doReferenceCalibration = True
 
