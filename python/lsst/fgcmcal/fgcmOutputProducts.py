@@ -174,7 +174,9 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
     cycleNumber = pexConfig.Field(
         doc="Final fit cycle from FGCM fit",
         dtype=int,
-        default=None,
+        default=0,
+        deprecated=("This config is no longer used, and will be removed after v25. "
+                    "Please set config.connections.cycleNumber directly instead."),
     )
     physicalFilterMap = pexConfig.DictField(
         doc="Mapping from 'physicalFilter' to band.",
@@ -280,12 +282,6 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
         self.photoCal.match.sourceSelection.flags.good = []
         self.photoCal.match.sourceSelection.flags.bad = ['flag_badStar']
         self.photoCal.match.sourceSelection.doUnresolved = False
-
-    def validate(self):
-        super().validate()
-
-        # Force the connections to conform with cycleNumber
-        self.connections.cycleNumber = str(self.cycleNumber)
 
 
 class FgcmOutputProductsTask(pipeBase.PipelineTask):
