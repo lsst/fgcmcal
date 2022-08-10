@@ -213,6 +213,7 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
             loader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
                                                     for ref in inputRefs.refCat],
                                            refCats=butlerQC.get(inputRefs.refCat),
+                                           name=self.config.connections.refCat,
                                            config=refConfig,
                                            log=self.log)
             buildStarsRefObjLoader = loader
@@ -224,6 +225,7 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
             loader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
                                                     for ref in inputRefs.refCat],
                                            refCats=butlerQC.get(inputRefs.refCat),
+                                           name=self.config.connections.refCat,
                                            config=refConfig,
                                            log=self.log)
             self.fgcmOutputProducts.refObjLoader = loader
