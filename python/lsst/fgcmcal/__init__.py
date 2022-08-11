@@ -13,7 +13,6 @@ from .fgcmOutputProducts import *
 from .fgcmLoadReferenceCatalog import *
 from .fgcmCalibrateTractBase import *
 from .fgcmCalibrateTractTable import *
-from .photoCalibConsolidateGen2Gen3 import *
 from .focalPlaneProjector import *
 from .sedterms import *
 from .version import *
