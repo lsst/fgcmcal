@@ -127,17 +127,6 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
     def __init__(self, *, config=None):
         super().__init__(config=config)
 
-        # The ref_dataset_name will be deprecated with Gen2
-        loaderName = config.fgcmBuildStars.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name
-        if config.connections.refCat != loaderName:
-            raise ValueError("connections.refCat must be the same as "
-                             "config.fgcmBuildStars.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name")
-        if config.fgcmOutputProducts.doReferenceCalibration:
-            loaderName = config.fgcmOutputProducts.refObjLoader.ref_dataset_name
-            if config.connections.refCat != loaderName:
-                raise ValueError("connections.refCat must be the same as "
-                                 "config.fgcmOutputProducts.refObjLoader.ref_dataset_name")
-
         if not config.fgcmBuildStars.doModelErrorsWithBackground:
             self.inputs.remove("background")
 

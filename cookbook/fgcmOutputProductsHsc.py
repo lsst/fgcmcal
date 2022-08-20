@@ -22,9 +22,6 @@ config.cycleNumber = 4
 # For quicker runs, we cut down the area used for cross-calibration
 config.referencePixelizationNPixels = 10
 
-# Reference object info
-config.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
-
 # Photometric calibration information
 config.photoCal.photoCatName = 'ps1'
 hscConfigDir = os.path.join(getPackageDir("obs_subaru"), "config")
