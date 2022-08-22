@@ -26,7 +26,6 @@ config.densityCutMaxPerPixel = 2000
 configDir = os.path.join(os.path.dirname(__file__))
 config.physicalFilterMap = HSC_FILTER_DEFINITIONS.physical_to_band
 config.doSubtractLocalBackground = True
-config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
 config.fgcmLoadReferenceCatalog.load(os.path.join(configDir, 'filterMap.py'))
 config.fgcmLoadReferenceCatalog.applyColorTerms = True
 config.fgcmLoadReferenceCatalog.colorterms.load(os.path.join(configDir, 'colorterms.py'))

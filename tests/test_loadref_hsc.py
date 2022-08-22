@@ -99,7 +99,10 @@ class FgcmLoadReferenceTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests
         refConfig = LoadReferenceObjectsConfig()
         refConfig.filterMap = config.filterMap
 
-        refObjLoader = ReferenceObjectLoader(dataIds=dataIds, refCats=refCats, config=refConfig)
+        refObjLoader = ReferenceObjectLoader(dataIds=dataIds,
+                                             refCats=refCats,
+                                             name=refCatName,
+                                             config=refConfig)
 
         loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(refObjLoader=refObjLoader,
                                                        refCatName=refCatName,
@@ -172,7 +175,10 @@ class FgcmLoadReferenceTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests
         refConfig = LoadReferenceObjectsConfig()
         refConfig.filterMap = config.filterMap
 
-        refObjLoader = ReferenceObjectLoader(dataIds=dataIds, refCats=refCats, config=refConfig)
+        refObjLoader = ReferenceObjectLoader(dataIds=dataIds,
+                                             refCats=refCats,
+                                             name=refCatName,
+                                             config=refConfig)
 
         loadCat = fgcmcal.FgcmLoadReferenceCatalogTask(refObjLoader=refObjLoader,
                                                        refCatName=refCatName,

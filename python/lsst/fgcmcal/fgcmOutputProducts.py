@@ -317,6 +317,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
             self.refObjLoader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
                                                                for ref in inputRefs.refCat],
                                                       refCats=butlerQC.get(inputRefs.refCat),
+                                                      name=self.config.connections.refCat,
                                                       log=self.log,
                                                       config=refConfig)
         else:

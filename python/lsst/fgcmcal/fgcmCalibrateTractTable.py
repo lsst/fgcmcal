@@ -127,17 +127,6 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
     def __init__(self, *, config=None):
         super().__init__(config=config)
 
-        # The ref_dataset_name will be deprecated with Gen2
-        loaderName = config.fgcmBuildStars.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name
-        if config.connections.refCat != loaderName:
-            raise ValueError("connections.refCat must be the same as "
-                             "config.fgcmBuildStars.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name")
-        if config.fgcmOutputProducts.doReferenceCalibration:
-            loaderName = config.fgcmOutputProducts.refObjLoader.ref_dataset_name
-            if config.connections.refCat != loaderName:
-                raise ValueError("connections.refCat must be the same as "
-                                 "config.fgcmOutputProducts.refObjLoader.ref_dataset_name")
-
         if not config.fgcmBuildStars.doModelErrorsWithBackground:
             self.inputs.remove("background")
 
@@ -213,6 +202,7 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
             loader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
                                                     for ref in inputRefs.refCat],
                                            refCats=butlerQC.get(inputRefs.refCat),
+                                           name=self.config.connections.refCat,
                                            config=refConfig,
                                            log=self.log)
             buildStarsRefObjLoader = loader
@@ -224,6 +214,7 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
             loader = ReferenceObjectLoader(dataIds=[ref.datasetRef.dataId
                                                     for ref in inputRefs.refCat],
                                            refCats=butlerQC.get(inputRefs.refCat),
+                                           name=self.config.connections.refCat,
                                            config=refConfig,
                                            log=self.log)
             self.fgcmOutputProducts.refObjLoader = loader

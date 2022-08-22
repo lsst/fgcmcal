@@ -32,7 +32,6 @@ config.doSubtractLocalBackground = True
 config.nVisitsPerCheckpoint = 100
 
 # Reference object loader configuration parameters
-config.fgcmLoadReferenceCatalog.refObjLoader.ref_dataset_name = 'ps1_pv3_3pi_20170110'
 config.fgcmLoadReferenceCatalog.refFilterMap = {'g': 'g', 'r': 'r', 'i': 'i', 'z': 'z', 'y': 'y'}
 config.fgcmLoadReferenceCatalog.applyColorTerms = True
 hscConfigDir = os.path.join(getPackageDir('obs_subaru'), 'config')
