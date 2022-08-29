@@ -35,12 +35,12 @@ Contributing
 
 ``lsst.fgcmcal`` is developed at https://github.com/lsst/fgcmcal.  You can find Jira issues for this module under the `fgcmcal <https://jira.lsstcorp.org/issues/?jql=project%20%3D%20DM%20AND%20component%20%3D%20fgcmcal>`_ component.
 
-.. _lsst.fgcmcal.pythononly-command-line-tasks:
+.. _lsst.fgcmcal.pythononly-pipeline-tasks:
 
-Command-line tasks
-------------------
+Pipeline tasks
+--------------
 
-.. lsst-cmdlinetasks::
+.. lsst-pipelinetasks::
    :root: lsst.fgcmcal
    :toctree: tasks
 
