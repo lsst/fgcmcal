@@ -190,12 +190,6 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=False,
     )
-    doRefcatOutput = pexConfig.Field(
-        doc="Output standard stars in reference catalog format",
-        dtype=bool,
-        default=False,
-        deprecated="doRefcatOutput is no longer supported; this config will be removed after v24"
-    )
     doAtmosphereOutput = pexConfig.Field(
         doc="Output atmospheres in transmission_atmosphere_fgcm format",
         dtype=bool,
