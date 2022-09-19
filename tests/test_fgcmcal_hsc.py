@@ -92,7 +92,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nOkZp = 27
         nBadZp = 1093
         nStdStars = 235
-        nPlots = 48
+        nPlots = 47
 
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
