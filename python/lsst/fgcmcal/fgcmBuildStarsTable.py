@@ -208,6 +208,9 @@ class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase, pipeBase.PipelineTaskC
         sourceSelector.isolated.parentName = 'parentSourceId'
         sourceSelector.isolated.nChildName = 'deblend_nChild'
 
+        sourceSelector.requireFiniteRaDec.raColName = 'ra'
+        sourceSelector.requireFiniteRaDec.decColName = 'decl'
+
         sourceSelector.unresolved.name = 'extendedness'
 
 

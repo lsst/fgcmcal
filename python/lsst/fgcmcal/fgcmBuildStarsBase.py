@@ -186,6 +186,7 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
         sourceSelector.doUnresolved = True
         sourceSelector.doSignalToNoise = True
         sourceSelector.doIsolated = True
+        sourceSelector.doRequireFiniteRaDec = True
 
         sourceSelector.signalToNoise.minimum = 10.0
         sourceSelector.signalToNoise.maximum = 1000.0
