@@ -43,15 +43,12 @@ import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 from lsst.afw.image import TransmissionCurve
-from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask
 from lsst.meas.algorithms import ReferenceObjectLoader, LoadReferenceObjectsConfig
 from lsst.pipe.tasks.photoCal import PhotoCalTask
 import lsst.geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
-from lsst.meas.algorithms import DatasetConfig
-from lsst.meas.algorithms.ingestIndexReferenceTask import addRefCatMetadata
 
 from .utilities import computeApproxPixelAreaFields
 from .utilities import lookupStaticCalibrations
@@ -219,11 +216,6 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=True,
     )
-    refObjLoader = pexConfig.ConfigurableField(
-        target=LoadIndexedReferenceObjectsTask,
-        doc="reference object loader for 'absolute' photometric calibration",
-        deprecated="refObjLoader is deprecated, and will be removed after v24",
-    )
     photoCal = pexConfig.ConfigurableField(
         target=PhotoCalTask,
         doc="task to perform 'absolute' calibration",
@@ -251,11 +243,6 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
              "(per band) from the set of pixels."),
         dtype=int,
         default=100,
-    )
-    datasetConfig = pexConfig.ConfigField(
-        dtype=DatasetConfig,
-        doc="Configuration for writing/reading ingested catalog",
-        deprecated="The datasetConfig was only used for gen2; this config will be removed after v24.",
     )
 
     def setDefaults(self):
@@ -705,59 +692,6 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
         struct = calTask.run(exposure, sourceCat)
 
         return struct
-
-    def _formatCatalog(self, fgcmStarCat, offsets, bands):
-        """
-        Turn an FGCM-formatted star catalog, applying zeropoint offsets.
-
-        Parameters
-        ----------
-        fgcmStarCat : `lsst.afw.Table.SimpleCatalog`
-            SimpleCatalog as output by fgcmcal
-        offsets : `list` with len(self.bands) entries
-            Zeropoint offsets to apply
-        bands : `list` [`str`]
-            List of band names from FGCM output
-
-        Returns
-        -------
-        formattedCat: `lsst.afw.table.SimpleCatalog`
-           SimpleCatalog suitable for using as a reference catalog
-        """
-
-        sourceMapper = afwTable.SchemaMapper(fgcmStarCat.schema)
-        minSchema = LoadIndexedReferenceObjectsTask.makeMinimalSchema(bands,
-                                                                      addCentroid=False,
-                                                                      addIsResolved=True,
-                                                                      coordErrDim=0)
-        sourceMapper.addMinimalSchema(minSchema)
-        for band in bands:
-            sourceMapper.editOutputSchema().addField('%s_nGood' % (band), type=np.int32)
-            sourceMapper.editOutputSchema().addField('%s_nTotal' % (band), type=np.int32)
-            sourceMapper.editOutputSchema().addField('%s_nPsfCandidate' % (band), type=np.int32)
-
-        formattedCat = afwTable.SimpleCatalog(sourceMapper.getOutputSchema())
-        formattedCat.reserve(len(fgcmStarCat))
-        formattedCat.extend(fgcmStarCat, mapper=sourceMapper)
-
-        # Note that we don't have to set `resolved` because the default is False
-
-        for b, band in enumerate(bands):
-            mag = fgcmStarCat['mag_std_noabs'][:, b].astype(np.float64) + offsets[b]
-            # We want fluxes in nJy from calibrated AB magnitudes
-            # (after applying offset).  Updated after RFC-549 and RFC-575.
-            flux = (mag*units.ABmag).to_value(units.nJy)
-            fluxErr = (np.log(10.)/2.5)*flux*fgcmStarCat['magErr_std'][:, b].astype(np.float64)
-
-            formattedCat['%s_flux' % (band)][:] = flux
-            formattedCat['%s_fluxErr' % (band)][:] = fluxErr
-            formattedCat['%s_nGood' % (band)][:] = fgcmStarCat['ngood'][:, b]
-            formattedCat['%s_nTotal' % (band)][:] = fgcmStarCat['ntotal'][:, b]
-            formattedCat['%s_nPsfCandidate' % (band)][:] = fgcmStarCat['npsfcand'][:, b]
-
-        addRefCatMetadata(formattedCat)
-
-        return formattedCat
 
     def _outputZeropoints(self, camera, zptCat, visitCat, offsets, bands,
                           physicalFilterMap, tract=None):

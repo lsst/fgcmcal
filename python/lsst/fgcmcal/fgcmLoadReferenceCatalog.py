@@ -34,7 +34,7 @@ from astropy import units
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
-from lsst.meas.algorithms import LoadIndexedReferenceObjectsTask, ReferenceSourceSelectorTask
+from lsst.meas.algorithms import ReferenceSourceSelectorTask
 from lsst.meas.algorithms import getRefFluxField
 from lsst.pipe.tasks.colorterms import ColortermLibrary
 from lsst.afw.image import abMagErrFromFluxErr
@@ -47,11 +47,6 @@ __all__ = ['FgcmLoadReferenceCatalogConfig', 'FgcmLoadReferenceCatalogTask']
 class FgcmLoadReferenceCatalogConfig(pexConfig.Config):
     """Config for FgcmLoadReferenceCatalogTask"""
 
-    refObjLoader = pexConfig.ConfigurableField(
-        target=LoadIndexedReferenceObjectsTask,
-        doc="Reference object loader for photometry",
-        deprecated="refObjLoader is deprecated, and will be removed after v24.",
-    )
     filterMap = pexConfig.DictField(
         doc="Mapping from physicalFilter label to reference filter name.",
         keytype=str,
