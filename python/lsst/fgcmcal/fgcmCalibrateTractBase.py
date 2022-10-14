@@ -81,7 +81,6 @@ class FgcmCalibrateTractConfigBase(pexConfig.Config):
         self.fgcmFitCycle.quietMode = True
         self.fgcmFitCycle.doPlots = False
         self.fgcmOutputProducts.doReferenceCalibration = False
-        self.fgcmOutputProducts.cycleNumber = 0
         self.fgcmOutputProducts.photoCal.applyColorTerms = False
 
     def validate(self):
