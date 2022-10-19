@@ -32,24 +32,3 @@ config.fgcmLoadReferenceCatalog.colorterms.load(os.path.join(configDir, 'colorte
 config.fgcmLoadReferenceCatalog.referenceSelector.doSignalToNoise = True
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.fluxField = 'i_flux'
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.errField = 'i_fluxErr'
-
-# TODO: DM-31889: These overrides can be removed when testdata_jointcal is
-# updated to the new column names.
-config.instFluxField = 'ApFlux_12_0_instFlux'
-config.localBackgroundFluxField = 'LocalBackground_instFlux'
-config.apertureInnerInstFluxField = 'ApFlux_12_0_instFlux'
-config.apertureOuterInstFluxField = 'ApFlux_17_0_instFlux'
-config.psfCandidateName = 'Calib_psf_candidate'
-config.sourceSelector['science'].flags.bad = ['PixelFlags_edge',
-                                              'PixelFlags_interpolatedCenter',
-                                              'PixelFlags_saturatedCenter',
-                                              'PixelFlags_crCenter',
-                                              'PixelFlags_bad',
-                                              'PixelFlags_interpolated',
-                                              'PixelFlags_saturated',
-                                              'Centroid_flag',
-                                              'ApFlux_12_0_flag',
-                                              'LocalBackground_flag']
-config.sourceSelector['science'].signalToNoise.fluxField = 'ApFlux_12_0_instFlux'
-config.sourceSelector['science'].signalToNoise.errField = 'ApFlux_12_0_instFluxErr'
-config.sourceSelector['science'].isolated.nChildName = 'Deblend_nChild'
