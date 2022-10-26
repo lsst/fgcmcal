@@ -209,6 +209,25 @@ class FgcmcalTestBase(object):
 
         self.assertFloatsAlmostEqual(i10Recon, i1/i0, msg='i10Recon', rtol=1e-5)
 
+        # Check that the standard atmosphere was output and non-zero.
+        atmStd = butler.get('fgcm_standard_atmosphere',
+                            collections=[outputCollection],
+                            instrument=instName)
+        bounds = atmStd.getWavelengthBounds()
+        lambdas = np.linspace(bounds[0], bounds[1], 1000)
+        tputs = atmStd.sampleAt(position=geom.Point2D(0.0, 0.0), wavelengths=lambdas)
+        self.assertGreater(np.min(tputs), 0.0)
+
+        # Check that the standard passbands were output and non-zero.
+        for physical_filter in fgcmLut.filterNames:
+            passband = butler.get('fgcm_standard_passband',
+                                  collections=[outputCollection],
+                                  instrument=instName,
+                                  physical_filter=physical_filter)
+            tputs = passband.sampleAt(position=geom.Point2D(0.0, 0.0), wavelengths=lambdas)
+            self.assertEqual(np.min(tputs), 0.0)
+            self.assertGreater(np.max(tputs), 0.0)
+
     def _testFgcmBuildStarsTable(self, instName, testName, queryString, visits, nStar, nObs):
         """Test running of FgcmBuildStarsTableTask
 
