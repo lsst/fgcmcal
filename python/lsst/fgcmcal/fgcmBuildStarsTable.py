@@ -378,7 +378,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
 
             if columns is None:
                 inColumns = handle.get(component='columns')
-                columns, detColumn = self._get_sourceTable_visit_columns(inColumns)
+                columns = self._get_sourceTable_visit_columns(inColumns)
             df = handle.get(parameters={'columns': columns})
 
             goodSrc = self.sourceSelector.selectSources(df)
@@ -401,7 +401,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             tempCat['y'][:] = df['y'].values[use]
             # The "visit" name in the parquet table is hard-coded.
             tempCat[visitKey][:] = df['visit'].values[use]
-            tempCat[ccdKey][:] = df[detColumn].values[use]
+            tempCat[ccdKey][:] = df['detector'].values[use]
             tempCat['psf_candidate'] = df[self.config.psfCandidateName].values[use]
 
             with np.warnings.catch_warnings():
@@ -487,17 +487,9 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         -------
         columns : `list`
             List of columns to read from sourceTable_visit.
-        detectorColumn : `str`
-            Name of the detector column.
         """
-        if 'detector' in inColumns:
-            # Default name for Gen3.
-            detectorColumn = 'detector'
-        else:
-            # Default name for Gen2 conversions (including test data).
-            detectorColumn = 'ccd'
         # Some names are hard-coded in the parquet table.
-        columns = ['visit', detectorColumn,
+        columns = ['visit', 'detector',
                    'ra', 'decl', 'x', 'y', self.config.psfCandidateName,
                    self.config.instFluxField, self.config.instFluxField + 'Err',
                    self.config.apertureInnerInstFluxField, self.config.apertureInnerInstFluxField + 'Err',
@@ -512,4 +504,4 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         if self.config.doSubtractLocalBackground:
             columns.append(self.config.localBackgroundFluxField)
 
-        return columns, detectorColumn
+        return columns

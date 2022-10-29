@@ -109,18 +109,6 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
         dtype=str,
         default=None
     )
-    visitDataRefName = pexConfig.Field(
-        doc="dataRef name for the 'visit' field, usually 'visit'.",
-        dtype=str,
-        default="visit",
-        deprecated="The visitDataRefname was only used for gen2; this config will be removed after v24."
-    )
-    ccdDataRefName = pexConfig.Field(
-        doc="dataRef name for the 'ccd' field, usually 'ccd' or 'detector'.",
-        dtype=str,
-        default="ccd",
-        deprecated="The ccdDataRefname was only used for gen2; this config will be removed after v24."
-    )
     doApplyWcsJacobian = pexConfig.Field(
         doc="Apply the jacobian of the WCS to the star observations prior to fit?",
         dtype=bool,
