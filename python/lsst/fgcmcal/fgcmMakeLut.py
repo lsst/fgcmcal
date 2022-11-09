@@ -39,6 +39,7 @@ import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
 import lsst.afw.cameraGeom as afwCameraGeom
+from lsst.afw.image import TransmissionCurve
 from .utilities import lookupStaticCalibrations
 
 import fgcm
@@ -96,6 +97,21 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         name="fgcmLookUpTable",
         storageClass="Catalog",
         dimensions=("instrument",),
+    )
+
+    fgcmStandardAtmosphere = connectionTypes.Output(
+        doc="Standard atmosphere used for FGCM calibration.",
+        name="fgcm_standard_atmosphere",
+        storageClass="TransmissionCurve",
+        dimensions=("instrument",),
+    )
+
+    fgcmStandardPassbands = connectionTypes.Output(
+        doc="Standard passbands used for FGCM calibration.",
+        name="fgcm_standard_passband",
+        storageClass="TransmissionCurve",
+        dimensions=("instrument", "physical_filter"),
+        multiple=True,
     )
 
 
@@ -304,11 +320,18 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
         filterHandleDict = {filterHandle.dataId['physical_filter']: filterHandle for
                             filterHandle in filterHandles}
 
-        lutCat = self._fgcmMakeLut(camera,
+        struct = self._fgcmMakeLut(camera,
                                    opticsHandle,
                                    sensorHandleDict,
                                    filterHandleDict)
-        butlerQC.put(lutCat, outputRefs.fgcmLookUpTable)
+
+        butlerQC.put(struct.fgcmLookUpTable, outputRefs.fgcmLookUpTable)
+        butlerQC.put(struct.fgcmStandardAtmosphere, outputRefs.fgcmStandardAtmosphere)
+
+        refDict = {passbandRef.dataId['physical_filter']: passbandRef for
+                   passbandRef in outputRefs.fgcmStandardPassbands}
+        for physical_filter, passband in struct.fgcmStandardPassbands.items():
+            butlerQC.put(passband, refDict[physical_filter])
 
     def _fgcmMakeLut(self, camera, opticsHandle, sensorHandleDict,
                      filterHandleDict):
@@ -330,8 +353,16 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
 
         Returns
         -------
-        fgcmLookUpTable : `BaseCatalog`
-            The FGCM look-up table.
+        retStruct : `lsst.pipe.base.Struct`
+            Output structure with keys:
+
+            fgcmLookUpTable : `BaseCatalog`
+                The FGCM look-up table.
+            fgcmStandardAtmosphere : `lsst.afw.image.TransmissionCurve`
+                Transmission curve for the FGCM standard atmosphere.
+            fgcmStandardPassbands : `dict` [`str`, `lsst.afw.image.TransmissionCurve`]
+                Dictionary of standard passbands, with the key as the
+                physical filter name.
         """
         # number of ccds from the length of the camera iterator
         nCcd = len(camera)
@@ -393,7 +424,31 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
 
         lutCat = self._makeLutCat(lutSchema, physicalFilterString,
                                   stdPhysicalFilterString, atmosphereTableName)
-        return lutCat
+
+        atmStd = TransmissionCurve.makeSpatiallyConstant(
+            throughput=self.fgcmLutMaker.atmStdTrans.astype(np.float64),
+            wavelengths=self.fgcmLutMaker.atmLambda.astype(np.float64),
+            throughputAtMin=self.fgcmLutMaker.atmStdTrans[0],
+            throughputAtMax=self.fgcmLutMaker.atmStdTrans[1],
+        )
+
+        fgcmStandardPassbands = {}
+        for i, physical_filter in enumerate(self.fgcmLutMaker.filterNames):
+            passband = self.fgcmLutMaker.throughputs[i]['THROUGHPUT_AVG']*self.fgcmLutMaker.atmStdTrans
+            fgcmStandardPassbands[physical_filter] = TransmissionCurve.makeSpatiallyConstant(
+                throughput=passband.astype(np.float64),
+                wavelengths=self.fgcmLutMaker.atmLambda.astype(np.float64),
+                throughputAtMin=passband[0],
+                throughputAtMax=passband[-1],
+            )
+
+        retStruct = pipeBase.Struct(
+            fgcmLookUpTable=lutCat,
+            fgcmStandardAtmosphere=atmStd,
+            fgcmStandardPassbands=fgcmStandardPassbands,
+        )
+
+        return retStruct
 
     def _getStdPhysicalFilterList(self):
         """Get the standard physical filter lists from config.physicalFilters
@@ -623,7 +678,7 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
         Returns
         -------
         lutCat: `afwTable.BaseCatalog`
-           Lut catalog for persistence
+           Look-up table catalog for persistence.
         """
 
         # The somewhat strange format is to make sure that
