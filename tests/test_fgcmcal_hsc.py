@@ -41,6 +41,11 @@ import fgcmcalTestBase  # noqa: E402
 
 ROOT = os.path.abspath(os.path.dirname(__file__))
 
+I0STD = [0.08294534, 0.07877351, 0.06464688]
+I10STD = [-0.000091981, -0.00061516, -0.00063434]
+I0RECON = [0.07322632, 0.0689530429, 0.05600673]
+I10RECON = [-5.89806616479, -7.01786443508, 3.62738180611]
+
 
 class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase):
     @classmethod
@@ -70,10 +75,10 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         testName = 'testfgcmcalpipe'
 
         nBand = 3
-        i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
-        i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
-        i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
-        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
+        i0Std = np.array(I0STD)
+        i10Std = np.array(I10STD)
+        i0Recon = np.array(I0RECON)
+        i10Recon = np.array(I10RECON)
 
         self._testFgcmMakeLut(instName, testName,
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
@@ -125,10 +130,10 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         testName = 'testfgcmcalmultiple'
 
         nBand = 3
-        i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
-        i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
-        i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
-        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
+        i0Std = np.array(I0STD)
+        i10Std = np.array(I10STD)
+        i0Recon = np.array(I0RECON)
+        i10Recon = np.array(I10RECON)
 
         self._testFgcmMakeLut(instName, testName,
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
@@ -152,10 +157,10 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         testName = 'testfgcmcaltract'
 
         nBand = 3
-        i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
-        i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
-        i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
-        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
+        i0Std = np.array(I0STD)
+        i10Std = np.array(I10STD)
+        i0Recon = np.array(I0RECON)
+        i10Recon = np.array(I10RECON)
 
         self._testFgcmMakeLut(instName, testName,
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
