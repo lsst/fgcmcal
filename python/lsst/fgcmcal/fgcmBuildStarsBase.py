@@ -277,7 +277,9 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         groupedHandles : `dict` [`list` [`lsst.daf.butler.DeferredDatasetHandle`]]
             Dataset handles, grouped by visit.
         """
-        for i, visit in enumerate(groupedHandles):
+
+        # Guarantee that these are sorted.
+        for i, visit in enumerate(sorted(groupedHandles)):
             if (i % self.config.nVisitsPerCheckpoint) == 0:
                 self.log.info("Retrieving metadata for visit %d (%d/%d)", visit, i, len(groupedHandles))
 
