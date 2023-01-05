@@ -826,7 +826,8 @@ def makeStdCat(stdSchema, stdStruct, goodBands):
     stdCat['ntotal'][:, :] = stdStruct['NTOTAL'][:, :]
     stdCat['mag_std_noabs'][:, :] = stdStruct['MAG_STD'][:, :]
     stdCat['magErr_std'][:, :] = stdStruct['MAGERR_STD'][:, :]
-    stdCat['npsfcand'][:, :] = stdStruct['NPSFCAND'][:, :]
+    if 'NPSFCAND' in stdStruct.dtype.names:
+        stdCat['npsfcand'][:, :] = stdStruct['NPSFCAND'][:, :]
     stdCat['delta_aper'][:, :] = stdStruct['DELTA_APER'][:, :]
 
     md = PropertyList()
@@ -919,6 +920,58 @@ def extractReferenceMags(refStars, bands, filterMap):
         # Continue to use old catalogs as before.
         refMag = refStars['refMag'][:, :]
         refMagErr = refStars['refMagErr'][:, :]
+
+    return refMag, refMagErr
+
+
+def extractReferenceMagsParquet(refStars, bands, filterMap):
+    """
+    Extract reference magnitudes from refStars for given bands and
+    associated filterMap.
+
+    Parameters
+    ----------
+    refStars : `astropy.table.Table`
+       FGCM reference star catalog
+    bands : `list`
+       List of bands for calibration
+    filterMap: `dict`
+       FGCM mapping of filter to band
+
+    Returns
+    -------
+    refMag : `np.ndarray`
+       nstar x nband array of reference magnitudes
+    refMagErr : `np.ndarray`
+       nstar x nband array of reference magnitude errors
+    """
+    import re
+
+    matcher = re.compile('ref_mag_err_(.*)$')
+
+    filternames = []
+    for col in refStars.columns:
+        if groups := matcher.search(col):
+            filternames.append(groups.group(1))
+
+    # The reference catalog that fgcm wants has one entry per band
+    # in the config file.
+    refMag = np.zeros((len(refStars), len(bands)), dtype=refStars[f'ref_mag_{filternames[0]}'].dtype) + 99.0
+    refMagErr = np.zeros_like(refMag)
+    for i, filtername in enumerate(filternames):
+        # We are allowed to run the fit task configured so that we do not
+        # use every column in the reference catalog.
+        try:
+            band = filterMap[filtername]
+        except KeyError:
+            continue
+        try:
+            ind = bands.index(band)
+        except ValueError:
+            continue
+
+        refMag[:, ind] = refStars[f'ref_mag_{filtername}']
+        refMagErr[:, ind] = refStars[f'ref_mag_err_{filtername}']
 
     return refMag, refMagErr
 

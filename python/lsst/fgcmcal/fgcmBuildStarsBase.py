@@ -195,7 +195,6 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         # Only log warning and fatal errors from the sourceSelector
         self.sourceSelector.log.setLevel(self.sourceSelector.log.WARN)
 
-    @abc.abstractmethod
     def fgcmMakeAllStarObservations(self, groupedHandles, visitCat,
                                     sourceSchema,
                                     camera,
@@ -298,7 +297,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             if goodSigma.size > 2:
                 psfSigma = np.median(summary['psfSigma'][goodSigma])
             elif goodSigma.size > 0:
-                psfSigma = np.mean(summary['psfSigma'][goodSigma])
+                psfSigma = summary['psfSigma'][goodSigma[0]]
             else:
                 self.log.warning("Could not find any good summary psfSigma for visit %d", visit)
                 psfSigma = 0.0
@@ -307,7 +306,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             if goodBackground.size > 2:
                 skyBackground = np.median(summary['skyBg'][goodBackground])
             elif goodBackground.size > 0:
-                skyBackground = np.mean(summary['skyBg'][goodBackground])
+                skyBackground = summary['skyBg'][goodBackground[0]]
             else:
                 self.log.warning('Could not find any good summary skyBg for visit %d', visit)
                 skyBackground = -1.0
