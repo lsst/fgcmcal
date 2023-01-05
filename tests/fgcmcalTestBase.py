@@ -119,7 +119,6 @@ class FgcmcalTestBase(object):
         butler = SimplePipelineExecutor.prep_butler(repo,
                                                     inputs=inputCollections,
                                                     output=outputCollection)
-
         pipeline = Pipeline.fromFile(pipelineFile)
         for taskName, fileList in configFiles.items():
             for fileName in fileList:
@@ -275,6 +274,58 @@ class FgcmcalTestBase(object):
         self.assertEqual(len(starIds), nStar)
 
         starObs = butler.get('fgcmStarObservations', collections=[outputCollection],
+                             instrument=instName)
+        self.assertEqual(len(starObs), nObs)
+
+    def _testFgcmBuildFromIsolatedStars(self, instName, testName, queryString, visits, nStar, nObs):
+        """Test running of FgcmBuildFromIsolatedStarsTask.
+
+        Parameters
+        ----------
+        instName : `str`
+            Short name of the instrument
+        testName : `str`
+            Base name of the test collection
+        queryString : `str`
+            Query to send to the pipetask.
+        visits : `list`
+            List of visits to calibrate
+        nStar : `int`
+            Number of stars expected
+        nObs : `int`
+            Number of observations of stars expected
+        """
+        instCamel = instName.title()
+
+        configFiles = {'fgcmBuildFromIsolatedStars': [
+            os.path.join(ROOT,
+                         'config',
+                         f'fgcmBuildFromIsolatedStars{instCamel}.py')
+        ]}
+        outputCollection = f'{instName}/{testName}/buildstars'
+
+        self._runPipeline(self.repo,
+                          os.path.join(ROOT,
+                                       'pipelines',
+                                       'fgcmBuildFromIsolatedStars%s.yaml' % (instCamel)),
+                          configFiles=configFiles,
+                          inputCollections=[f'{instName}/{testName}/lut',
+                                            'refcats/gen2'],
+                          outputCollection=outputCollection,
+                          queryString=queryString,
+                          registerDatasetTypes=True)
+
+        butler = dafButler.Butler(self.repo)
+
+        visitCat = butler.get('fgcmVisitCatalog', collections=[outputCollection],
+                              instrument=instName)
+        self.assertEqual(len(visits), len(visitCat))
+
+        starIds = butler.get('fgcm_star_ids', collections=[outputCollection],
+                             instrument=instName)
+        self.assertEqual(len(starIds), nStar)
+
+        starObs = butler.get('fgcm_star_observations', collections=[outputCollection],
                              instrument=instName)
         self.assertEqual(len(starObs), nObs)
 
@@ -440,11 +491,6 @@ class FgcmcalTestBase(object):
         rawStars = butler.get('fgcmStandardStars' + config.connections.cycleNumber,
                               collections=[inputCollection], instrument=instName)
 
-        candRatio = (rawStars['npsfcand'][:, 0].astype(np.float64)
-                     / rawStars['ntotal'][:, 0].astype(np.float64))
-        self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
-        self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
-
         # Test the fgcm_photoCalib output
         zptCat = butler.get('fgcmZeropoints' + config.connections.cycleNumber,
                             collections=[inputCollection], instrument=instName)
@@ -609,9 +655,11 @@ class FgcmcalTestBase(object):
         """
         instCamel = instName.title()
 
-        configFiles = {'fgcmBuildStarsTable': [os.path.join(ROOT,
-                                                            'config',
-                                                            f'fgcmBuildStarsTable{instCamel}.py')],
+        configFiles = {'fgcmBuildFromIsolatedStars': [
+            os.path.join(ROOT,
+                         'config',
+                         f'fgcmBuildFromIsolatedStars{instCamel}.py'
+                         )],
                        'fgcmFitCycle': [os.path.join(ROOT,
                                                      'config',
                                                      f'fgcmFitCycle{instCamel}.py')],

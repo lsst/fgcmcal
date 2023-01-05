@@ -1,8 +1,8 @@
 description: Full fgcmcal pipeline
 instrument: lsst.obs.subaru.HyperSuprimeCam
 tasks:
-  fgcmBuildStarsTable:
-    class: lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask
+  fgcmBuildFromIsolatedStars:
+    class: lsst.fgcmcal.fgcmBuildFromIsolatedStars.FgcmBuildFromIsolatedStarsTask
   fgcmFitCycle:
     class: lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask
     config:
