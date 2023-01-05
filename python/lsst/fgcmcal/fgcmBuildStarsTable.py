@@ -103,15 +103,6 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
-    background = connectionTypes.Input(
-        doc="Calexp background model",
-        name="calexpBackground",
-        storageClass="Background",
-        dimensions=("instrument", "visit", "detector"),
-        deferLoad=True,
-        multiple=True,
-    )
-
     fgcmVisitCatalog = connectionTypes.Output(
         doc="Catalog of visit information for fgcm",
         name="fgcmVisitCatalog",
@@ -153,9 +144,6 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         if not config.doReferenceMatches:
             self.prerequisiteInputs.remove("refCat")
             self.prerequisiteInputs.remove("fgcmLookUpTable")
-
-        if not config.doModelErrorsWithBackground:
-            self.inputs.remove("background")
 
         if not config.doReferenceMatches:
             self.outputs.remove("fgcmReferenceStars")
@@ -277,16 +265,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         groupedHandles = self._groupHandles(sourceTableHandleDict,
                                             visitSummaryHandleDict)
 
-        if self.config.doModelErrorsWithBackground:
-            bkgHandles = inputRefDict['background']
-            bkgHandleDict = {(bkgHandle.dataId.byName()['visit'],
-                              bkgHandle.dataId.byName()['detector']): bkgHandle for
-                             bkgHandle in bkgHandles}
-        else:
-            bkgHandleDict = None
-
-        visitCat = self.fgcmMakeVisitCatalog(camera, groupedHandles,
-                                             bkgHandleDict=bkgHandleDict)
+        visitCat = self.fgcmMakeVisitCatalog(camera, groupedHandles)
 
         rad = calibFluxApertureRadius
         fgcmStarObservationCat = self.fgcmMakeAllStarObservations(groupedHandles,
