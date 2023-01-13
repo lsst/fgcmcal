@@ -706,12 +706,9 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         pixel_cats = []
 
         # Compute the dtype from the filter names.
-        dtype = [("fgcm_id", "i4")]
-        for filter_name in reference_filter_names:
-            dtype.extend(([
-                (f"ref_mag_{filter_name}", "f4"),
-                (f"ref_mag_err_{filter_name}", "f4"),
-            ]))
+        dtype = [("fgcm_id", "i4"),
+                 ("refMag", "f4", (len(reference_filter_names), )),
+                 ("refMagErr", "f4", (len(reference_filter_names), ))]
 
         (gdpix,) = (hpix > 0).nonzero()
         for ii, gpix in enumerate(gdpix):
@@ -762,9 +759,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
 
             pixel_cat = Table(data=np.zeros(i1.size, dtype=dtype))
             pixel_cat["fgcm_id"] = fgcm_obj["fgcm_id"][p1a[i1]]
-            for jj, reference_filter in enumerate(reference_filter_names):
-                pixel_cat[f"ref_mag_{reference_filter}"][:] = ref_cat["refMag"][i2, jj]
-                pixel_cat[f"ref_mag_err_{reference_filter}"][:] = ref_cat["refMagErr"][i2, jj]
+            pixel_cat["refMag"][:, :] = ref_cat["refMag"][i2, :]
+            pixel_cat["refMagErr"][:, :] = ref_cat["refMagErr"][i2, :]
 
             pixel_cats.append(pixel_cat)
 
@@ -776,7 +772,10 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 gdpix.size - 1,
             )
 
-        return vstack(pixel_cats)
+        ref_cat_full = vstack(pixel_cats)
+        ref_cat_full.meta.update({'FILTERNAMES': reference_filter_names})
+
+        return ref_cat_full
 
     def _compute_delta_aper_summary_statistics(self, visit_cat, star_obs):
         """Compute delta aperture summary statistics (per visit).

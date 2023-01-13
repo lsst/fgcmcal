@@ -43,7 +43,7 @@ from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
 
 from .utilities import makeConfigDict, translateFgcmLut, translateVisitCatalog
-from .utilities import extractReferenceMags, extractReferenceMagsParquet
+from .utilities import extractReferenceMags
 from .utilities import makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat, makeStdSchema, makeStdCat
 from .sedterms import SedboundarytermDict, SedtermDict
@@ -1161,14 +1161,10 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         if _config.doReferenceCalibration:
             refStars = handleDict['fgcmReferenceStars'].get()
 
-            if self.config.useParquetCatalogFormat:
-                refMag, refMagErr = extractReferenceMagsParquet(refStars,
-                                                                _config.bands,
-                                                                _config.physicalFilterMap)
-            else:
-                refMag, refMagErr = extractReferenceMags(refStars,
-                                                         _config.bands,
-                                                         _config.physicalFilterMap)
+            refMag, refMagErr = extractReferenceMags(refStars,
+                                                     _config.bands,
+                                                     _config.physicalFilterMap)
+
             refId = refStars['fgcm_id'][:]
         else:
             refStars = None
