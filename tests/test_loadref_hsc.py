@@ -94,7 +94,7 @@ class FgcmLoadReferenceTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests
                                                                                   'refcats/gen2'])
         refs = set(butler.registry.queryDatasets(refCatName))
         dataIds = [butler.registry.expandDataId(ref.dataId) for ref in refs]
-        refCats = [butler.getDirectDeferred(ref) for ref in refs]
+        refCats = [butler.getDeferred(ref) for ref in refs]
 
         refConfig = LoadReferenceObjectsConfig()
         refConfig.filterMap = config.filterMap
@@ -170,7 +170,7 @@ class FgcmLoadReferenceTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests
                                                                                   'refcats/gen2'])
         refs = set(butler.registry.queryDatasets(refCatName))
         dataIds = [butler.registry.expandDataId(ref.dataId) for ref in refs]
-        refCats = [butler.getDirectDeferred(ref) for ref in refs]
+        refCats = [butler.getDeferred(ref) for ref in refs]
 
         refConfig = LoadReferenceObjectsConfig()
         refConfig.filterMap = config.filterMap
