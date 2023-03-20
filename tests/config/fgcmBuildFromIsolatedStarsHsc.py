@@ -1,6 +1,3 @@
-# All camera defaults were copied from obs_subaru/config/fgcmBuildStarsTable.py
-# on 07/21/21, weekly w_2021_29.
-
 import os
 from lsst.obs.hsc.hscFilters import HSC_FILTER_DEFINITIONS
 
@@ -20,8 +17,9 @@ config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.minimum = 50.0
 config.doModelErrorsWithBackground = False
 
 config.minPerBand = 2
-config.connections.refCat = "ps1_pv3_3pi_20170110"
-config.densityCutMaxPerPixel = 2000
+config.connections.ref_cat = "ps1_pv3_3pi_20170110"
+# This is set low enough to ensure that this code path is triggered.
+config.densityCutMaxPerPixel = 200
 
 configDir = os.path.join(os.path.dirname(__file__))
 config.physicalFilterMap = HSC_FILTER_DEFINITIONS.physical_to_band

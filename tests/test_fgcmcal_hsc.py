@@ -29,6 +29,7 @@ import os
 import tempfile
 import numpy as np
 
+# Ensure that matplotlib doesn't try to open a display during testing.
 import matplotlib
 matplotlib.use("Agg")
 
@@ -67,7 +68,12 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                               os.path.join(cls.dataDir, 'hsc/repo'),
                               os.path.join(cls.dataDir, 'hsc', 'exports.yaml'))
 
-    def test_fgcmcalPipeline(self):
+    def test_fgcmcalPipelineBuildFromTable(self):
+        """Test running the full pipeline, using older association code.
+
+        This test uses the FgcmBuildStarsFromTableTask instead of the new
+        FgcmBuildFromIsolatedStarsTask.
+        """
         # Set numpy seed for stability
         np.random.seed(seed=1000)
 
@@ -99,6 +105,73 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nStdStars = 235
         nPlots = 47
 
+        # We need an extra config file to turn off parquet format.
+        extraConfigFile = os.path.join(self.testDir, "turn_off_parquet.py")
+        with open(extraConfigFile, "w") as f:
+            f.write("config.useParquetCatalogFormat = False\n")
+
+        self._testFgcmFitCycle(instName, testName,
+                               0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True,
+                               extraConfig=extraConfigFile)
+        self._testFgcmFitCycle(instName, testName,
+                               1, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True,
+                               extraConfig=extraConfigFile)
+
+        # We need to create an extra config file to turn on "sub-ccd gray" for testing.
+        # We also want to exercise the code path setting useExposureReferenceOffset = False.
+        extraConfigFile = os.path.join(self.testDir, "cycle03_patch_config.py")
+        with open(extraConfigFile, "w") as f:
+            f.write("config.useParquetCatalogFormat = False\n")
+            f.write("config.isFinalCycle = True\n")
+            f.write("config.ccdGraySubCcdDict = {'g': True, 'r': True, 'i': True}\n")
+            f.write("config.useExposureReferenceOffset = False")
+
+        self._testFgcmFitCycle(instName, testName,
+                               2, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
+                               extraConfig=extraConfigFile)
+
+    def test_fgcmcalPipeline(self):
+        """Test running the full pipeline, using new isolated star association code.
+
+        This test uses the FgcmBuildFromIsolatedStarsTask instead of the old
+        FgcmBuildStarsFromTableTask.
+        """
+        # Set numpy seed for stability
+        np.random.seed(seed=1000)
+
+        instName = 'HSC'
+        testName = 'testfgcmcalpipe'
+
+        nBand = 3
+        i0Std = np.array(I0STD)
+        i10Std = np.array(I10STD)
+        i0Recon = np.array(I0RECON)
+        i10Recon = np.array(I10RECON)
+
+        self._testFgcmMakeLut(instName, testName,
+                              nBand, i0Std, i0Recon, i10Std, i10Recon)
+
+        visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
+
+        nStar = 295
+        nObs = 1808
+
+        self._testFgcmBuildFromIsolatedStars(
+            instName,
+            testName,
+            "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I')",
+            visits,
+            nStar,
+            nObs,
+        )
+
+        nZp = 1120
+        nGoodZp = 27
+        nOkZp = 27
+        nBadZp = 1093
+        nStdStars = 227
+        nPlots = 47
+
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
         self._testFgcmFitCycle(instName, testName,
@@ -116,8 +189,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                                2, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
                                extraConfig=extraConfigFile)
 
-        zpOffsets = np.array([-0.0008051003096625209,
-                              0.0072303167544305325])
+        zpOffsets = np.array([-0.001461041159927845,
+                              0.005496968515217304])
 
         self._testFgcmOutputProducts(instName, testName,
                                      zpOffsets, 36236, 87, 'i', 1)
@@ -142,8 +215,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # These are slightly different from above due to the configuration change
         # mid-way in the separate fits.
-        zpOffsets = np.array([-0.0006988655077293515,
-                              0.004102597013115883])
+        zpOffsets = np.array([-0.0027262186631560326,
+                              0.004101278726011515])
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I')",

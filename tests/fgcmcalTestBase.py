@@ -119,7 +119,6 @@ class FgcmcalTestBase(object):
         butler = SimplePipelineExecutor.prep_butler(repo,
                                                     inputs=inputCollections,
                                                     output=outputCollection)
-
         pipeline = Pipeline.fromFile(pipelineFile)
         for taskName, fileList in configFiles.items():
             for fileName in fileList:
@@ -142,19 +141,19 @@ class FgcmcalTestBase(object):
         Parameters
         ----------
         instName : `str`
-            Short name of the instrument
+            Short name of the instrument.
         testName : `str`
-            Base name of the test collection
+            Base name of the test collection.
         nBand : `int`
-            Number of bands tested
+            Number of bands tested.
         i0Std : `np.ndarray'
-            Values of i0Std to compare to
+            Values of i0Std to compare to.
         i10Std : `np.ndarray`
-            Values of i10Std to compare to
+            Values of i10Std to compare to.
         i0Recon : `np.ndarray`
-            Values of reconstructed i0 to compare to
+            Values of reconstructed i0 to compare to.
         i10Recon : `np.ndarray`
-            Values of reconsntructed i10 to compare to
+            Values of reconsntructed i10 to compare to.
         """
         instCamel = instName.title()
 
@@ -234,17 +233,17 @@ class FgcmcalTestBase(object):
         Parameters
         ----------
         instName : `str`
-            Short name of the instrument
+            Short name of the instrument.
         testName : `str`
-            Base name of the test collection
+            Base name of the test collection.
         queryString : `str`
             Query to send to the pipetask.
         visits : `list`
-            List of visits to calibrate
+            List of visits to calibrate.
         nStar : `int`
-            Number of stars expected
+            Number of stars expected.
         nObs : `int`
-            Number of observations of stars expected
+            Number of observations of stars expected.
         """
         instCamel = instName.title()
 
@@ -278,6 +277,58 @@ class FgcmcalTestBase(object):
                              instrument=instName)
         self.assertEqual(len(starObs), nObs)
 
+    def _testFgcmBuildFromIsolatedStars(self, instName, testName, queryString, visits, nStar, nObs):
+        """Test running of FgcmBuildFromIsolatedStarsTask.
+
+        Parameters
+        ----------
+        instName : `str`
+            Short name of the instrument.
+        testName : `str`
+            Base name of the test collection.
+        queryString : `str`
+            Query to send to the pipetask.
+        visits : `list`
+            List of visits to calibrate.
+        nStar : `int`
+            Number of stars expected.
+        nObs : `int`
+            Number of observations of stars expected.
+        """
+        instCamel = instName.title()
+
+        configFiles = {'fgcmBuildFromIsolatedStars': [
+            os.path.join(ROOT,
+                         'config',
+                         f'fgcmBuildFromIsolatedStars{instCamel}.py')
+        ]}
+        outputCollection = f'{instName}/{testName}/buildstars'
+
+        self._runPipeline(self.repo,
+                          os.path.join(ROOT,
+                                       'pipelines',
+                                       'fgcmBuildFromIsolatedStars%s.yaml' % (instCamel)),
+                          configFiles=configFiles,
+                          inputCollections=[f'{instName}/{testName}/lut',
+                                            'refcats/gen2'],
+                          outputCollection=outputCollection,
+                          queryString=queryString,
+                          registerDatasetTypes=True)
+
+        butler = dafButler.Butler(self.repo)
+
+        visitCat = butler.get('fgcmVisitCatalog', collections=[outputCollection],
+                              instrument=instName)
+        self.assertEqual(len(visits), len(visitCat))
+
+        starIds = butler.get('fgcm_star_ids', collections=[outputCollection],
+                             instrument=instName)
+        self.assertEqual(len(starIds), nStar)
+
+        starObs = butler.get('fgcm_star_observations', collections=[outputCollection],
+                             instrument=instName)
+        self.assertEqual(len(starObs), nObs)
+
     def _testFgcmFitCycle(self, instName, testName, cycleNumber,
                           nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
                           skipChecks=False, extraConfig=None):
@@ -286,23 +337,23 @@ class FgcmcalTestBase(object):
         Parameters
         ----------
         instName : `str`
-            Short name of the instrument
+            Short name of the instrument.
         testName : `str`
-            Base name of the test collection
+            Base name of the test collection.
         cycleNumber : `int`
             Fit cycle number.
         nZp : `int`
-            Number of zeropoints created by the task
+            Number of zeropoints created by the task.
         nGoodZp : `int`
-            Number of good (photometric) zeropoints created
+            Number of good (photometric) zeropoints created.
         nOkZp : `int`
-            Number of constrained zeropoints (photometric or not)
+            Number of constrained zeropoints (photometric or not).
         nBadZp : `int`
-            Number of unconstrained (bad) zeropoints
+            Number of unconstrained (bad) zeropoints.
         nStdStars : `int`
-            Number of standard stars produced
+            Number of standard stars produced.
         nPlots : `int`
-            Number of plots produced
+            Number of plots produced.
         skipChecks : `bool`, optional
             Skip number checks, when running less-than-final cycle.
         extraConfig : `str`, optional
@@ -397,19 +448,19 @@ class FgcmcalTestBase(object):
         Parameters
         ----------
         instName : `str`
-            Short name of the instrument
+            Short name of the instrument.
         testName : `str`
-            Base name of the test collection
+            Base name of the test collection.
         zpOffsets : `np.ndarray`
-            Zeropoint offsets expected
+            Zeropoint offsets expected.
         testVisit : `int`
-            Visit id to check for round-trip computations
+            Visit id to check for round-trip computations.
         testCcd : `int`
-            Ccd id to check for round-trip computations
+            Ccd id to check for round-trip computations.
         testFilter : `str`
-            Filtername for testVisit/testCcd
+            Filtername for testVisit/testCcd.
         testBandIndex : `int`
-            Band index for testVisit/testCcd
+            Band index for testVisit/testCcd.
         """
         instCamel = instName.title()
 
@@ -439,11 +490,6 @@ class FgcmcalTestBase(object):
 
         rawStars = butler.get('fgcmStandardStars' + config.connections.cycleNumber,
                               collections=[inputCollection], instrument=instName)
-
-        candRatio = (rawStars['npsfcand'][:, 0].astype(np.float64)
-                     / rawStars['ntotal'][:, 0].astype(np.float64))
-        self.assertFloatsAlmostEqual(candRatio.min(), 0.0)
-        self.assertFloatsAlmostEqual(candRatio.max(), 1.0)
 
         # Test the fgcm_photoCalib output
         zptCat = butler.get('fgcmZeropoints' + config.connections.cycleNumber,
@@ -597,21 +643,23 @@ class FgcmcalTestBase(object):
         Parameters
         ----------
         instName : `str`
-            Short name of the instrument
+            Short name of the instrument.
         testName : `str`
-            Base name of the test collection
+            Base name of the test collection.
         queryString : `str`
             Query to send to the pipetask.
         visits : `list`
-            List of visits to calibrate
+            List of visits to calibrate.
         zpOffsets : `np.ndarray`
-            Zeropoint offsets expected
+            Zeropoint offsets expected.
         """
         instCamel = instName.title()
 
-        configFiles = {'fgcmBuildStarsTable': [os.path.join(ROOT,
-                                                            'config',
-                                                            f'fgcmBuildStarsTable{instCamel}.py')],
+        configFiles = {'fgcmBuildFromIsolatedStars': [
+            os.path.join(ROOT,
+                         'config',
+                         f'fgcmBuildFromIsolatedStars{instCamel}.py'
+                         )],
                        'fgcmFitCycle': [os.path.join(ROOT,
                                                      'config',
                                                      f'fgcmFitCycle{instCamel}.py')],
@@ -654,20 +702,20 @@ class FgcmcalTestBase(object):
         ----------
         butler : `lsst.daf.butler.Butler`
         srcHandles : `list`
-           handles of source catalogs
+           Handles of source catalogs.
         photoCals : `list`
            photoCalib objects, matched to srcHandles.
         rawStars : `lsst.afw.table.SourceCatalog`
-           Fgcm standard stars
+           Fgcm standard stars.
         bandIndex : `int`
-           Index of the band for the source catalogs
+           Index of the band for the source catalogs.
         offsets : `np.ndarray`
-           Testing calibration offsets to apply to rawStars
+           Testing calibration offsets to apply to rawStars.
 
         Returns
         -------
         matchMag : `np.ndarray`
-           Array of matched magnitudes
+           Array of matched magnitudes.
         matchDelta : `np.ndarray`
            Array of matched deltas between src and standard stars.
         """
@@ -705,15 +753,15 @@ class FgcmcalTestBase(object):
         Parameters
         ----------
         instName : `str`
-            Short name of the instrument
+            Short name of the instrument.
         testName : `str`
-            Base name of the test collection
+            Base name of the test collection.
         visits : `list`
-            List of visits to calibrate
+            List of visits to calibrate.
         tract : `int`
-            Tract number
+            Tract number.
         skymapName : `str`
-            Name of the sky map
+            Name of the sky map.
         rawRepeatability : `np.array`
             Expected raw repeatability after convergence.
             Length should be number of bands.
@@ -787,7 +835,7 @@ class FgcmcalTestBase(object):
 
     @classmethod
     def tearDownClass(cls):
-        """Tear down and clear directories
+        """Tear down and clear directories.
         """
         if os.path.exists(cls.testDir):
             shutil.rmtree(cls.testDir, True)

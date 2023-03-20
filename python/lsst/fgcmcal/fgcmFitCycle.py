@@ -87,8 +87,36 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
+    fgcmStarObservationsParquet = connectionTypes.Input(
+        doc=("Catalog of star observations for fgcm, in parquet format. "
+             "Used if useParquetCatalogFormat is True."),
+        name="fgcm_star_observations",
+        storageClass="ArrowAstropy",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmStarIdsParquet = connectionTypes.Input(
+        doc=("Catalog of fgcm calibration star IDs, in parquet format. "
+             "Used if useParquetCatalogFormat is True."),
+        name="fgcm_star_ids",
+        storageClass="ArrowAstropy",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
+    fgcmReferenceStarsParquet = connectionTypes.Input(
+        doc=("Catalog of fgcm-matched reference stars, in parquet format. "
+             "Used if useParquetCatalogFormat is True."),
+        name="fgcm_reference_stars",
+        storageClass="ArrowAstropy",
+        dimensions=("instrument",),
+        deferLoad=True,
+    )
+
     fgcmStarObservations = connectionTypes.Input(
-        doc="Catalog of star observations for fgcm",
+        doc=("Catalog of star observations for fgcm; old format. "
+             "Used if useParquetCatalogFormat is False."),
         name="fgcmStarObservations",
         storageClass="Catalog",
         dimensions=("instrument",),
@@ -96,7 +124,8 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
     )
 
     fgcmStarIds = connectionTypes.Input(
-        doc="Catalog of fgcm calibration star IDs",
+        doc=("Catalog of fgcm calibration star IDs. "
+             "Used if useParquetCatalogFormat is False."),
         name="fgcmStarIds",
         storageClass="Catalog",
         dimensions=("instrument",),
@@ -104,7 +133,8 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
     )
 
     fgcmStarIndices = connectionTypes.Input(
-        doc="Catalog of fgcm calibration star indices",
+        doc=("Catalog of fgcm calibration star indices; old format."
+             "Used if useParquetCatalogFormat is False."),
         name="fgcmStarIndices",
         storageClass="Catalog",
         dimensions=("instrument",),
@@ -112,7 +142,8 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
     )
 
     fgcmReferenceStars = connectionTypes.Input(
-        doc="Catalog of fgcm-matched reference stars",
+        doc=("Catalog of fgcm-matched reference stars; old format."
+             "Used if useParquetCatalogFormat is False."),
         name="fgcmReferenceStars",
         storageClass="Catalog",
         dimensions=("instrument",),
@@ -210,6 +241,19 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
 
         if not config.doReferenceCalibration:
             self.inputs.remove("fgcmReferenceStars")
+            self.inputs.remove("fgcmReferenceStarsParquet")
+
+        if config.useParquetCatalogFormat:
+            self.inputs.remove("fgcmStarObservations")
+            self.inputs.remove("fgcmStarIds")
+            self.inputs.remove("fgcmStarIndices")
+            if config.doReferenceCalibration:
+                self.inputs.remove("fgcmReferenceStars")
+        else:
+            self.inputs.remove("fgcmStarObservationsParquet")
+            self.inputs.remove("fgcmStarIdsParquet")
+            if config.doReferenceCalibration:
+                self.inputs.remove("fgcmReferenceStarsParquet")
 
         if str(int(config.connections.cycleNumber)) != config.connections.cycleNumber:
             raise ValueError("cycleNumber must be of integer format")
@@ -274,6 +318,11 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         doc="Run multiple fit cycles in one task",
         dtype=bool,
         default=False,
+    )
+    useParquetCatalogFormat = pexConfig.Field(
+        doc="Use parquet catalog format?",
+        dtype=bool,
+        default=True,
     )
     multipleCyclesFinalCycleNumber = pexConfig.RangeField(
         doc=("Final cycle number in multiple cycle mode.  The initial cycle "
@@ -921,11 +970,18 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
 
         handleDict['fgcmLookUpTable'] = butlerQC.get(inputRefs.fgcmLookUpTable)
         handleDict['fgcmVisitCatalog'] = butlerQC.get(inputRefs.fgcmVisitCatalog)
-        handleDict['fgcmStarObservations'] = butlerQC.get(inputRefs.fgcmStarObservations)
-        handleDict['fgcmStarIds'] = butlerQC.get(inputRefs.fgcmStarIds)
-        handleDict['fgcmStarIndices'] = butlerQC.get(inputRefs.fgcmStarIndices)
-        if self.config.doReferenceCalibration:
-            handleDict['fgcmReferenceStars'] = butlerQC.get(inputRefs.fgcmReferenceStars)
+
+        if self.config.useParquetCatalogFormat:
+            handleDict['fgcmStarObservations'] = butlerQC.get(inputRefs.fgcmStarObservationsParquet)
+            handleDict['fgcmStarIds'] = butlerQC.get(inputRefs.fgcmStarIdsParquet)
+            if self.config.doReferenceCalibration:
+                handleDict['fgcmReferenceStars'] = butlerQC.get(inputRefs.fgcmReferenceStarsParquet)
+        else:
+            handleDict['fgcmStarObservations'] = butlerQC.get(inputRefs.fgcmStarObservations)
+            handleDict['fgcmStarIds'] = butlerQC.get(inputRefs.fgcmStarIds)
+            handleDict['fgcmStarIndices'] = butlerQC.get(inputRefs.fgcmStarIndices)
+            if self.config.doReferenceCalibration:
+                handleDict['fgcmReferenceStars'] = butlerQC.get(inputRefs.fgcmReferenceStars)
         if self.config.cycleNumber > 0:
             handleDict['fgcmFlaggedStars'] = butlerQC.get(inputRefs.fgcmFlaggedStarsInput)
             handleDict['fgcmFitParameters'] = butlerQC.get(inputRefs.fgcmFitParametersInput)
@@ -1074,7 +1130,10 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
 
         starObs = handleDict['fgcmStarObservations'].get()
         starIds = handleDict['fgcmStarIds'].get()
-        starIndices = handleDict['fgcmStarIndices'].get()
+        if not self.config.useParquetCatalogFormat:
+            starIndices = handleDict['fgcmStarIndices'].get()
+        else:
+            starIndices = None
 
         # grab the flagged stars if available
         if 'fgcmFlaggedStars' in handleDict:
@@ -1084,8 +1143,18 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                 flaggedStars = handleDict['fgcmFlaggedStars'].get()
             flagId = flaggedStars['objId'][:]
             flagFlag = flaggedStars['objFlag'][:]
+
+            del flaggedStars
+        elif self.config.useParquetCatalogFormat:
+            # If we are using the parquet catalog format, then that means that
+            # reserved stars have already been flagged.  We extract the flags here
+            # to input to fgcm, which will then be persisted (with additional
+            # quality flags) as the fgcmFlaggedStars datatype in subsequent
+            # fit cycles.
+            (flagged,) = (starIds['obj_flag'] > 0).nonzero()
+            flagId = starIds['fgcm_id'][flagged]
+            flagFlag = starIds['obj_flag'][flagged]
         else:
-            flaggedStars = None
             flagId = None
             flagFlag = None
 
@@ -1095,6 +1164,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             refMag, refMagErr = extractReferenceMags(refStars,
                                                      _config.bands,
                                                      _config.physicalFilterMap)
+
             refId = refStars['fgcm_id'][:]
         else:
             refStars = None
@@ -1105,7 +1175,10 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         # match star observations to visits
         # Only those star observations that match visits from fgcmExpInfo['VISIT'] will
         # actually be transferred into fgcm using the indexing below.
-        visitIndex = np.searchsorted(fgcmExpInfo['VISIT'], starObs['visit'][starIndices['obsIndex']])
+        if self.config.useParquetCatalogFormat:
+            visitIndex = np.searchsorted(fgcmExpInfo['VISIT'], starObs['visit'])
+        else:
+            visitIndex = np.searchsorted(fgcmExpInfo['VISIT'], starObs['visit'][starIndices['obsIndex']])
 
         # The fgcmStars.loadStars method will copy all the star information into
         # special shared memory objects that will not blow up the memory usage when
@@ -1114,35 +1187,62 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         # stored the data to ensure that the garbage collector can clear the memory,
         # and ensure that this memory is not copied when multiprocessing kicks in.
 
-        # We determine the conversion from the native units (typically radians) to
-        # degrees for the first star.  This allows us to treat coord_ra/coord_dec as
-        # numpy arrays rather than Angles, which would we approximately 600x slower.
-        conv = starObs[0]['ra'].asDegrees() / float(starObs[0]['ra'])
+        if self.config.useParquetCatalogFormat:
+            # Note that the ra/dec coordinates for the parquet format are in
+            # degrees, which is what fgcm expects.
+            fgcmStars.loadStars(fgcmPars,
+                                starObs['visit'][:],
+                                starObs['detector'][:],
+                                starObs['ra'][:],
+                                starObs['dec'][:],
+                                starObs['inst_mag'][:],
+                                starObs['inst_mag_err'][:],
+                                fgcmExpInfo['FILTERNAME'][visitIndex],
+                                starIds['fgcm_id'][:],
+                                starIds['ra'][:],
+                                starIds['dec'][:],
+                                starIds['obs_arr_index'][:],
+                                starIds['n_obs'][:],
+                                obsX=starObs['x'][:],
+                                obsY=starObs['y'][:],
+                                obsDeltaMagBkg=starObs['delta_mag_bkg'][:],
+                                obsDeltaAper=starObs['delta_mag_aper'][:],
+                                refID=refId,
+                                refMag=refMag,
+                                refMagErr=refMagErr,
+                                flagID=flagId,
+                                flagFlag=flagFlag,
+                                computeNobs=True)
+        else:
+            # We determine the conversion from the native units (typically radians) to
+            # degrees for the first star.  This allows us to treat coord_ra/coord_dec as
+            # numpy arrays rather than Angles, which would we approximately 600x slower.
+            conv = starObs[0]['ra'].asDegrees() / float(starObs[0]['ra'])
 
-        fgcmStars.loadStars(fgcmPars,
-                            starObs['visit'][starIndices['obsIndex']],
-                            starObs['ccd'][starIndices['obsIndex']],
-                            starObs['ra'][starIndices['obsIndex']] * conv,
-                            starObs['dec'][starIndices['obsIndex']] * conv,
-                            starObs['instMag'][starIndices['obsIndex']],
-                            starObs['instMagErr'][starIndices['obsIndex']],
-                            fgcmExpInfo['FILTERNAME'][visitIndex],
-                            starIds['fgcm_id'][:],
-                            starIds['ra'][:],
-                            starIds['dec'][:],
-                            starIds['obsArrIndex'][:],
-                            starIds['nObs'][:],
-                            obsX=starObs['x'][starIndices['obsIndex']],
-                            obsY=starObs['y'][starIndices['obsIndex']],
-                            obsDeltaMagBkg=starObs['deltaMagBkg'][starIndices['obsIndex']],
-                            obsDeltaAper=starObs['deltaMagAper'][starIndices['obsIndex']],
-                            psfCandidate=starObs['psf_candidate'][starIndices['obsIndex']],
-                            refID=refId,
-                            refMag=refMag,
-                            refMagErr=refMagErr,
-                            flagID=flagId,
-                            flagFlag=flagFlag,
-                            computeNobs=True)
+            fgcmStars.loadStars(fgcmPars,
+                                starObs['visit'][starIndices['obsIndex']],
+                                starObs['ccd'][starIndices['obsIndex']],
+                                starObs['ra'][starIndices['obsIndex']] * conv,
+                                starObs['dec'][starIndices['obsIndex']] * conv,
+                                starObs['instMag'][starIndices['obsIndex']],
+                                starObs['instMagErr'][starIndices['obsIndex']],
+                                fgcmExpInfo['FILTERNAME'][visitIndex],
+                                starIds['fgcm_id'][:],
+                                starIds['ra'][:],
+                                starIds['dec'][:],
+                                starIds['obsArrIndex'][:],
+                                starIds['nObs'][:],
+                                obsX=starObs['x'][starIndices['obsIndex']],
+                                obsY=starObs['y'][starIndices['obsIndex']],
+                                obsDeltaMagBkg=starObs['deltaMagBkg'][starIndices['obsIndex']],
+                                obsDeltaAper=starObs['deltaMagAper'][starIndices['obsIndex']],
+                                psfCandidate=starObs['psf_candidate'][starIndices['obsIndex']],
+                                refID=refId,
+                                refMag=refMag,
+                                refMagErr=refMagErr,
+                                flagID=flagId,
+                                flagFlag=flagFlag,
+                                computeNobs=True)
 
         # Release all references to temporary objects holding star data (see above)
         del starObs
@@ -1150,7 +1250,6 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         del starIndices
         del flagId
         del flagFlag
-        del flaggedStars
         del refStars
         del refId
         del refMag

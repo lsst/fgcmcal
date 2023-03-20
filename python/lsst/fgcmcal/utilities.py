@@ -826,7 +826,8 @@ def makeStdCat(stdSchema, stdStruct, goodBands):
     stdCat['ntotal'][:, :] = stdStruct['NTOTAL'][:, :]
     stdCat['mag_std_noabs'][:, :] = stdStruct['MAG_STD'][:, :]
     stdCat['magErr_std'][:, :] = stdStruct['MAGERR_STD'][:, :]
-    stdCat['npsfcand'][:, :] = stdStruct['NPSFCAND'][:, :]
+    if 'NPSFCAND' in stdStruct.dtype.names:
+        stdCat['npsfcand'][:, :] = stdStruct['NPSFCAND'][:, :]
     stdCat['delta_aper'][:, :] = stdStruct['DELTA_APER'][:, :]
 
     md = PropertyList()
@@ -873,27 +874,32 @@ def extractReferenceMags(refStars, bands, filterMap):
 
     Parameters
     ----------
-    refStars : `lsst.afw.table.BaseCatalog`
-       FGCM reference star catalog
+    refStars : `astropy.table.Table` or `lsst.afw.table.BaseCatalog`
+        FGCM reference star catalog.
     bands : `list`
-       List of bands for calibration
+        List of bands for calibration.
     filterMap: `dict`
-       FGCM mapping of filter to band
+        FGCM mapping of filter to band.
 
     Returns
     -------
     refMag : `np.ndarray`
-       nstar x nband array of reference magnitudes
+        nstar x nband array of reference magnitudes.
     refMagErr : `np.ndarray`
-       nstar x nband array of reference magnitude errors
+        nstar x nband array of reference magnitude errors.
     """
-    # After DM-23331 fgcm reference catalogs have FILTERNAMES to prevent
-    # against index errors and allow more flexibility in fitting after
-    # the build stars step.
+    hasAstropyMeta = False
+    try:
+        meta = refStars.meta
+        hasAstropyMeta = True
+    except AttributeError:
+        meta = refStars.getMetadata()
 
-    md = refStars.getMetadata()
-    if 'FILTERNAMES' in md:
-        filternames = md.getArray('FILTERNAMES')
+    if 'FILTERNAMES' in meta:
+        if hasAstropyMeta:
+            filternames = meta['FILTERNAMES']
+        else:
+            filternames = meta.getArray('FILTERNAMES')
 
         # The reference catalog that fgcm wants has one entry per band
         # in the config file
@@ -914,11 +920,8 @@ def extractReferenceMags(refStars, bands, filterMap):
 
             refMag[:, ind] = refStars['refMag'][:, i]
             refMagErr[:, ind] = refStars['refMagErr'][:, i]
-
     else:
-        # Continue to use old catalogs as before.
-        refMag = refStars['refMag'][:, :]
-        refMagErr = refStars['refMagErr'][:, :]
+        raise RuntimeError("FGCM reference stars missing FILTERNAMES metadata.")
 
     return refMag, refMagErr
 

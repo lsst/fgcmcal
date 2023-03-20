@@ -195,7 +195,6 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         # Only log warning and fatal errors from the sourceSelector
         self.sourceSelector.log.setLevel(self.sourceSelector.log.WARN)
 
-    @abc.abstractmethod
     def fgcmMakeAllStarObservations(self, groupedHandles, visitCat,
                                     sourceSchema,
                                     camera,
@@ -230,7 +229,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         """
         raise NotImplementedError("fgcmMakeAllStarObservations not implemented.")
 
-    def fgcmMakeVisitCatalog(self, camera, groupedHandles, bkgHandleDict=None):
+    def fgcmMakeVisitCatalog(self, camera, groupedHandles):
         """
         Make a visit catalog with all the keys from each visit
 
@@ -240,8 +239,6 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
            Camera from the butler
         groupedHandles: `dict` [`list` [`lsst.daf.butler.DeferredDatasetHandle`]]
             Dataset handles, grouped by visit.
-        bkgHandleDict: `dict`, optional
-           Dictionary of `lsst.daf.butler.DeferredDatasetHandle` for background info.
 
         Returns
         -------
@@ -264,12 +261,11 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
 
         # No matter what, fill the catalog. This will check if it was
         # already read.
-        self._fillVisitCatalog(visitCat, groupedHandles,
-                               bkgHandleDict=bkgHandleDict)
+        self._fillVisitCatalog(visitCat, groupedHandles)
 
         return visitCat
 
-    def _fillVisitCatalog(self, visitCat, groupedHandles, bkgHandleDict=None):
+    def _fillVisitCatalog(self, visitCat, groupedHandles):
         """
         Fill the visit catalog with visit metadata
 
@@ -279,11 +275,10 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             Visit catalog.  See _makeFgcmVisitSchema() for schema definition.
         groupedHandles : `dict` [`list` [`lsst.daf.butler.DeferredDatasetHandle`]]
             Dataset handles, grouped by visit.
-        bkgHandleDict : `dict`, optional
-            Dictionary of `lsst.daf.butler.DeferredDatasetHandle`
-            for background info.
         """
-        for i, visit in enumerate(groupedHandles):
+
+        # Guarantee that these are sorted.
+        for i, visit in enumerate(sorted(groupedHandles)):
             if (i % self.config.nVisitsPerCheckpoint) == 0:
                 self.log.info("Retrieving metadata for visit %d (%d/%d)", visit, i, len(groupedHandles))
 
@@ -295,7 +290,6 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
                 # Take the first available ccd if reference isn't available
                 summaryRow = summary[0]
 
-            summaryDetector = summaryRow['id']
             visitInfo = summaryRow.getVisitInfo()
             physicalFilter = summaryRow['physical_filter']
             # Compute the median psf sigma if possible
@@ -303,10 +297,19 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             if goodSigma.size > 2:
                 psfSigma = np.median(summary['psfSigma'][goodSigma])
             elif goodSigma.size > 0:
-                psfSigma = np.mean(summary['psfSigma'][goodSigma])
+                psfSigma = summary['psfSigma'][goodSigma[0]]
             else:
                 self.log.warning("Could not find any good summary psfSigma for visit %d", visit)
                 psfSigma = 0.0
+            # Compute median background if possible
+            goodBackground, = np.where(np.nan_to_num(summary['skyBg']) > 0.0)
+            if goodBackground.size > 2:
+                skyBackground = np.median(summary['skyBg'][goodBackground])
+            elif goodBackground.size > 0:
+                skyBackground = summary['skyBg'][goodBackground[0]]
+            else:
+                self.log.warning('Could not find any good summary skyBg for visit %d', visit)
+                skyBackground = -1.0
 
             rec = visitCat[i]
             rec['visit'] = visit
@@ -329,18 +332,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             # Median delta aperture, to be measured from stars
             rec['deltaAper'] = 0.0
             rec['psfSigma'] = psfSigma
-
-            if self.config.doModelErrorsWithBackground:
-                # Use the same detector used from the summary.
-                bkgHandle = bkgHandleDict[(visit, summaryDetector)]
-                bgList = bkgHandle.get()
-
-                bgStats = (bg[0].getStatsImage().getImage().array
-                           for bg in bgList)
-                rec['skyBackground'] = sum(np.median(bg[np.isfinite(bg)]) for bg in bgStats)
-            else:
-                rec['skyBackground'] = -1.0
-
+            rec['skyBackground'] = skyBackground
             rec['used'] = 1
 
     def _makeSourceMapper(self, sourceSchema):
