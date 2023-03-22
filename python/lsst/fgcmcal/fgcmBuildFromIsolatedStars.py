@@ -166,17 +166,13 @@ class FgcmBuildFromIsolatedStarsConfig(FgcmBuildStarsConfigBase, pipeBase.Pipeli
         source_selector = self.sourceSelector["science"]
         source_selector.setDefaults()
 
-        source_selector.doFlags = True
+        source_selector.doFlags = False
         source_selector.doSignalToNoise = True
         source_selector.doUnresolved = False
         source_selector.doIsolated = False
         source_selector.doRequireFiniteRaDec = False
 
         source_selector.flags.bad = []
-
-        if self.doSubtractLocalBackground:
-            local_background_flag_name = self.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
-            source_selector.flags.bad.append(local_background_flag_name)
 
         source_selector.signalToNoise.minimum = 11.0
         source_selector.signalToNoise.maximum = 1000.0
@@ -390,6 +386,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
 
         if self.config.doSubtractLocalBackground:
             source_columns.append(self.config.localBackgroundFluxField)
+            local_background_flag_name = self.config.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
+            source_columns.append(local_background_flag_name)
 
         if self.sourceSelector.config.doFlags:
             source_columns.extend(self.sourceSelector.config.flags.bad)
@@ -445,7 +443,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             # Down-select sources.
             good_sources = self.sourceSelector.selectSources(sources).selected
             if self.config.doSubtractLocalBackground:
-                good_sources &= (~sources["localBackground_flag"])
+                good_sources &= (~sources[local_background_flag_name])
                 local_background = local_background_area*sources[self.config.localBackgroundFluxField]
                 good_sources &= ((sources[self.config.instFluxField] - local_background) > 0)
 
@@ -453,19 +451,33 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 self.log.info("No good sources found in tract %d", tract)
                 continue
 
-            # Need to re-sum numbers of observations of each star in the required bands.
+            # Need to count the observations of each star after cuts, per band.
+            # If we have requiredBands specified, we must make sure that each star
+            # has the minumum number of observations in each of thos bands.
+            # Otherwise, we must make sure that each star has at least the minimum
+            # number of observations in _any_ band.
             if len(self.config.requiredBands) > 0:
-                n_req = np.zeros((len(self.config.requiredBands), len(stars)), dtype=np.int32)
-                for i, band in enumerate(self.config.requiredBands):
-                    (band_use,) = (sources[good_sources]["band"] == band).nonzero()
-                    np.add.at(
-                        n_req,
-                        (i, sources[good_sources]["obj_index"][band_use]),
-                        1,
-                    )
+                loop_bands = self.config.requiredBands
+            else:
+                loop_bands = np.unique(sources["band"])
+
+            n_req = np.zeros((len(loop_bands), len(stars)), dtype=np.int32)
+            for i, band in enumerate(loop_bands):
+                (band_use,) = (sources[good_sources]["band"] == band).nonzero()
+                np.add.at(
+                    n_req,
+                    (i, sources[good_sources]["obj_index"][band_use]),
+                    1,
+                )
+
+            if len(self.config.requiredBands) > 0:
+                # The min gives us the band with the fewest observations, which must be
+                # above the limit.
                 (good_stars,) = (n_req.min(axis=0) >= self.config.minPerBand).nonzero()
             else:
-                good_stars = np.arange(len(stars))
+                # The max gives us the band with the most observations, which must be
+                # above the limit.
+                (good_stars,) = (n_req.max(axis=0) >= self.config.minPerBand).nonzero()
 
             # With the following matching:
             #   sources[good_sources][b] <-> stars[good_stars[a]]
