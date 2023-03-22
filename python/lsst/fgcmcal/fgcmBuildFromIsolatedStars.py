@@ -166,7 +166,7 @@ class FgcmBuildFromIsolatedStarsConfig(FgcmBuildStarsConfigBase, pipeBase.Pipeli
         source_selector = self.sourceSelector["science"]
         source_selector.setDefaults()
 
-        source_selector.doFlags = True
+        source_selector.doFlags = False
         source_selector.doSignalToNoise = True
         source_selector.doUnresolved = False
         source_selector.doIsolated = False
@@ -388,8 +388,11 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             self.config.apertureOuterInstFluxField + "Err",
         ]
 
+        local_background_flag_name = None
         if self.config.doSubtractLocalBackground:
             source_columns.append(self.config.localBackgroundFluxField)
+            local_background_flag_name = self.config.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
+            source_columns.append(local_background_flag_name)
 
         if self.sourceSelector.config.doFlags:
             source_columns.extend(self.sourceSelector.config.flags.bad)
@@ -445,7 +448,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             # Down-select sources.
             good_sources = self.sourceSelector.selectSources(sources).selected
             if self.config.doSubtractLocalBackground:
-                good_sources &= (~sources["localBackground_flag"])
+                good_sources &= (~sources[local_background_flag_name])
                 local_background = local_background_area*sources[self.config.localBackgroundFluxField]
                 good_sources &= ((sources[self.config.instFluxField] - local_background) > 0)
 
