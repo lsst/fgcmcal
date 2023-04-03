@@ -539,7 +539,7 @@ class FgcmcalTestBase(object):
             # The raw zeropoint needs to be modified to know about the wcs jacobian
             refs = butler.registry.queryDatasets('camera', dimensions=['instrument'],
                                                  collections=...)
-            camera = butler.getDirect(list(refs)[0])
+            camera = butler.get(list(refs)[0])
             approxPixelAreaFields = fgcmcal.utilities.computeApproxPixelAreaFields(camera)
             center = approxPixelAreaFields[testCcd].getBBox().getCenter()
             pixAreaCorr = approxPixelAreaFields[testCcd].evaluate(center)
@@ -724,7 +724,7 @@ class FgcmcalTestBase(object):
 
         matchDelta = None
         for srcHandle, photoCal in zip(srcHandles, photoCals):
-            src = butler.getDirect(srcHandle)
+            src = butler.get(srcHandle)
             src = photoCal.calibrateCatalog(src)
 
             gdSrc, = np.where(np.nan_to_num(src['slot_CalibFlux_flux']) > 0.0)
@@ -801,7 +801,7 @@ class FgcmcalTestBase(object):
                                                 collections=outputCollection,
                                                 where=whereClause)
 
-        repeatabilityCat = butler.getDirect(list(repRefs)[0])
+        repeatabilityCat = butler.get(list(repRefs)[0])
         repeatability = repeatabilityCat['rawRepeatability'][:]
         self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=4e-6)
 
@@ -817,7 +817,7 @@ class FgcmcalTestBase(object):
 
             count = 0
             for ref in set(refs):
-                expCat = butler.getDirect(ref)
+                expCat = butler.get(ref)
                 test, = np.where((expCat['visit'] > 0) & (expCat['id'] >= 0))
                 count += test.size
 
