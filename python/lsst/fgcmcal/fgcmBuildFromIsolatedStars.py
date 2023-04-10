@@ -28,6 +28,7 @@ calibration stars for input into fgcm.  This task additionally uses fgcm to
 match star observations into unique stars, and performs as much cleaning of the
 input catalog as possible.
 """
+import warnings
 import numpy as np
 import esutil
 import hpgeom as hpg
@@ -523,9 +524,9 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             exp_time = np.zeros(len(star_obs))
             exp_time[obs_match] = visit_cat_table["exptime"][visit_match]
 
-            with np.warnings.catch_warnings():
+            with warnings.catch_warnings():
                 # Ignore warnings, we will filter infinities and nans below.
-                np.warnings.simplefilter("ignore")
+                warnings.simplefilter("ignore")
 
                 inst_mag_inner = -2.5*np.log10(sources[self.config.apertureInnerInstFluxField])
                 inst_mag_err_inner = k*(sources[self.config.apertureInnerInstFluxField + "Err"]
