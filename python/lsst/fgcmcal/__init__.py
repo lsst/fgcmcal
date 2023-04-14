@@ -3,7 +3,6 @@
 #
 
 import pkgutil
-import lsstimport
 
 from .fgcmFitCycle import *
 from .fgcmBuildStarsBase import *
