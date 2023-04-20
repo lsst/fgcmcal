@@ -606,10 +606,12 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
 
             merge_source_counter += len(star_obs)
 
+        fgcm_obj = vstack(fgcm_objs)
+
         # Set the fgcm_id to a unique 64-bit integer for easier sorting.
         fgcm_obj["fgcm_id"][:] = np.arange(len(fgcm_obj)) + 1
 
-        return vstack(fgcm_objs), vstack(star_obs_cats)
+        return fgcm_obj, vstack(star_obs_cats)
 
     def _density_downsample(self, fgcm_obj, star_obs):
         """Downsample stars according to density.
