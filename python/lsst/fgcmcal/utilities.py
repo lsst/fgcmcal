@@ -27,10 +27,8 @@ and do not need to be part of a task.
 import numpy as np
 import os
 import re
-from deprecated.sphinx import deprecated
 
 from lsst.daf.base import PropertyList
-import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -419,76 +417,6 @@ def translateVisitCatalog(visitCat):
     fgcmExpInfo['FILTERNAME'][:] = visitCat.asAstropy()['physicalFilter']
 
     return fgcmExpInfo
-
-
-@deprecated(reason="This method is no longer used in fgcmcal.  It will be removed after v23.",
-            version="v23.0", category=FutureWarning)
-def computeCcdOffsets(camera, defaultOrientation):
-    """
-    Compute the CCD offsets in ra/dec and x/y space
-
-    Parameters
-    ----------
-    camera: `lsst.afw.cameraGeom.Camera`
-    defaultOrientation: `float`
-       Default camera orientation (degrees)
-
-    Returns
-    -------
-    ccdOffsets: `numpy.ndarray`
-       Numpy array with ccd offset information for input to FGCM.
-       Angular units are degrees, and x/y units are pixels.
-    """
-    # TODO: DM-21215 will fully generalize to arbitrary camera orientations
-
-    # and we need to know the ccd offsets from the camera geometry
-    ccdOffsets = np.zeros(len(camera), dtype=[('CCDNUM', 'i4'),
-                                              ('DELTA_RA', 'f8'),
-                                              ('DELTA_DEC', 'f8'),
-                                              ('RA_SIZE', 'f8'),
-                                              ('DEC_SIZE', 'f8'),
-                                              ('X_SIZE', 'i4'),
-                                              ('Y_SIZE', 'i4')])
-
-    # Generate fake WCSs centered at 180/0 to avoid the RA=0/360 problem,
-    # since we are looking for relative positions
-    boresight = geom.SpherePoint(180.0*geom.degrees, 0.0*geom.degrees)
-
-    # TODO: DM-17597 will update testdata_jointcal so that the test data
-    # does not have nan as the boresight angle for HSC data.  For the
-    # time being, there is this ungainly hack.
-    if camera.getName() == 'HSC' and np.isnan(defaultOrientation):
-        orientation = 270*geom.degrees
-    else:
-        orientation = defaultOrientation*geom.degrees
-    flipX = False
-
-    # Create a temporary visitInfo for input to createInitialSkyWcs
-    visitInfo = afwImage.VisitInfo(boresightRaDec=boresight,
-                                   boresightRotAngle=orientation,
-                                   rotType=afwImage.RotType.SKY)
-
-    for i, detector in enumerate(camera):
-        ccdOffsets['CCDNUM'][i] = detector.getId()
-
-        wcs = createInitialSkyWcs(visitInfo, detector, flipX)
-
-        detCenter = wcs.pixelToSky(detector.getCenter(afwCameraGeom.PIXELS))
-        ccdOffsets['DELTA_RA'][i] = (detCenter.getRa() - boresight.getRa()).asDegrees()
-        ccdOffsets['DELTA_DEC'][i] = (detCenter.getDec() - boresight.getDec()).asDegrees()
-
-        bbox = detector.getBBox()
-
-        detCorner1 = wcs.pixelToSky(geom.Point2D(bbox.getMin()))
-        detCorner2 = wcs.pixelToSky(geom.Point2D(bbox.getMax()))
-
-        ccdOffsets['RA_SIZE'][i] = np.abs((detCorner2.getRa() - detCorner1.getRa()).asDegrees())
-        ccdOffsets['DEC_SIZE'][i] = np.abs((detCorner2.getDec() - detCorner1.getDec()).asDegrees())
-
-        ccdOffsets['X_SIZE'][i] = bbox.getMaxX()
-        ccdOffsets['Y_SIZE'][i] = bbox.getMaxY()
-
-    return ccdOffsets
 
 
 def computeReferencePixelScale(camera):

@@ -168,13 +168,6 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
                                pipelineConnections=FgcmOutputProductsConnections):
     """Config for FgcmOutputProductsTask"""
 
-    cycleNumber = pexConfig.Field(
-        doc="Final fit cycle from FGCM fit",
-        dtype=int,
-        default=0,
-        deprecated=("This config is no longer used, and will be removed after v25. "
-                    "Please set config.connections.cycleNumber directly instead."),
-    )
     physicalFilterMap = pexConfig.DictField(
         doc="Mapping from 'physicalFilter' to band.",
         keytype=str,

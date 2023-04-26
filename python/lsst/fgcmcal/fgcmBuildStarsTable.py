@@ -30,6 +30,7 @@ input catalog as possible.
 """
 
 import time
+import warnings
 
 import numpy as np
 import collections
@@ -383,9 +384,9 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             tempCat[ccdKey][:] = df['detector'].values[use]
             tempCat['psf_candidate'] = df[self.config.psfCandidateName].values[use]
 
-            with np.warnings.catch_warnings():
+            with warnings.catch_warnings():
                 # Ignore warnings, we will filter infinites and nans below
-                np.warnings.simplefilter("ignore")
+                warnings.simplefilter("ignore")
 
                 instMagInner = -2.5*np.log10(df[self.config.apertureInnerInstFluxField].values[use])
                 instMagErrInner = k*(df[self.config.apertureInnerInstFluxField + 'Err'].values[use]
