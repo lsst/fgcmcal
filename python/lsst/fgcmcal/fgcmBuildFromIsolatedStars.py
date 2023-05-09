@@ -371,7 +371,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             "visit",
             "detector",
             "ra",
-            "decl",
+            "dec",
             "x",
             "y",
             "physical_filter",
@@ -513,7 +513,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             # We now reformat the sources and compute the ``observations`` that fgcm expects.
             star_obs = Table(data=np.zeros(len(sources), dtype=star_obs_dtype))
             star_obs["ra"] = sources["ra"]
-            star_obs["dec"] = sources["decl"]
+            star_obs["dec"] = sources["dec"]
             star_obs["x"] = sources["x"]
             star_obs["y"] = sources["y"]
             star_obs["visit"] = sources["visit"]
@@ -595,7 +595,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             fgcm_obj = Table(data=np.zeros(len(stars), dtype=fgcm_obj_dtype))
             fgcm_obj["isolated_star_id"] = stars["isolated_star_id"]
             fgcm_obj["ra"] = stars["ra"]
-            fgcm_obj["dec"] = stars["decl"]
+            fgcm_obj["dec"] = stars["dec"]
             fgcm_obj["obs_arr_index"] = stars["source_cat_index"]
             fgcm_obj["n_obs"] = stars["nsource"]
 
