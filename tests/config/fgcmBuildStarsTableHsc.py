@@ -27,6 +27,8 @@ configDir = os.path.join(os.path.dirname(__file__))
 config.physicalFilterMap = HSC_FILTER_DEFINITIONS.physical_to_band
 config.doSubtractLocalBackground = True
 config.sourceSelector["science"].flags.bad.append("localBackground_flag")
+# Our test files do not have detect_isPrimary in the columns.
+config.sourceSelector["science"].doRequirePrimary = False
 config.fgcmLoadReferenceCatalog.load(os.path.join(configDir, 'filterMap.py'))
 config.fgcmLoadReferenceCatalog.applyColorTerms = True
 config.fgcmLoadReferenceCatalog.colorterms.load(os.path.join(configDir, 'colorterms.py'))

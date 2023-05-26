@@ -202,6 +202,8 @@ class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase, pipeBase.PipelineTaskC
 
         sourceSelector.unresolved.name = 'extendedness'
 
+        sourceSelector.doRequirePrimary = True
+
 
 class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
     """
@@ -481,6 +483,8 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         if self.sourceSelector.config.doIsolated:
             columns.append(self.sourceSelector.config.isolated.parentName)
             columns.append(self.sourceSelector.config.isolated.nChildName)
+        if self.sourceSelector.config.doRequirePrimary:
+            columns.append(self.sourceSelector.config.requirePrimary.primaryColName)
         if self.config.doSubtractLocalBackground:
             columns.append(self.config.localBackgroundFluxField)
 

@@ -256,6 +256,7 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
         self.photoCal.match.sourceSelection.flags.good = []
         self.photoCal.match.sourceSelection.flags.bad = ['flag_badStar']
         self.photoCal.match.sourceSelection.doUnresolved = False
+        self.photoCal.match.sourceSelection.doRequirePrimary = False
 
 
 class FgcmOutputProductsTask(pipeBase.PipelineTask):
