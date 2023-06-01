@@ -167,7 +167,7 @@ class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase, pipeBase.PipelineTaskC
         # sourceTable_visit catalogs, which differ from the raw src
         # catalogs.  Therefore, all field and flag names cannot
         # be derived from the base config class.
-        self.instFluxField = 'apFlux_12_0_instFlux'
+        self.instFluxField = 'normCompGaussianFlux_instFlux'
         self.localBackgroundFluxField = 'localBackground_instFlux'
         self.apertureInnerInstFluxField = 'apFlux_12_0_instFlux'
         self.apertureOuterInstFluxField = 'apFlux_17_0_instFlux'
