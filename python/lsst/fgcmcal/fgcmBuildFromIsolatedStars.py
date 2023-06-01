@@ -390,10 +390,10 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             local_background_flag_name = self.config.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
             source_columns.append(local_background_flag_name)
 
+            local_background_area = np.pi*calib_flux_aperture_radius**2.
+
         if self.sourceSelector.config.doFlags:
             source_columns.extend(self.sourceSelector.config.flags.bad)
-
-        local_background_area = np.pi*calib_flux_aperture_radius**2.
 
         # Compute the approximate pixel area over the full focal plane
         # from the WCS jacobian using the camera model.
