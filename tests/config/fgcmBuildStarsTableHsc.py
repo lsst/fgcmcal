@@ -23,6 +23,14 @@ config.minPerBand = 2
 config.connections.refCat = "ps1_pv3_3pi_20170110"
 config.densityCutMaxPerPixel = 2000
 
+# Test files do not have normalized compensated gaussian fluxes.
+config.instFluxField = "apFlux_12_0_instFlux"
+config.sourceSelector["science"].signalToNoise.fluxField = "apFlux_12_0_instFlux"
+config.sourceSelector["science"].signalToNoise.errField = "apFlux_12_0_instFluxErr"
+if "normCompGaussianFlux_flag" in config.sourceSelector["science"].flags.bad:
+    config.sourceSelector["science"].flags.bad.remove("normCompGaussianFlux_flag")
+config.sourceSelector["science"].flags.bad.append("apFlux_12_0_flag")
+
 configDir = os.path.join(os.path.dirname(__file__))
 config.physicalFilterMap = HSC_FILTER_DEFINITIONS.physical_to_band
 config.doSubtractLocalBackground = True
