@@ -198,7 +198,7 @@ class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase, pipeBase.PipelineTaskC
         sourceSelector.isolated.nChildName = 'deblend_nChild'
 
         sourceSelector.requireFiniteRaDec.raColName = 'ra'
-        sourceSelector.requireFiniteRaDec.decColName = 'decl'
+        sourceSelector.requireFiniteRaDec.decColName = 'dec'
 
         sourceSelector.unresolved.name = 'extendedness'
 
@@ -378,7 +378,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
             tempCat.resize(use.size)
 
             tempCat['ra'][:] = np.deg2rad(df['ra'].values[use])
-            tempCat['dec'][:] = np.deg2rad(df['decl'].values[use])
+            tempCat['dec'][:] = np.deg2rad(df['dec'].values[use])
             tempCat['x'][:] = df['x'].values[use]
             tempCat['y'][:] = df['y'].values[use]
             # The "visit" name in the parquet table is hard-coded.
@@ -472,7 +472,7 @@ class FgcmBuildStarsTableTask(FgcmBuildStarsBaseTask):
         """
         # Some names are hard-coded in the parquet table.
         columns = ['visit', 'detector',
-                   'ra', 'decl', 'x', 'y', self.config.psfCandidateName,
+                   'ra', 'dec', 'x', 'y', self.config.psfCandidateName,
                    self.config.instFluxField, self.config.instFluxField + 'Err',
                    self.config.apertureInnerInstFluxField, self.config.apertureInnerInstFluxField + 'Err',
                    self.config.apertureOuterInstFluxField, self.config.apertureOuterInstFluxField + 'Err']
