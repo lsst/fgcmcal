@@ -304,7 +304,7 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
     ConfigClass = FgcmMakeLutConfig
     _DefaultName = "fgcmMakeLut"
 
-    def __init__(self, butler=None, initInputs=None, **kwargs):
+    def __init__(self, initInputs=None, **kwargs):
         super().__init__(**kwargs)
 
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
