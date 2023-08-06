@@ -149,6 +149,9 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         if not config.doReferenceMatches:
             self.outputs.remove("fgcmReferenceStars")
 
+    def getSpatialBoundsConnections(self):
+        return ("visitSummary",)
+
 
 class FgcmBuildStarsTableConfig(FgcmBuildStarsConfigBase, pipeBase.PipelineTaskConfig,
                                 pipelineConnections=FgcmBuildStarsTableConnections):

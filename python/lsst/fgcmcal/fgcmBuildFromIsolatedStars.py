@@ -138,6 +138,9 @@ class FgcmBuildFromIsolatedStarsConnections(pipeBase.PipelineTaskConnections,
             self.prerequisiteInputs.remove("fgcm_lookup_table")
             self.outputs.remove("fgcm_reference_stars")
 
+    def getSpatialBoundsConnections(self):
+        return ("isolated_star_cats", "visit_summaries")
+
 
 class FgcmBuildFromIsolatedStarsConfig(FgcmBuildStarsConfigBase, pipeBase.PipelineTaskConfig,
                                        pipelineConnections=FgcmBuildFromIsolatedStarsConnections):
