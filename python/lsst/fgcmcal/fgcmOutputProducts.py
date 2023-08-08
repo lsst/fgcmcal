@@ -163,6 +163,9 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         if not config.doReferenceCalibration:
             self.outputs.remove("fgcmOffsets")
 
+    def getSpatialBoundsConnections(self):
+        return ("fgcmPhotoCalib",)
+
 
 class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
                                pipelineConnections=FgcmOutputProductsConnections):

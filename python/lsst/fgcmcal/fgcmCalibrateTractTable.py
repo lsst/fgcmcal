@@ -135,6 +135,9 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         if not config.fgcmOutputProducts.doZeropointOutput:
             self.prerequisiteInputs.remove("fgcmZeropoints")
 
+    def getSpatialBoundsConnections(self):
+        return ("visitSummary",)
+
 
 class FgcmCalibrateTractTableConfig(FgcmCalibrateTractConfigBase, pipeBase.PipelineTaskConfig,
                                     pipelineConnections=FgcmCalibrateTractTableConnections):
