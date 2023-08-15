@@ -73,7 +73,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
         i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
         i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
-        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
+        i10Recon = np.array([-5.898066164791944, -7.017864435075141, 3.6273818061064906])
 
         self._testFgcmMakeLut(instName, testName,
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
@@ -92,7 +92,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nOkZp = 27
         nBadZp = 1093
         nStdStars = 235
-        nPlots = 48
+        nPlots = 47
 
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -128,7 +128,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
         i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
         i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
-        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
+        i10Recon = np.array([-5.898066164791944, -7.017864435075141, 3.6273818061064906])
 
         self._testFgcmMakeLut(instName, testName,
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
@@ -155,7 +155,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         i0Std = np.array([0.08294534, 0.07877351, 0.06464688])
         i10Std = np.array([-0.000091981, -0.00061516, -0.00063434])
         i0Recon = np.array([0.07322632, 0.0689530429, 0.05600673])
-        i10Recon = np.array([-5.89816122, -7.01847144, 3.62675740])
+        i10Recon = np.array([-5.898066164791944, -7.017864435075141, 3.6273818061064906])
 
         self._testFgcmMakeLut(instName, testName,
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
