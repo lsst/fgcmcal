@@ -29,12 +29,12 @@ import os
 import re
 
 from lsst.daf.base import PropertyList
+from lsst.daf.butler import Timespan
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.geom as geom
 from lsst.obs.base import createInitialSkyWcs
-from lsst.pipe.base import Instrument
 
 import fgcm
 
@@ -855,9 +855,15 @@ def extractReferenceMags(refStars, bands, filterMap):
 
 
 def lookupStaticCalibrations(datasetType, registry, quantumDataId, collections):
-    instrument = Instrument.fromName(quantumDataId["instrument"], registry)
-    unboundedCollection = instrument.makeUnboundedCalibrationRunName()
-
-    return registry.queryDatasets(datasetType,
-                                  dataId=quantumDataId,
-                                  collections=[unboundedCollection])
+    # For static calibrations, we search with a timespan that has unbounded
+    # begin and end; we'll get an error if there's more than one match (because
+    # then it's not static).
+    timespan = Timespan(begin=None, end=None)
+    result = []
+    # First iterate over all of the data IDs for this dataset type that are
+    # consistent with the quantum data ID.
+    for dataId in registry.queryDataIds(datasetType.dimensions, dataId=quantumDataId):
+        # Find the dataset with this data ID using the unbounded timespan.
+        if ref := registry.findDataset(datasetType, dataId, collections=collections, timespan=timespan):
+            result.append(ref)
+    return result
