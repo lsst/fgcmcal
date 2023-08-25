@@ -55,7 +55,6 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         name="camera",
         storageClass="Camera",
         dimensions=("instrument",),
-        lookupFunction=lookupStaticCalibrations,
         isCalibration=True,
     )
 
@@ -64,7 +63,6 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         name="transmission_optics",
         storageClass="TransmissionCurve",
         dimensions=("instrument",),
-        lookupFunction=lookupStaticCalibrations,
         isCalibration=True,
         deferLoad=True,
     )

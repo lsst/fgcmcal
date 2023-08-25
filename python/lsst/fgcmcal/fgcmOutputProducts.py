@@ -51,7 +51,6 @@ import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
 
 from .utilities import computeApproxPixelAreaFields
-from .utilities import lookupStaticCalibrations
 from .utilities import FGCM_ILLEGAL_VALUE
 
 import fgcm
@@ -67,7 +66,6 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         name="camera",
         storageClass="Camera",
         dimensions=("instrument",),
-        lookupFunction=lookupStaticCalibrations,
         isCalibration=True,
     )
 

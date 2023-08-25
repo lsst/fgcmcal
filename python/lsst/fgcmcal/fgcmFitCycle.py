@@ -47,7 +47,6 @@ from .utilities import extractReferenceMags
 from .utilities import makeZptSchema, makeZptCat
 from .utilities import makeAtmSchema, makeAtmCat, makeStdSchema, makeStdCat
 from .sedterms import SedboundarytermDict, SedtermDict
-from .utilities import lookupStaticCalibrations
 from .focalPlaneProjector import FocalPlaneProjector
 
 import fgcm
@@ -66,7 +65,6 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         name="camera",
         storageClass="Camera",
         dimensions=("instrument",),
-        lookupFunction=lookupStaticCalibrations,
         isCalibration=True,
     )
 

@@ -43,7 +43,6 @@ from lsst.meas.algorithms import ReferenceObjectLoader, LoadReferenceObjectsConf
 
 from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsBaseTask
 from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromName
-from .utilities import lookupStaticCalibrations
 
 __all__ = ['FgcmBuildStarsTableConfig', 'FgcmBuildStarsTableTask']
 
@@ -56,7 +55,6 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
         name="camera",
         storageClass="Camera",
         dimensions=("instrument",),
-        lookupFunction=lookupStaticCalibrations,
         isCalibration=True,
     )
 
