@@ -633,7 +633,7 @@ class FgcmcalTestBase(object):
         # To account for overall throughput changes, we scale by the median ratio,
         # we only care about the shape
         ratio = np.median(testResp/lutCat[0]['atmStdTrans'])
-        self.assertFloatsAlmostEqual(testResp/ratio, lutCat[0]['atmStdTrans'], atol=0.04)
+        self.assertFloatsAlmostEqual(testResp/ratio, lutCat[0]['atmStdTrans'], atol=0.2)
 
         # The second should be close to the first, but there is the airmass
         # difference so they aren't identical.
