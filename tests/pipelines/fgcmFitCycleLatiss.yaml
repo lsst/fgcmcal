@@ -1,0 +1,5 @@
+description: Perform an fgcmcal fit cycle
+instrument: lsst.obs.lsst.Latiss
+tasks:
+  fgcmFitCycle:
+    class: lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask

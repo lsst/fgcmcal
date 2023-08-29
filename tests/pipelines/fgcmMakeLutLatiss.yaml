@@ -1,0 +1,4 @@
+description: Make fgcmcal look-up table
+instrument: lsst.obs.lsst.Latiss
+tasks:
+  fgcmMakeLut: lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask
