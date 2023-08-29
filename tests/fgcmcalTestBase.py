@@ -448,7 +448,8 @@ class FgcmcalTestBase(object):
         self.assertEqual(len(stds), nStdStars)
 
     def _testFgcmOutputProducts(self, instName, testName,
-                                zpOffsets, testVisit, testCcd, testFilter, testBandIndex):
+                                zpOffsets, testVisit, testCcd, testFilter, testBandIndex,
+                                testSrc=True):
         """Test running of FgcmOutputProductsTask.
 
         Parameters
@@ -467,6 +468,8 @@ class FgcmcalTestBase(object):
             Filtername for testVisit/testCcd.
         testBandIndex : `int`
             Band index for testVisit/testCcd.
+        testSrc : `bool`, optional
+            Test the source catalogs?  (Only if available in dataset.)
         """
         instCamel = instName.title()
 
@@ -527,85 +530,86 @@ class FgcmcalTestBase(object):
         # We do round-trip value checking on just the final one (chosen arbitrarily)
         testCal = photoCalibDict[(testVisit, testCcd)]
 
-        src = butler.get('src', visit=int(testVisit), detector=int(testCcd),
-                         collections=[outputCollection], instrument=instName)
+        if testSrc:
+            src = butler.get('src', visit=int(testVisit), detector=int(testCcd),
+                             collections=[outputCollection], instrument=instName)
 
-        # Only test sources with positive flux
-        gdSrc = (src['slot_CalibFlux_instFlux'] > 0.0)
+            # Only test sources with positive flux
+            gdSrc = (src['slot_CalibFlux_instFlux'] > 0.0)
 
-        # We need to apply the calibration offset to the fgcmzpt (which is internal
-        # and doesn't know about that yet)
-        testZpInd, = np.where((zptCat['visit'] == testVisit)
-                              & (zptCat['detector'] == testCcd))
-        fgcmZpt = (zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex]
-                   + zptCat['fgcmDeltaChrom'][testZpInd])
-        fgcmZptGrayErr = np.sqrt(zptCat['fgcmZptVar'][testZpInd])
+            # We need to apply the calibration offset to the fgcmzpt (which is internal
+            # and doesn't know about that yet)
+            testZpInd, = np.where((zptCat['visit'] == testVisit)
+                                  & (zptCat['detector'] == testCcd))
+            fgcmZpt = (zptCat['fgcmZpt'][testZpInd] + offsets[testBandIndex]
+                       + zptCat['fgcmDeltaChrom'][testZpInd])
+            fgcmZptGrayErr = np.sqrt(zptCat['fgcmZptVar'][testZpInd])
 
-        if config.doComposeWcsJacobian:
-            # The raw zeropoint needs to be modified to know about the wcs jacobian
-            refs = butler.registry.queryDatasets('camera', dimensions=['instrument'],
-                                                 collections=...)
-            camera = butler.get(list(refs)[0])
-            approxPixelAreaFields = fgcmcal.utilities.computeApproxPixelAreaFields(camera)
-            center = approxPixelAreaFields[testCcd].getBBox().getCenter()
-            pixAreaCorr = approxPixelAreaFields[testCcd].evaluate(center)
-            fgcmZpt += -2.5*np.log10(pixAreaCorr)
+            if config.doComposeWcsJacobian:
+                # The raw zeropoint needs to be modified to know about the wcs jacobian
+                refs = butler.registry.queryDatasets('camera', dimensions=['instrument'],
+                                                     collections=...)
+                camera = butler.get(list(refs)[0])
+                approxPixelAreaFields = fgcmcal.utilities.computeApproxPixelAreaFields(camera)
+                center = approxPixelAreaFields[testCcd].getBBox().getCenter()
+                pixAreaCorr = approxPixelAreaFields[testCcd].evaluate(center)
+                fgcmZpt += -2.5*np.log10(pixAreaCorr)
 
-        # This is the magnitude through the mean calibration
-        photoCalMeanCalMags = np.zeros(gdSrc.sum())
-        # This is the magnitude through the full focal-plane variable mags
-        photoCalMags = np.zeros_like(photoCalMeanCalMags)
-        # This is the magnitude with the FGCM (central-ccd) zeropoint
-        zptMeanCalMags = np.zeros_like(photoCalMeanCalMags)
+            # This is the magnitude through the mean calibration
+            photoCalMeanCalMags = np.zeros(gdSrc.sum())
+            # This is the magnitude through the full focal-plane variable mags
+            photoCalMags = np.zeros_like(photoCalMeanCalMags)
+            # This is the magnitude with the FGCM (central-ccd) zeropoint
+            zptMeanCalMags = np.zeros_like(photoCalMeanCalMags)
 
-        for i, rec in enumerate(src[gdSrc]):
-            photoCalMeanCalMags[i] = testCal.instFluxToMagnitude(rec['slot_CalibFlux_instFlux'])
-            photoCalMags[i] = testCal.instFluxToMagnitude(rec['slot_CalibFlux_instFlux'],
-                                                          rec.getCentroid())
-            zptMeanCalMags[i] = fgcmZpt - 2.5*np.log10(rec['slot_CalibFlux_instFlux'])
+            for i, rec in enumerate(src[gdSrc]):
+                photoCalMeanCalMags[i] = testCal.instFluxToMagnitude(rec['slot_CalibFlux_instFlux'])
+                photoCalMags[i] = testCal.instFluxToMagnitude(rec['slot_CalibFlux_instFlux'],
+                                                              rec.getCentroid())
+                zptMeanCalMags[i] = fgcmZpt - 2.5*np.log10(rec['slot_CalibFlux_instFlux'])
 
-        # These should be very close but some tiny differences because the fgcm value
-        # is defined at the center of the bbox, and the photoCal is the mean over the box
-        self.assertFloatsAlmostEqual(photoCalMeanCalMags,
-                                     zptMeanCalMags, rtol=1e-6)
-        # These should be roughly equal, but not precisely because of the focal-plane
-        # variation.  However, this is a useful sanity check for something going totally
-        # wrong.
-        self.assertFloatsAlmostEqual(photoCalMeanCalMags,
-                                     photoCalMags, rtol=1e-2)
+            # These should be very close but some tiny differences because the fgcm value
+            # is defined at the center of the bbox, and the photoCal is the mean over the box
+            self.assertFloatsAlmostEqual(photoCalMeanCalMags,
+                                         zptMeanCalMags, rtol=1e-6)
+            # These should be roughly equal, but not precisely because of the focal-plane
+            # variation.  However, this is a useful sanity check for something going totally
+            # wrong.
+            self.assertFloatsAlmostEqual(photoCalMeanCalMags,
+                                         photoCalMags, rtol=1e-2)
 
-        # The next test compares the "FGCM standard magnitudes" (which are output
-        # from the fgcm code itself) to the "calibrated magnitudes" that are
-        # obtained from running photoCalib.calibrateCatalog() on the original
-        # src catalogs.  This summary comparison ensures that using photoCalibs
-        # yields the same results as what FGCM is computing internally.
-        # Note that we additionally need to take into account the post-processing
-        # offsets used in the tests.
+            # The next test compares the "FGCM standard magnitudes" (which are output
+            # from the fgcm code itself) to the "calibrated magnitudes" that are
+            # obtained from running photoCalib.calibrateCatalog() on the original
+            # src catalogs.  This summary comparison ensures that using photoCalibs
+            # yields the same results as what FGCM is computing internally.
+            # Note that we additionally need to take into account the post-processing
+            # offsets used in the tests.
 
-        # For decent statistics, we are matching all the sources from one visit
-        # (multiple ccds)
-        whereClause = f"instrument='{instName:s}' and visit={testVisit:d}"
-        srcRefs = butler.registry.queryDatasets('src', dimensions=['visit'],
-                                                collections='%s/testdata' % (instName),
-                                                where=whereClause,
-                                                findFirst=True)
-        photoCals = []
-        for srcRef in srcRefs:
-            photoCals.append(photoCalibDict[(testVisit, srcRef.dataId['detector'])])
+            # For decent statistics, we are matching all the sources from one visit
+            # (multiple ccds)
+            whereClause = f"instrument='{instName:s}' and visit={testVisit:d}"
+            srcRefs = butler.registry.queryDatasets('src', dimensions=['visit'],
+                                                    collections='%s/testdata' % (instName),
+                                                    where=whereClause,
+                                                    findFirst=True)
+            photoCals = []
+            for srcRef in srcRefs:
+                photoCals.append(photoCalibDict[(testVisit, srcRef.dataId['detector'])])
 
-        matchMag, matchDelta = self._getMatchedVisitCat(butler, srcRefs, photoCals,
-                                                        rawStars, testBandIndex, offsets)
+            matchMag, matchDelta = self._getMatchedVisitCat(butler, srcRefs, photoCals,
+                                                            rawStars, testBandIndex, offsets)
 
-        st = np.argsort(matchMag)
-        # Compare the brightest 25% of stars.  No matter the setting of
-        # deltaMagBkgOffsetPercentile, we want to ensure that these stars
-        # match on average.
-        brightest, = np.where(matchMag < matchMag[st[int(0.25*st.size)]])
-        self.assertFloatsAlmostEqual(np.median(matchDelta[brightest]), 0.0, atol=0.002)
+            st = np.argsort(matchMag)
+            # Compare the brightest 25% of stars.  No matter the setting of
+            # deltaMagBkgOffsetPercentile, we want to ensure that these stars
+            # match on average.
+            brightest, = np.where(matchMag < matchMag[st[int(0.25*st.size)]])
+            self.assertFloatsAlmostEqual(np.median(matchDelta[brightest]), 0.0, atol=0.002)
 
-        # And the photoCal error is just the zeropoint gray error
-        self.assertFloatsAlmostEqual(testCal.getCalibrationErr(),
-                                     (np.log(10.0)/2.5)*testCal.getCalibrationMean()*fgcmZptGrayErr)
+            # And the photoCal error is just the zeropoint gray error
+            self.assertFloatsAlmostEqual(testCal.getCalibrationErr(),
+                                         (np.log(10.0)/2.5)*testCal.getCalibrationMean()*fgcmZptGrayErr)
 
         # Test the transmission output
         visitCatalog = butler.get('fgcmVisitCatalog', collections=[inputCollection],
