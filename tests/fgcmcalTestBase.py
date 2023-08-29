@@ -227,7 +227,8 @@ class FgcmcalTestBase(object):
             self.assertEqual(np.min(tputs), 0.0)
             self.assertGreater(np.max(tputs), 0.0)
 
-    def _testFgcmBuildStarsTable(self, instName, testName, queryString, visits, nStar, nObs):
+    def _testFgcmBuildStarsTable(self, instName, testName, queryString, visits, nStar, nObs,
+                                 refcatCollection="refcats/gen2"):
         """Test running of FgcmBuildStarsTableTask
 
         Parameters
@@ -244,6 +245,8 @@ class FgcmcalTestBase(object):
             Number of stars expected.
         nObs : `int`
             Number of observations of stars expected.
+        refcatCollection : `str`, optional
+            Name of reference catalog collection.
         """
         instCamel = instName.title()
 
@@ -258,7 +261,7 @@ class FgcmcalTestBase(object):
                                        'fgcmBuildStarsTable%s.yaml' % (instCamel)),
                           configFiles=configFiles,
                           inputCollections=[f'{instName}/{testName}/lut',
-                                            'refcats/gen2'],
+                                            refcatCollection],
                           outputCollection=outputCollection,
                           queryString=queryString,
                           registerDatasetTypes=True)
@@ -277,7 +280,8 @@ class FgcmcalTestBase(object):
                              instrument=instName)
         self.assertEqual(len(starObs), nObs)
 
-    def _testFgcmBuildFromIsolatedStars(self, instName, testName, queryString, visits, nStar, nObs):
+    def _testFgcmBuildFromIsolatedStars(self, instName, testName, queryString, visits, nStar, nObs,
+                                        refcatCollection="refcats/gen2"):
         """Test running of FgcmBuildFromIsolatedStarsTask.
 
         Parameters
@@ -294,6 +298,8 @@ class FgcmcalTestBase(object):
             Number of stars expected.
         nObs : `int`
             Number of observations of stars expected.
+        refcatCollection : `str`, optional
+            Name of reference catalog collection.
         """
         instCamel = instName.title()
 
@@ -310,7 +316,7 @@ class FgcmcalTestBase(object):
                                        'fgcmBuildFromIsolatedStars%s.yaml' % (instCamel)),
                           configFiles=configFiles,
                           inputCollections=[f'{instName}/{testName}/lut',
-                                            'refcats/gen2'],
+                                            refcatCollection],
                           outputCollection=outputCollection,
                           queryString=queryString,
                           registerDatasetTypes=True)
@@ -637,7 +643,8 @@ class FgcmcalTestBase(object):
         ratio = np.median(testResp/testResp2)
         self.assertFloatsAlmostEqual(testResp/ratio, testResp2, atol=0.04)
 
-    def _testFgcmMultiFit(self, instName, testName, queryString, visits, zpOffsets):
+    def _testFgcmMultiFit(self, instName, testName, queryString, visits, zpOffsets,
+                          refcatCollection="refcats/gen2"):
         """Test running the full pipeline with multiple fit cycles.
 
         Parameters
@@ -652,6 +659,8 @@ class FgcmcalTestBase(object):
             List of visits to calibrate.
         zpOffsets : `np.ndarray`
             Zeropoint offsets expected.
+        refcatCollection : `str`, optional
+            Name of reference catalog collection.
         """
         instCamel = instName.title()
 
@@ -679,7 +688,7 @@ class FgcmcalTestBase(object):
                                        f'fgcmFullPipeline{instCamel}.yaml'),
                           configFiles=configFiles,
                           inputCollections=[f'{instName}/{testName}/lut',
-                                            'refcats/gen2'],
+                                            refcatCollection],
                           outputCollection=outputCollection,
                           queryString=queryString,
                           registerDatasetTypes=True)
