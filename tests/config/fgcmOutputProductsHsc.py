@@ -15,5 +15,5 @@ config.photoCal.applyColorTerms = True
 config.photoCal.photoCatName = 'ps1_pv3_3pi_20170110'
 
 configDir = os.path.join(os.path.dirname(__file__))
-config.photoCal.colorterms.load(os.path.join(configDir, 'colorterms.py'))
+config.photoCal.colorterms.load(os.path.join(configDir, 'colortermsHsc.py'))
 config.connections.refCat = 'ps1_pv3_3pi_20170110'
