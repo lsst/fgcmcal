@@ -542,6 +542,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=float,
         default=None,
     )
+    mirrorArea = pexConfig.Field(
+        doc="Mirror area (square meters) of telescope.  If not set, will "
+            "try to estimate from camera.telescopeDiameter.",
+        dtype=float,
+        default=None,
+        optional=True,
+    )
     defaultCameraOrientation = pexConfig.Field(
         doc="Default camera orientation for QA plots.",
         dtype=float,
