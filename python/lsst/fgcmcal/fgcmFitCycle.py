@@ -442,6 +442,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=float,
         default=5.0,
     )
+    superStarPlotCcdResiduals = pexConfig.Field(
+        doc="If plotting is enabled, should per-detector residuals be plotted? "
+            "This may produce a lot of output, and should be used only for "
+            "debugging purposes.",
+        dtype=bool,
+        default=False,
+    )
     focalPlaneSigmaClip = pexConfig.Field(
         doc="Number of sigma to clip outliers per focal-plane.",
         dtype=float,
