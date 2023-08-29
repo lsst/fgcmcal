@@ -578,7 +578,7 @@ def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
                             '(value set by deltaMagBkgOffsetPercentile) calibration '
                             'stars.'))
     zptSchema.addField('exptime', type=np.float32, doc='Exposure time')
-    zptSchema.addField('filtername', type=str, size=10, doc='Filter name')
+    zptSchema.addField('filtername', type=str, size=30, doc='Filter name')
 
     return zptSchema
 
@@ -649,7 +649,7 @@ def makeAtmSchema():
 
     atmSchema = afwTable.Schema()
 
-    atmSchema.addField('visit', type=np.int32, doc='Visit number')
+    atmSchema.addField('visit', type=np.int64, doc='Visit number')
     atmSchema.addField('pmb', type=np.float64, doc='Barometric pressure (mb)')
     atmSchema.addField('pwv', type=np.float64, doc='Water vapor (mm)')
     atmSchema.addField('tau', type=np.float64, doc='Aerosol optical depth')
