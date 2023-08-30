@@ -32,7 +32,6 @@ import lsst.afw.table as afwTable
 from .fgcmBuildStarsTable import FgcmBuildStarsTableTask
 from .fgcmCalibrateTractBase import (FgcmCalibrateTractConfigBase,
                                      FgcmCalibrateTractBaseTask)
-from .utilities import lookupStaticCalibrations
 
 __all__ = ['FgcmCalibrateTractTableConfig', 'FgcmCalibrateTractTableTask']
 
@@ -45,7 +44,6 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
         name="camera",
         storageClass="Camera",
         dimensions=("instrument",),
-        lookupFunction=lookupStaticCalibrations,
         isCalibration=True,
     )
 

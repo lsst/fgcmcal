@@ -45,7 +45,6 @@ from lsst.pipe.tasks.reserveIsolatedStars import ReserveIsolatedStarsTask
 
 from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsBaseTask
 from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromName
-from .utilities import lookupStaticCalibrations
 
 __all__ = ["FgcmBuildFromIsolatedStarsConfig", "FgcmBuildFromIsolatedStarsTask"]
 
@@ -58,7 +57,6 @@ class FgcmBuildFromIsolatedStarsConnections(pipeBase.PipelineTaskConnections,
         name="camera",
         storageClass="Camera",
         dimensions=("instrument",),
-        lookupFunction=lookupStaticCalibrations,
         isCalibration=True,
     )
     fgcm_lookup_table = connectionTypes.PrerequisiteInput(
