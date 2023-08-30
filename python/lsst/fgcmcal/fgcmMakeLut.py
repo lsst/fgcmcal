@@ -118,36 +118,6 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         if not config.doSensorTransmission:
             del self.transmission_sensor
 
-        if not config.filterTransmissionIsUnbounded:
-            self.transmission_filter = connectionTypes.PrerequisiteInput(
-                doc="Filter transmission curve information.",
-                name="transmission_filter",
-                storageClass="TransmissionCurve",
-                dimensions=("band", "instrument", "physical_filter",),
-                isCalibration=True,
-                deferLoad=True,
-                multiple=True,
-            )
-        if not config.opticsTransmissionIsUnbounded:
-            self.transmission_optics = connectionTypes.PrerequisiteInput(
-                doc="Optics transmission information.",
-                name="transmission_optics",
-                storageClass="TransmissionCurve",
-                dimensions=("instrument",),
-                isCalibration=True,
-                deferLoad=True,
-            )
-        if not config.opticsTransmissionIsUnbounded:
-            self.transmission_sensor = connectionTypes.PrerequisiteInput(
-                doc="Optics transmission information.",
-                name="transmission_sensor",
-                storageClass="TransmissionCurve",
-                dimensions=("instrument", "detector",),
-                isCalibration=True,
-                deferLoad=True,
-                multiple=True,
-            )
-
 
 class FgcmMakeLutParametersConfig(pexConfig.Config):
     """Config for parameters if atmosphereTableName not available"""
@@ -304,21 +274,6 @@ class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
     )
     doSensorTransmission = pexConfig.Field(
         doc="Include sensor transmission?",
-        dtype=bool,
-        default=True,
-    )
-    filterTransmissionIsUnbounded = pexConfig.Field(
-        doc="Filter transmission has no timespan?",
-        dtype=bool,
-        default=True,
-    )
-    opticsTransmissionIsUnbounded = pexConfig.Field(
-        doc="Optics transmission has no timespan?",
-        dtype=bool,
-        default=True,
-    )
-    sensorTransmissionIsUnbounded = pexConfig.Field(
-        doc="Sensor transmission has no timespan?",
         dtype=bool,
         default=True,
     )
