@@ -131,7 +131,6 @@ class FgcmcalTestBase(object):
 
         executor = SimplePipelineExecutor.from_pipeline(pipeline,
                                                         where=queryString,
-                                                        root=repo,
                                                         butler=butler,
                                                         resources=resources)
         quanta = executor.run(register_dataset_types=registerDatasetTypes)
