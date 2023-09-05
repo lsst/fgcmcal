@@ -69,7 +69,7 @@ class FgcmcalTestLatiss(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCa
                               os.path.join(cls.dataDir, 'latiss', 'exports.yaml'))
 
     def test_fgcmcalPipeline(self):
-        """Test running the full pipeline, using new isolated star association code.
+        """Test running the full pipeline, using isolated star association code.
         """
         # Set numpy seed for stability
         np.random.seed(seed=1000)
@@ -126,7 +126,7 @@ class FgcmcalTestLatiss(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCa
         nGoodZp = 13
         nOkZp = 13
         nBadZp = 7
-        nStdStars = 50
+        nStdStars = 48
         nPlots = 38
 
         self._testFgcmFitCycle(instName, testName,
@@ -146,8 +146,8 @@ class FgcmcalTestLatiss(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCa
                                2, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
                                extraConfig=extraConfigFile)
 
-        zpOffsets = np.array([0.03581522777676582,
-                              -0.0034634433686733246])
+        zpOffsets = np.array([0.025642290711402893,
+                              -0.001271035522222519])
 
         self._testFgcmOutputProducts(
             instName,
@@ -200,8 +200,8 @@ class FgcmcalTestLatiss(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCa
 
         # These are slightly different from above due to the configuration change
         # mid-way in the separate fits.
-        zpOffsets = np.array([-0.003004444297403097,
-                              -0.08112616837024689])
+        zpOffsets = np.array([0.00999188981950283,
+                              -0.009526489302515984])
 
         self._testFgcmMultiFit(
             instName,
