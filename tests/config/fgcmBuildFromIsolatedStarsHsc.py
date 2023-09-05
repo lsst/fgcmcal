@@ -25,9 +25,9 @@ configDir = os.path.join(os.path.dirname(__file__))
 config.physicalFilterMap = HSC_FILTER_DEFINITIONS.physical_to_band
 config.doSubtractLocalBackground = True
 config.sourceSelector["science"].flags.bad.append("localBackground_flag")
-config.fgcmLoadReferenceCatalog.load(os.path.join(configDir, 'filterMap.py'))
+config.fgcmLoadReferenceCatalog.load(os.path.join(configDir, 'filterMapHsc.py'))
 config.fgcmLoadReferenceCatalog.applyColorTerms = True
-config.fgcmLoadReferenceCatalog.colorterms.load(os.path.join(configDir, 'colorterms.py'))
+config.fgcmLoadReferenceCatalog.colorterms.load(os.path.join(configDir, 'colortermsHsc.py'))
 config.fgcmLoadReferenceCatalog.referenceSelector.doSignalToNoise = True
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.fluxField = 'i_flux'
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.errField = 'i_fluxErr'

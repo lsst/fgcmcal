@@ -112,6 +112,12 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
+    def __init__(self, *, config=None):
+        if not config.doOpticsTransmission:
+            del self.transmission_optics
+        if not config.doSensorTransmission:
+            del self.transmission_sensor
+
 
 class FgcmMakeLutParametersConfig(pexConfig.Config):
     """Config for parameters if atmosphereTableName not available"""
@@ -261,6 +267,16 @@ class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
         default=None,
         optional=True,
     )
+    doOpticsTransmission = pexConfig.Field(
+        doc="Include optics transmission?",
+        dtype=bool,
+        default=True,
+    )
+    doSensorTransmission = pexConfig.Field(
+        doc="Include sensor transmission?",
+        dtype=bool,
+        default=True,
+    )
     parameters = pexConfig.ConfigField(
         doc="Atmosphere parameters (required if no atmosphereTableName)",
         dtype=FgcmMakeLutParametersConfig,
@@ -308,11 +324,17 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         camera = butlerQC.get(inputRefs.camera)
 
-        opticsHandle = butlerQC.get(inputRefs.transmission_optics)
+        if self.config.doOpticsTransmission:
+            opticsHandle = butlerQC.get(inputRefs.transmission_optics)
+        else:
+            opticsHandle = None
 
-        sensorHandles = butlerQC.get(inputRefs.transmission_sensor)
-        sensorHandleDict = {sensorHandle.dataId.byName()['detector']: sensorHandle for
-                            sensorHandle in sensorHandles}
+        if self.config.doSensorTransmission:
+            sensorHandles = butlerQC.get(inputRefs.transmission_sensor)
+            sensorHandleDict = {sensorHandle.dataId.byName()['detector']: sensorHandle for
+                                sensorHandle in sensorHandles}
+        else:
+            sensorHandleDict = {}
 
         filterHandles = butlerQC.get(inputRefs.transmission_filter)
         filterHandleDict = {filterHandle.dataId['physical_filter']: filterHandle for
@@ -528,11 +550,35 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
         ValueError : Raised if configured filter name does not match any of the
             available filter transmission curves.
         """
-        self._opticsTransmission = opticsHandle.get()
+        if self.config.doOpticsTransmission:
+            self._opticsTransmission = opticsHandle.get()
+        else:
+            self._opticsTransmission = TransmissionCurve.makeSpatiallyConstant(
+                throughput=np.ones(100),
+                wavelengths=np.linspace(
+                    self.config.parameters.lambdaRange[0],
+                    self.config.parameters.lambdaRange[1],
+                    100,
+                ),
+                throughputAtMin=1.0,
+                throughputAtMax=1.0,
+            )
 
         self._sensorsTransmission = {}
         for detector in camera:
-            self._sensorsTransmission[detector.getId()] = sensorHandleDict[detector.getId()].get()
+            if self.config.doSensorTransmission:
+                self._sensorsTransmission[detector.getId()] = sensorHandleDict[detector.getId()].get()
+            else:
+                self._sensorsTransmission[detector.getId()] = TransmissionCurve.makeSpatiallyConstant(
+                    throughput=np.ones(100),
+                    wavelengths=np.linspace(
+                        self.config.parameters.lambdaRange[0],
+                        self.config.parameters.lambdaRange[1],
+                        100,
+                    ),
+                    throughputAtMin=1.0,
+                    throughputAtMax=1.0,
+                )
 
         self._filtersTransmission = {}
         for physicalFilter in self.config.physicalFilters:

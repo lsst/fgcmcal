@@ -442,6 +442,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=float,
         default=5.0,
     )
+    superStarPlotCcdResiduals = pexConfig.Field(
+        doc="If plotting is enabled, should per-detector residuals be plotted? "
+            "This may produce a lot of output, and should be used only for "
+            "debugging purposes.",
+        dtype=bool,
+        default=False,
+    )
     focalPlaneSigmaClip = pexConfig.Field(
         doc="Number of sigma to clip outliers per focal-plane.",
         dtype=float,
@@ -541,6 +548,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         doc="Observatory latitude",
         dtype=float,
         default=None,
+    )
+    mirrorArea = pexConfig.Field(
+        doc="Mirror area (square meters) of telescope.  If not set, will "
+            "try to estimate from camera.telescopeDiameter.",
+        dtype=float,
+        default=None,
+        optional=True,
     )
     defaultCameraOrientation = pexConfig.Field(
         doc="Default camera orientation for QA plots.",

@@ -17,6 +17,7 @@ doc/*.tag
 doc/*.inc
 doc/doxygen.conf
 tests/.tests
+tests/TestFgcm*
 version.py
 bin/
 pytest_session.txt

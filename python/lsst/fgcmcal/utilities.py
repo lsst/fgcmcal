@@ -99,7 +99,11 @@ def makeConfigDict(config, log, camera, maxIter,
     # TODO: Having direct access to the mirror area from the camera would be
     #  useful.  See DM-16489.
     # Mirror area in cm**2
-    mirrorArea = np.pi*(camera.telescopeDiameter*100./2.)**2.
+    if config.mirrorArea is None:
+        mirrorArea = np.pi*(camera.telescopeDiameter*100./2.)**2.
+    else:
+        # Convert to square cm.
+        mirrorArea = config.mirrorArea * 100.**2.
 
     # Get approximate average camera gain:
     gains = [amp.getGain() for detector in camera for amp in detector.getAmplifiers()]
@@ -146,6 +150,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'superStarSubCCDChebyshevOrder': config.superStarSubCcdChebyshevOrder,
                   'superStarSubCCDTriangular': config.superStarSubCcdTriangular,
                   'superStarSigmaClip': config.superStarSigmaClip,
+                  'superStarPlotCCDResiduals': config.superStarPlotCcdResiduals,
                   'focalPlaneSigmaClip': config.focalPlaneSigmaClip,
                   'ccdGraySubCCDDict': dict(config.ccdGraySubCcdDict),
                   'ccdGraySubCCDChebyshevOrder': config.ccdGraySubCcdChebyshevOrder,
@@ -573,7 +578,7 @@ def makeZptSchema(superStarChebyshevSize, zptChebyshevSize):
                             '(value set by deltaMagBkgOffsetPercentile) calibration '
                             'stars.'))
     zptSchema.addField('exptime', type=np.float32, doc='Exposure time')
-    zptSchema.addField('filtername', type=str, size=10, doc='Filter name')
+    zptSchema.addField('filtername', type=str, size=30, doc='Filter name')
 
     return zptSchema
 
@@ -644,7 +649,7 @@ def makeAtmSchema():
 
     atmSchema = afwTable.Schema()
 
-    atmSchema.addField('visit', type=np.int32, doc='Visit number')
+    atmSchema.addField('visit', type=np.int64, doc='Visit number')
     atmSchema.addField('pmb', type=np.float64, doc='Barometric pressure (mb)')
     atmSchema.addField('pwv', type=np.float64, doc='Water vapor (mm)')
     atmSchema.addField('tau', type=np.float64, doc='Aerosol optical depth')
