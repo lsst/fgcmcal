@@ -104,3 +104,5 @@ config.deltaAperOuterRadiusArcsec = 2.89
 config.doComputeDeltaAperPerVisit = True
 config.doComputeDeltaAperMap = True
 config.doComputeDeltaAperPerCcd = True
+
+config.fitCcdChromaticityDict = {'r': True}
