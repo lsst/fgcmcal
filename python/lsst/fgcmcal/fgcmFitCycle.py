@@ -715,6 +715,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=False,
     )
+    fitCcdChromaticityDict = pexConfig.DictField(
+        doc="Per-band specification on whether to compute first-order quantum efficiency (QE) "
+            "adjustments. Any band not explicitly specified will default to False.",
+        keytype=str,
+        itemtype=bool,
+        default={},
+    )
     coatingMjds = pexConfig.ListField(
         doc="Mirror coating dates in MJD",
         dtype=float,
@@ -1287,6 +1294,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                                        (parCat['compMirrorChromaticity'].size, )),
                                       ('MIRRORCHROMATICITYPIVOT', 'f8',
                                        (parCat['mirrorChromaticityPivot'].size, )),
+                                      ('COMPCCDCHROMATICITY', 'f8',
+                                       (parCat['compCcdChromaticity'].size, )),
                                       ('COMPMEDIANSEDSLOPE', 'f8',
                                        (parCat['compMedianSedSlope'].size, )),
                                       ('COMPAPERCORRPIVOT', 'f8',
@@ -1361,6 +1370,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         inParams['COMPREFSIGMA'][:] = parCat['compRefSigma'][0, :]
         inParams['COMPMIRRORCHROMATICITY'][:] = parCat['compMirrorChromaticity'][0, :]
         inParams['MIRRORCHROMATICITYPIVOT'][:] = parCat['mirrorChromaticityPivot'][0, :]
+        inParams['COMPCCDCHROMATICITY'][:] = parCat['compCcdChromaticity'][0, :]
         inParams['COMPMEDIANSEDSLOPE'][:] = parCat['compMedianSedSlope'][0, :]
         inParams['COMPAPERCORRPIVOT'][:] = parCat['compAperCorrPivot'][0, :]
         inParams['COMPAPERCORRSLOPE'][:] = parCat['compAperCorrSlope'][0, :]
@@ -1555,6 +1565,9 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         parSchema.addField('mirrorChromaticityPivot', type='ArrayD',
                            doc='Mirror chromaticity pivot mjd',
                            size=pars['MIRRORCHROMATICITYPIVOT'].size)
+        parSchema.addField('compCcdChromaticity', type='ArrayD',
+                           doc='Computed CCD chromaticity terms',
+                           size=pars['COMPCCDCHROMATICITY'].size)
         parSchema.addField('compMedianSedSlope', type='ArrayD',
                            doc='Computed median SED slope (per band)',
                            size=pars['COMPMEDIANSEDSLOPE'].size)
@@ -1677,7 +1690,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                     'parRetrievedLnPwvNightlyOffset', 'compAperCorrPivot',
                     'parFilterOffset', 'parFilterOffsetFitFlag',
                     'compAbsThroughput', 'compRefOffset', 'compRefSigma',
-                    'compMirrorChromaticity', 'mirrorChromaticityPivot',
+                    'compMirrorChromaticity', 'mirrorChromaticityPivot', 'compCcdChromaticity',
                     'compAperCorrSlope', 'compAperCorrSlopeErr', 'compAperCorrRange',
                     'compModelErrExptimePivot', 'compModelErrFwhmPivot',
                     'compModelErrSkyPivot', 'compModelErrPars',
