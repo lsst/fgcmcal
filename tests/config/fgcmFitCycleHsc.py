@@ -105,4 +105,7 @@ config.doComputeDeltaAperPerVisit = True
 config.doComputeDeltaAperMap = True
 config.doComputeDeltaAperPerCcd = True
 
+# Fit the r band chromaticity terms to exercise the code because
+# we only have r/i in the test data.  In actual running with HSC,
+# you would not want to fit these terms for HSC-R or HSC-R2 filters.
 config.fitCcdChromaticityDict = {'r': True}

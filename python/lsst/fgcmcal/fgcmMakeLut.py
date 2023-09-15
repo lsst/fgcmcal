@@ -44,7 +44,21 @@ from .utilities import lookupStaticCalibrations
 
 import fgcm
 
-__all__ = ['FgcmMakeLutParametersConfig', 'FgcmMakeLutConfig', 'FgcmMakeLutTask']
+__all__ = ['FgcmMakeLutParametersConfig', 'FgcmMakeLutConfig', 'FgcmMakeLutTask', 'SensorCorrectionTerms']
+
+
+class SensorCorrectionTerms(pexConfig.Config):
+    refLambda = pexConfig.Field(
+        doc="Reference wavelength for first-order correction terms.",
+        dtype=float,
+        optional=False,
+    )
+    correctionTermDict = pexConfig.DictField(
+        doc="Mapping of detector number to first-order correction term.",
+        keytype=int,
+        itemtype=float,
+        default={},
+    )
 
 
 class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
@@ -276,6 +290,12 @@ class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
         doc="Include sensor transmission?",
         dtype=bool,
         default=True,
+    )
+    sensorCorrectionTermDict = pexConfig.ConfigDictField(
+        doc="Mapping of filter name to sensor correction terms.",
+        keytype=str,
+        itemtype=SensorCorrectionTerms,
+        default={},
     )
     parameters = pexConfig.ConfigField(
         doc="Atmosphere parameters (required if no atmosphereTableName)",
@@ -526,6 +546,16 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
             lutConfig['lambdaRange'] = self.config.parameters.lambdaRange
             lutConfig['lambdaStep'] = self.config.parameters.lambdaStep
             lutConfig['lambdaNorm'] = self.config.parameters.lambdaNorm
+
+        # Add any per-filter correction term updates if necessary.
+        # Note that sensorCTerms is the name of the config field in fgcm.
+        if self.config.sensorCorrectionTermDict:
+            lutConfig['sensorCTerms'] = {}
+            for key, value in self.config.sensorCorrectionTermDict.items():
+                lutConfig['sensorCTerms'][key] = (
+                    value.refLambda,
+                    dict(value.correctionTermDict),
+                )
 
         return lutConfig
 
