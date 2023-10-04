@@ -44,8 +44,8 @@ ROOT = os.path.abspath(os.path.dirname(__file__))
 
 I0STD = [0.08294534, 0.07877351, 0.06464688]
 I10STD = [-0.000091981, -0.00061516, -0.00063434]
-I0RECON = [0.07322632, 0.0689530429, 0.05600673]
-I10RECON = [-5.89806616479, -7.01786443508, 3.62738180611]
+I0RECON = [0.07322179342588758, 0.0689530429, 0.05600673]
+I10RECON = [-4.490243571049125, -7.01786443508, 3.62738180611]
 
 
 class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase):
@@ -189,7 +189,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                                2, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
                                extraConfig=extraConfigFile)
 
-        zpOffsets = np.array([-0.001461041159927845,
+        zpOffsets = np.array([-0.001339632086455822,
                               0.005496968515217304])
 
         self._testFgcmOutputProducts(instName, testName,
@@ -215,7 +215,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # These are slightly different from above due to the configuration change
         # mid-way in the separate fits.
-        zpOffsets = np.array([-0.0027262186631560326,
+        zpOffsets = np.array([-0.0022663213312625885,
                               0.004101278726011515])
 
         self._testFgcmMultiFit(instName, testName,
@@ -239,7 +239,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         rawRepeatability = np.array([0.0,
-                                     0.0025195920941720683,
+                                     0.005631336514834158,
                                      0.004095912225403857])
         filterNCalibMap = {'HSC-R': 12,
                            'HSC-I': 15}
