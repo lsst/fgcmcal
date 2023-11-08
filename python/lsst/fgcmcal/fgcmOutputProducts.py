@@ -280,12 +280,12 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
 
         if self.config.doZeropointOutput:
             handleDict['fgcmZeropoints'] = butlerQC.get(inputRefs.fgcmZeropoints)
-            photoCalibRefDict = {photoCalibRef.dataId.byName()['visit']:
+            photoCalibRefDict = {photoCalibRef.dataId['visit']:
                                  photoCalibRef for photoCalibRef in outputRefs.fgcmPhotoCalib}
 
         if self.config.doAtmosphereOutput:
             handleDict['fgcmAtmosphereParameters'] = butlerQC.get(inputRefs.fgcmAtmosphereParameters)
-            atmRefDict = {atmRef.dataId.byName()['visit']: atmRef for
+            atmRefDict = {atmRef.dataId['visit']: atmRef for
                           atmRef in outputRefs.fgcmTransmissionAtmosphere}
 
         if self.config.doReferenceCalibration:

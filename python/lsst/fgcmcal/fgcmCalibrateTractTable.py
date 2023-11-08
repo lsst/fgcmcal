@@ -188,12 +188,12 @@ class FgcmCalibrateTractTableTask(FgcmCalibrateTractBaseTask):
 
         # And the outputs
         if self.config.fgcmOutputProducts.doZeropointOutput:
-            photoCalibRefDict = {photoCalibRef.dataId.byName()['visit']:
+            photoCalibRefDict = {photoCalibRef.dataId['visit']:
                                  photoCalibRef for photoCalibRef in outputRefs.fgcmPhotoCalib}
             handleDict['fgcmPhotoCalibs'] = photoCalibRefDict
 
         if self.config.fgcmOutputProducts.doAtmosphereOutput:
-            atmRefDict = {atmRef.dataId.byName()['visit']: atmRef for
+            atmRefDict = {atmRef.dataId['visit']: atmRef for
                           atmRef in outputRefs.fgcmTransmissionAtmosphere}
             handleDict['fgcmTransmissionAtmospheres'] = atmRefDict
 
