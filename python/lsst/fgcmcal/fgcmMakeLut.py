@@ -351,7 +351,7 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
 
         if self.config.doSensorTransmission:
             sensorHandles = butlerQC.get(inputRefs.transmission_sensor)
-            sensorHandleDict = {sensorHandle.dataId.byName()['detector']: sensorHandle for
+            sensorHandleDict = {sensorHandle.dataId['detector']: sensorHandle for
                                 sensorHandle in sensorHandles}
         else:
             sensorHandleDict = {}
