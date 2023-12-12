@@ -12,6 +12,7 @@ config.physicalFilterMap = LATISS_FILTER_DEFINITIONS.physical_to_band
 config.requiredBands = ["g", "r"]
 # Do 5 iterations in multi-cycle run mode.
 config.maxIterBeforeFinalCycle = 5
+config.minCcdPerExp = 1
 config.nCore = 1
 config.cycleNumber = 0
 config.utBoundary = 0.0

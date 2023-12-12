@@ -1084,6 +1084,20 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         else:
             _config = self.config
 
+        # We need to validate a few configs here after we have the
+        # camera, to ensure the minimum number of ccds is not
+        # more than the number of detectors in the camera.
+        if _config.ccdGrayFocalPlaneFitMinCcd > len(camera):
+            raise ValueError(
+                f"Cannot set ccdGrayFocalPlaneFitMinCcd ({_config.ccdGrayFocalPlaneFitMinCcd}) "
+                f"greater than the number of camera detectors ({len(camera)}).",
+            )
+        if _config.minCcdPerExp > len(camera):
+            raise ValueError(
+                f"Cannot set minCcdPerExp ({_config.minCcdPerExp}) greater than the number of "
+                f"camera detectors ({len(camera)}).",
+            )
+
         # Set defaults on whether to output standards and zeropoints
         self.maxIter = _config.maxIterBeforeFinalCycle
         self.outputStandards = _config.outputStandardsBeforeFinalCycle
