@@ -35,7 +35,6 @@ import copy
 
 import numpy as np
 import hpgeom as hpg
-import esutil
 from astropy import units
 
 import lsst.daf.base as dafBase
@@ -561,7 +560,7 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
             stdCat['coord_dec'],
             degrees=False,
         )
-        h, rev = esutil.stat.histogram(ipring, rev=True)
+        h, rev = fgcm.fgcmUtilities.histogram_rev_sorted(ipring)
 
         gdpix, = np.where(h >= self.config.referencePixelizationMinStars)
 

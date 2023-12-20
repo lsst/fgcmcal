@@ -35,7 +35,7 @@ import hpgeom as hpg
 from smatch.matcher import Matcher
 from astropy.table import Table, vstack
 
-from fgcm.fgcmUtilities import objFlagDict
+from fgcm.fgcmUtilities import objFlagDict, histogram_rev_sorted
 
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
@@ -633,8 +633,9 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         ipnest = hpg.angle_to_pixel(self.config.densityCutNside, fgcm_obj["ra"], fgcm_obj["dec"])
         # Use the esutil.stat.histogram function to pull out the histogram of
         # grouped pixels, and the rev_indices which describes which inputs
-        # are grouped together.
-        hist, rev_indices = esutil.stat.histogram(ipnest, rev=True)
+        # are grouped together.  The fgcm histogram_rev_sorted shim
+        # ensures that the indices are properly sorted.
+        hist, rev_indices = histogram_rev_sorted(ipnest)
 
         obj_use = np.ones(len(fgcm_obj), dtype=bool)
 
@@ -717,7 +718,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
 
         # Split into healpix pixels for more efficient matching.
         ipnest = hpg.angle_to_pixel(self.config.coarseNside, fgcm_obj["ra"], fgcm_obj["dec"])
-        hpix, revpix = esutil.stat.histogram(ipnest, rev=True)
+        hpix, revpix = histogram_rev_sorted(ipnest)
 
         pixel_cats = []
 
@@ -810,7 +811,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         a, b = esutil.numpy_util.match(visit_cat["visit"], star_obs["visit"][ok])
         visit_index[b] = a
 
-        h, rev = esutil.stat.histogram(visit_index, rev=True)
+        h, rev = histogram_rev_sorted(visit_index)
 
         visit_cat["deltaAper"] = -9999.0
         h_use, = np.where(h >= 3)
