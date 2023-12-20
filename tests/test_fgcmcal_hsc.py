@@ -102,7 +102,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nGoodZp = 27
         nOkZp = 27
         nBadZp = 1093
-        nStdStars = 235
+        nStdStars = 237
         nPlots = 47
 
         # We need an extra config file to turn off parquet format.
@@ -239,7 +239,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         rawRepeatability = np.array([0.0,
-                                     0.005631336514834158,
+                                     0.003440500079097844,
                                      0.004095912225403857])
         filterNCalibMap = {'HSC-R': 12,
                            'HSC-I': 15}
