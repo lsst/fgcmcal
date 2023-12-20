@@ -566,7 +566,7 @@ class FgcmcalTestBase(object):
                 photoCalMeanCalMags[i] = testCal.instFluxToMagnitude(rec['slot_CalibFlux_instFlux'])
                 photoCalMags[i] = testCal.instFluxToMagnitude(rec['slot_CalibFlux_instFlux'],
                                                               rec.getCentroid())
-                zptMeanCalMags[i] = fgcmZpt - 2.5*np.log10(rec['slot_CalibFlux_instFlux'])
+                zptMeanCalMags[i] = fgcmZpt[0] - 2.5*np.log10(rec['slot_CalibFlux_instFlux'])
 
             # These should be very close but some tiny differences because the fgcm value
             # is defined at the center of the bbox, and the photoCal is the mean over the box

@@ -1785,7 +1785,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         rec = parCat.addNew()
 
         # info section
-        rec['nCcd'] = parInfo['NCCD']
+        rec['nCcd'] = parInfo['NCCD'][0]
         rec['lutFilterNames'] = lutFilterNameString
         rec['fitBands'] = fitBandString
         # note these are not currently supported here.
@@ -1814,7 +1814,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                     'compEpsilonCcdMap', 'compEpsilonCcdNStarMap', 'compExpRefOffset']
 
         for scalarName in scalarNames:
-            rec[scalarName] = pars[scalarName.upper()]
+            rec[scalarName] = pars[scalarName.upper()][0]
 
         for arrName in arrNames:
             rec[arrName][:] = np.atleast_1d(pars[0][arrName.upper()])[:]
