@@ -321,9 +321,9 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
                 self.log.info("  Band %s, repeatability: %.2f mmag" % (band, rep))
 
             # Check for convergence
-            if np.alltrue((previousReservedRawRepeatability
-                           - fgcmFitCycle.fgcmPars.compReservedRawRepeatability)
-                          < self.config.convergenceTolerance):
+            if np.all((previousReservedRawRepeatability
+                       - fgcmFitCycle.fgcmPars.compReservedRawRepeatability)
+                      < self.config.convergenceTolerance):
                 self.log.info("Raw repeatability has converged after cycle number %d." % (cycleNumber))
                 converged = True
             else:
