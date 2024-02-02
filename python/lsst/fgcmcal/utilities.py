@@ -46,33 +46,35 @@ FGCM_ILLEGAL_VALUE = -9999.0
 
 def makeConfigDict(config, log, camera, maxIter,
                    resetFitParameters, outputZeropoints,
-                   lutFilterNames, tract=None):
+                   lutFilterNames, tract=None, nCore=1):
     """
     Make the FGCM fit cycle configuration dict
 
     Parameters
     ----------
-    config: `lsst.fgcmcal.FgcmFitCycleConfig`
+    config : `lsst.fgcmcal.FgcmFitCycleConfig`
         Configuration object
-    log: `lsst.log.Log`
+    log : `lsst.log.Log`
         LSST log object
-    camera: `lsst.afw.cameraGeom.Camera`
+    camera : `lsst.afw.cameraGeom.Camera`
         Camera from the butler
-    maxIter: `int`
+    maxIter : `int`
         Maximum number of iterations
     resetFitParameters: `bool`
         Reset fit parameters before fitting?
-    outputZeropoints: `bool`
+    outputZeropoints : `bool`
         Compute zeropoints for output?
     lutFilterNames : array-like, `str`
         Array of physical filter names in the LUT.
-    tract: `int`, optional
+    tract : `int`, optional
         Tract number for extending the output file name for debugging.
         Default is None.
+    nCore : `int`, optional
+        Number of cores to use.
 
     Returns
     -------
-    configDict: `dict`
+    configDict : `dict`
         Configuration dictionary for fgcm
     """
     # Extract the bands that are _not_ being fit for fgcm configuration
@@ -140,7 +142,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'requiredBands': list(config.requiredBands),
                   'filterToBand': filterToBand,
                   'logLevel': 'INFO',
-                  'nCore': config.nCore,
+                  'nCore': nCore,
                   'nStarPerRun': config.nStarPerRun,
                   'nExpPerRun': config.nExpPerRun,
                   'reserveFraction': config.reserveFraction,

@@ -391,6 +391,8 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         doc="Number of cores to use",
         dtype=int,
         default=4,
+        deprecated="Number of cores is deprecated as a config, and will be removed after v27. "
+                   "Please use pipetask (?) parameters instead [tbd]",
     )
     nStarPerRun = pexConfig.Field(
         doc="Number of stars to run in each chunk",
@@ -986,6 +988,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         camera = butlerQC.get(inputRefs.camera)
 
+        nCore = butlerQC.resources.num_cores
+
         handleDict = {}
 
         handleDict['fgcmLookUpTable'] = butlerQC.get(inputRefs.fgcmLookUpTable)
@@ -1019,7 +1023,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                     handleDict['fgcmFlaggedStars'] = fgcmDatasetDict['fgcmFlaggedStars']
                     handleDict['fgcmFitParameters'] = fgcmDatasetDict['fgcmFitParameters']
 
-                fgcmDatasetDict, config = self._fgcmFitCycle(camera, handleDict, config=config)
+                fgcmDatasetDict, config = self._fgcmFitCycle(camera, handleDict, config=config, nCore=nCore)
                 butlerQC.put(fgcmDatasetDict['fgcmFitParameters'],
                              getattr(outputRefs, f'fgcmFitParameters{cycle}'))
                 butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'],
@@ -1034,7 +1038,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                                  getattr(outputRefs, f'fgcmStandardStars{cycle}'))
         else:
             # Run a single cycle
-            fgcmDatasetDict, _ = self._fgcmFitCycle(camera, handleDict)
+            fgcmDatasetDict, _ = self._fgcmFitCycle(camera, handleDict, nCore=nCore)
 
             butlerQC.put(fgcmDatasetDict['fgcmFitParameters'], outputRefs.fgcmFitParameters)
             butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'], outputRefs.fgcmFlaggedStars)
@@ -1044,7 +1048,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             if self.outputStandards:
                 butlerQC.put(fgcmDatasetDict['fgcmStandardStars'], outputRefs.fgcmStandardStars)
 
-    def _fgcmFitCycle(self, camera, handleDict, config=None):
+    def _fgcmFitCycle(self, camera, handleDict, config=None, nCore=1):
         """
         Run the fit cycle
 
@@ -1073,6 +1077,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                 handle for fit parameter catalog.
         config : `lsst.pex.config.Config`, optional
             Configuration to use to override self.config.
+        nCore : `int`, optional
+            Number of cores to use during fitting.
 
         Returns
         -------
@@ -1107,7 +1113,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         configDict = makeConfigDict(_config, self.log, camera,
                                     self.maxIter, self.resetFitParameters,
                                     self.outputZeropoints,
-                                    lutIndexVals[0]['FILTERNAMES'])
+                                    lutIndexVals[0]['FILTERNAMES'],
+                                    nCore=nCore)
 
         # next we need the exposure/visit information
         visitCat = handleDict['fgcmVisitCatalog'].get()
