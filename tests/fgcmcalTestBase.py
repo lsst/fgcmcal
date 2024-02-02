@@ -35,7 +35,7 @@ import esutil
 import lsst.daf.butler as dafButler
 import lsst.pipe.base as pipeBase
 import lsst.geom as geom
-from lsst.pipe.base import Pipeline
+from lsst.pipe.base import Pipeline, ExecutionResources
 from lsst.ctrl.mpexec import SimplePipelineExecutor
 
 import lsst.fgcmcal as fgcmcal
@@ -127,10 +127,13 @@ class FgcmcalTestBase(object):
             for option, value in configDict.items():
                 pipeline.addConfigOverride(taskName, option, value)
 
+        resources = ExecutionResources(num_cores=1)
+
         executor = SimplePipelineExecutor.from_pipeline(pipeline,
                                                         where=queryString,
                                                         root=repo,
-                                                        butler=butler)
+                                                        butler=butler,
+                                                        resources=resources)
         quanta = executor.run(register_dataset_types=registerDatasetTypes)
 
         return len(quanta)
