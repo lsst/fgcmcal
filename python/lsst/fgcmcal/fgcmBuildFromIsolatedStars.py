@@ -481,6 +481,10 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 # above the limit.
                 (good_stars,) = (n_req.max(axis=0) >= self.config.minPerBand).nonzero()
 
+            if len(good_stars) == 0:
+                self.log.info("No good stars found in tract %d", tract)
+                continue
+
             # With the following matching:
             #   sources[good_sources][b] <-> stars[good_stars[a]]
             obj_index = sources["obj_index"][good_sources]
