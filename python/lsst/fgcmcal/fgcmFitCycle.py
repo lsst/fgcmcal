@@ -381,6 +381,12 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=True,
     )
+    refStarMaxFracUse = pexConfig.Field(
+        doc=("Maximum fraction of reference stars to use in the fit. Remainder will "
+             "be used only for validation."),
+        dtype=float,
+        default=0.5,
+    )
     useExposureReferenceOffset = pexConfig.Field(
         doc=("Use per-exposure (visit) offsets between calibrated stars and reference stars "
              "for final zeropoints? This may help uniformity for disjoint surveys."),

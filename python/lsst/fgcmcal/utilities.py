@@ -186,6 +186,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'refStarSnMin': config.refStarSnMin,
                   'refStarOutlierNSig': config.refStarOutlierNSig,
                   'applyRefStarColorCuts': config.applyRefStarColorCuts,
+                  'refStarMaxFracUse': config.refStarMaxFracUse,
                   'useExposureReferenceOffset': config.useExposureReferenceOffset,
                   'illegalValue': FGCM_ILLEGAL_VALUE,  # internally used by fgcm.
                   'starColorCuts': starColorCutList,

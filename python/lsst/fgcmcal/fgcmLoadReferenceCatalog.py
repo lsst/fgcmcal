@@ -139,7 +139,7 @@ class FgcmLoadReferenceCatalogTask(pipeBase.Task):
 
         # Determine the size of the sky circle to load
         lon, lat = hpg.pixel_to_angle(nside, pixel, nest=nest, degrees=False)
-        center = lsst.geom.SpherePoint(lon * lsst.geom.degrees, lat * lsst.geom.radians)
+        center = lsst.geom.SpherePoint(lon * lsst.geom.radians, lat * lsst.geom.radians)
 
         theta_phi = hpg.boundaries(nside, pixel, step=1, nest=nest, lonlat=False)
 
