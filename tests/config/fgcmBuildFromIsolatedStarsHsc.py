@@ -1,6 +1,10 @@
 import os
 from lsst.obs.hsc.hscFilters import HSC_FILTER_DEFINITIONS
 
+config.instFluxField = 'apFlux_12_0_instFlux'
+config.sourceSelector["science"].signalToNoise.fluxField = 'apFlux_12_0_instFlux'
+config.sourceSelector["science"].signalToNoise.errField = 'apFlux_12_0_instFluxErr'
+
 # This override is to be consistent with the old tests
 config.referenceCCD = 13
 # The filterMap and bands are for the small subset of bands used in the tests
