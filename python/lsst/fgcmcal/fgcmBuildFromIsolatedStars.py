@@ -176,7 +176,7 @@ class FgcmBuildFromIsolatedStarsConfig(FgcmBuildStarsConfigBase, pipeBase.Pipeli
 
         source_selector.flags.bad = []
 
-        source_selector.signalToNoise.minimum = 11.0
+        source_selector.signalToNoise.minimum = 25.0
         source_selector.signalToNoise.maximum = 1000.0
         source_selector.signalToNoise.fluxField = self.instFluxField
         source_selector.signalToNoise.errField = self.instFluxField + 'Err'
