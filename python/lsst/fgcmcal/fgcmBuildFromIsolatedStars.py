@@ -160,7 +160,7 @@ class FgcmBuildFromIsolatedStarsConfig(FgcmBuildStarsConfigBase, pipeBase.Pipeli
         self.reserve_selection.reserve_fraction = 0.1
 
         # The names here correspond to the isolated_star_sources.
-        self.instFluxField = 'normCompGaussianFlux_instFlux'
+        self.instFluxField = 'normCompTophatFlux_instFlux'
         self.localBackgroundFluxField = 'localBackground_instFlux'
         self.apertureInnerInstFluxField = 'apFlux_12_0_instFlux'
         self.apertureOuterInstFluxField = 'apFlux_17_0_instFlux'
@@ -176,7 +176,7 @@ class FgcmBuildFromIsolatedStarsConfig(FgcmBuildStarsConfigBase, pipeBase.Pipeli
 
         source_selector.flags.bad = []
 
-        source_selector.signalToNoise.minimum = 25.0
+        source_selector.signalToNoise.minimum = 11.0
         source_selector.signalToNoise.maximum = 1000.0
         source_selector.signalToNoise.fluxField = self.instFluxField
         source_selector.signalToNoise.errField = self.instFluxField + 'Err'
