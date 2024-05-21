@@ -87,7 +87,7 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
 
     fgcmStandardStars = connectionTypes.Input(
         doc="Catalog of standard star data from fgcm fit",
-        name="fgcmStandardStars{cycleNumber}",
+        name="fgcm_Cycle{cycleNumber}_StandardStars",
         storageClass="SimpleCatalog",
         dimensions=("instrument",),
         deferLoad=True,
@@ -95,7 +95,7 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
 
     fgcmZeropoints = connectionTypes.Input(
         doc="Catalog of zeropoints from fgcm fit",
-        name="fgcmZeropoints{cycleNumber}",
+        name="fgcm_Cycle{cycleNumber}_Zeropoints",
         storageClass="Catalog",
         dimensions=("instrument",),
         deferLoad=True,
@@ -103,7 +103,7 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
 
     fgcmAtmosphereParameters = connectionTypes.Input(
         doc="Catalog of atmosphere parameters from fgcm fit",
-        name="fgcmAtmosphereParameters{cycleNumber}",
+        name="fgcm_Cycle{cycleNumber}_AtmosphereParameters",
         storageClass="Catalog",
         dimensions=("instrument",),
         deferLoad=True,

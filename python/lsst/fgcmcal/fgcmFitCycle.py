@@ -148,94 +148,276 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         deferLoad=True,
     )
 
-    fgcmFlaggedStarsInput = connectionTypes.PrerequisiteInput(
-        doc="Catalog of flagged stars for fgcm calibration from previous fit cycle",
-        name="fgcmFlaggedStars{previousCycleNumber}",
-        storageClass="Catalog",
-        dimensions=("instrument",),
-        deferLoad=True,
-    )
-
-    fgcmFitParametersInput = connectionTypes.PrerequisiteInput(
-        doc="Catalog of fgcm fit parameters from previous fit cycle",
-        name="fgcmFitParameters{previousCycleNumber}",
-        storageClass="Catalog",
-        dimensions=("instrument",),
-        deferLoad=True,
-    )
-
-    fgcmFitParameters = connectionTypes.Output(
-        doc="Catalog of fgcm fit parameters from current fit cycle",
-        name="fgcmFitParameters{cycleNumber}",
-        storageClass="Catalog",
-        dimensions=("instrument",),
-    )
-
-    fgcmFlaggedStars = connectionTypes.Output(
-        doc="Catalog of flagged stars for fgcm calibration from current fit cycle",
-        name="fgcmFlaggedStars{cycleNumber}",
-        storageClass="Catalog",
-        dimensions=("instrument",),
-    )
-
-    fgcmZeropoints = connectionTypes.Output(
-        doc="Catalog of fgcm zeropoint data from current fit cycle",
-        name="fgcmZeropoints{cycleNumber}",
-        storageClass="Catalog",
-        dimensions=("instrument",),
-    )
-
-    fgcmAtmosphereParameters = connectionTypes.Output(
-        doc="Catalog of atmospheric fit parameters from current fit cycle",
-        name="fgcmAtmosphereParameters{cycleNumber}",
-        storageClass="Catalog",
-        dimensions=("instrument",),
-    )
-
-    fgcmStandardStars = connectionTypes.Output(
-        doc="Catalog of standard star magnitudes from current fit cycle",
-        name="fgcmStandardStars{cycleNumber}",
-        storageClass="SimpleCatalog",
-        dimensions=("instrument",),
-    )
-
-    # Add connections for running multiple cycles
-    # This uses vars() to alter the class __dict__ to programmatically
-    # write many similar outputs.
-    for cycle in range(MULTIPLE_CYCLES_MAX):
-        vars()[f"fgcmFitParameters{cycle}"] = connectionTypes.Output(
-            doc=f"Catalog of fgcm fit parameters from fit cycle {cycle}",
-            name=f"fgcmFitParameters{cycle}",
-            storageClass="Catalog",
-            dimensions=("instrument",),
-        )
-        vars()[f"fgcmFlaggedStars{cycle}"] = connectionTypes.Output(
-            doc=f"Catalog of flagged stars for fgcm calibration from fit cycle {cycle}",
-            name=f"fgcmFlaggedStars{cycle}",
-            storageClass="Catalog",
-            dimensions=("instrument",),
-        )
-        vars()[f"fgcmZeropoints{cycle}"] = connectionTypes.Output(
-            doc=f"Catalog of fgcm zeropoint data from fit cycle {cycle}",
-            name=f"fgcmZeropoints{cycle}",
-            storageClass="Catalog",
-            dimensions=("instrument",),
-        )
-        vars()[f"fgcmAtmosphereParameters{cycle}"] = connectionTypes.Output(
-            doc=f"Catalog of atmospheric fit parameters from fit cycle {cycle}",
-            name=f"fgcmAtmosphereParameters{cycle}",
-            storageClass="Catalog",
-            dimensions=("instrument",),
-        )
-        vars()[f"fgcmStandardStars{cycle}"] = connectionTypes.Output(
-            doc=f"Catalog of standard star magnitudes from fit cycle {cycle}",
-            name=f"fgcmStandardStars{cycle}",
-            storageClass="SimpleCatalog",
-            dimensions=("instrument",),
-        )
-
     def __init__(self, *, config=None):
         super().__init__(config=config)
+
+        # The connection parameters ``cycleNumber`` and ``previousCycleNumber``
+        # always comes in as strings, and doing a round-trip via
+        # integer-to-string ensures that they actually are integers.
+        if str(int(config.connections.cycleNumber)) != config.connections.cycleNumber:
+            raise ValueError("cycleNumber must be of integer format")
+        if str(int(config.connections.previousCycleNumber)) != config.connections.previousCycleNumber:
+            raise ValueError("previousCycleNumber must be of integer format")
+        # We additionally confirm that there is a delta of 1 between them.
+        # Note that this math cannot be done in the parameters because they are
+        # strings.
+        if int(config.connections.previousCycleNumber) != (int(config.connections.cycleNumber) - 1):
+            raise ValueError("previousCycleNumber must be 1 less than cycleNumber")
+
+        inputAndOutputConnections = [
+            ("FitParameters", "Catalog", "Catalog of fgcm fit parameters."),
+            ("FlaggedStars", "Catalog", "Catalog of flagged stars for fgcm calibration."),
+        ]
+        multicycleOutputConnections = [
+            ("OutputConfig", "Config", "Configuration for next fgcm fit cycle."),
+        ]
+        optionalZpOutputConnections = [
+            ("Zeropoints", "Catalog", "Catalog of fgcm zeropoint data."),
+            ("AtmosphereParameters", "Catalog", "Catalog of atmospheric fit parameters."),
+        ]
+        optionalStarOutputConnections = [
+            ("StandardStars", "SimpleCatalog", "Catalog of standard star magnitudes."),
+        ]
+
+        # Some plots are per band, some are per filter.
+        bands = config.bands
+        physical_filters = []
+        for band in bands:
+            for key, val in config.physicalFilterMap.items():
+                if band == val:
+                    # We cannot have dashes or spaces or tildes in the name.
+                    physical_filters.append(key.replace("-", "_").replace(" ", "_").replace("~", "_"))
+
+        epochs = [f"epoch{i}" for i in range(len(config.epochMjds))]
+
+        # All names will be preceeded with ``fgcm_CycleN_``.
+        plotConnections = [
+            ("Zeropoints_Plot", "Plot", "Plot of fgcm zeropoints."),
+            ("ExpgrayDeep_Plot", "Plot", "Plot of gray term per exposure per time for deep fields."),
+            ("NightlyAlpha_Plot", "Plot", "Plot of nightly AOD alpha term."),
+            ("NightlyTau_Plot", "Plot", "Plot of nightly aerosol optical depth (tau)."),
+            ("NightlyPwv_Plot", "Plot", "Plot of nightly water vapor."),
+            ("NightlyO3_Plot", "Plot", "Plot of nightly ozone."),
+            ("FilterOffsets_Plot", "Plot", "Plot of in-band filter offsets."),
+            ("AbsThroughputs_Plot", "Plot", "Plot of absolute throughput fractions."),
+            ("QESysWashesInitial_Plot", "Plot", "Plot of initial system QE with mirror washes."),
+            ("QESysWashesFinal_Plot", "Plot", "Plot of final system QE with mirror washes."),
+            ("RpwvVsRpwvInput_Plot",
+             "Plot",
+             "Plot of change in per-visit ``retrieved`` PWV from previous fit cycle."),
+            ("RpwvVsRpwvSmooth_Plot",
+             "Plot",
+             "Plot of per-visit ``retrieved`` PWV vs. smoothed PWV."),
+            ("ModelPwvVsRpwv_Plot",
+             "Plot",
+             "Plot of model PWV vs. per-visit ``retrieved`` PWV."),
+            ("ChisqFit_Plot",
+             "Plot",
+             "Plot of chisq as a function of iteration."),
+        ]
+        for band in bands:
+            plotConnections.extend(
+                [
+                    (f"Apercorr_{band}_Plot", "Plot", "Plot of fgcm aperture corrections."),
+                    (f"EpsilonGlobal_{band}_Plot",
+                     "Plot",
+                     "Plot of global background over/undersubtraction."),
+                    (f"EpsilonMap_{band}_Plot",
+                     "Plot",
+                     "Map of spatially varying background over/undersubtraction."),
+                    (f"ExpgrayInitial_{band}_Plot",
+                     "Plot",
+                     "Histogram of initial gray term per exposure."),
+                    (f"CompareRedblueExpgray_{band}_Plot",
+                     "Plot",
+                     "Plot of red/blue split gray term per exposure"),
+                    (f"Expgray_{band}_Plot", "Plot", "Histogram of gray term per exposure."),
+                    (f"ExpgrayAirmass_{band}_Plot",
+                     "Plot",
+                     "Plot of exposure gray term as a function of airmass."),
+                    (f"ExpgrayCompareMjdRedblue_{band}_Plot",
+                     "Plot",
+                     "Plot of red/blue split gray term per exposure as a function of time."),
+                    (f"ExpgrayUT_{band}_Plot",
+                     "Plot",
+                     "Plot of grey term per exposure as a function of time of night."),
+                    (f"ExpgrayCompareBands_{band}_Plot",
+                     "Plot",
+                     "Plot of gray term per exposure between bands nearby in time."),
+                    (f"ExpgrayReference_{band}_Plot",
+                     "Plot",
+                     "Histogram of gray term per exposure compared to reference mags."),
+                    (f"QESysRefstarsStdInitial_{band}_Plot",
+                     "Plot",
+                     "Plot of reference mag - calibrated (standard) mag vs. time (before fit)."),
+                    (f"QESysRefstarsStdFinal_{band}_Plot",
+                     "Plot",
+                     "Plot of reference mag - calibrated (standard) mag vs. time (after fit)."),
+                    (f"QESysRefstarsObsInitial_{band}_Plot",
+                     "Plot",
+                     "Plot of reference mag - observed (instrumental) mag vs. time (before fit)."),
+                    (f"QESysRefstarsObsFinal_{band}_Plot",
+                     "Plot",
+                     "Plot of reference mag - observed (instrumental) mag vs. time (after fit)."),
+                    (f"ModelMagerrInitial_{band}_Plot",
+                     "Plot",
+                     "Plots for magnitude error model, initial estimate."),
+                    (f"ModelMagerrPostfit_{band}_Plot",
+                     "Plot",
+                     "Plots for magnitude error model, after fitting."),
+                    (f"SigmaFgcmAllStars_{band}_Plot",
+                     "Plot",
+                     "Histograms for intrinsic scatter for all bright stars."),
+                    (f"SigmaFgcmReservedStars_{band}_Plot",
+                     "Plot",
+                     "Histograms for intrinsic scatter for reserved bright stars."),
+                    (f"SigmaFgcmReservedStarsCrunched_{band}_Plot",
+                     "Plot",
+                     "Histograms for intrinsic scatter for reserved bright stars (after gray correction)."),
+                    (f"SigmaCal_{band}_Plot",
+                     "Plot",
+                     "Plot showing scatter as a function of systematic error floor."),
+                    (f"SigmaRef_{band}_Plot",
+                     "Plot",
+                     "Histograms of scatter with respect to reference stars."),
+                    (f"RefResidVsColorAll_{band}_Plot",
+                     "Plot",
+                     "Plot of reference star residuals vs. color (all stars)."),
+                    (f"RefResidVsColorCut_{band}_Plot",
+                     "Plot",
+                     "Plot of reference star residuals vs. color (reference star color cuts)."),
+                ]
+            )
+        for physical_filter in physical_filters:
+            plotConnections.extend(
+                [
+                    (f"I1R1_{physical_filter}_Plot", "Plot", "Plot of fgcm R1 vs. I1."),
+                    (f"I1_{physical_filter}_Plot", "Plot", "Focal plane map of fgcm I1."),
+                    (f"R1_{physical_filter}_Plot", "Plot", "Focal plane map of fgcm R1."),
+                    (f"R1mI1_{physical_filter}_Plot", "Plot", "Focal plane map of fgcm R1 - I1."),
+                    (f"R1mI1_vs_mjd_{physical_filter}_Plot", "Plot", "R1 - I1 residuals vs. mjd."),
+                    (f"CompareRedblueMirrorchrom_{physical_filter}_Plot",
+                     "Plot",
+                     "Comparison of mirror chromaticity residuals for red/blue stars."),
+                    (f"CcdChromaticity_{physical_filter}_Plot",
+                     "Plot",
+                     "Focal plane map of fgcm ccd chromaticity."),
+                    (f"EpsilonDetector_{physical_filter}_Plot",
+                     "Plot",
+                     "Focal plane map of background over/undersubtraction."),
+                    (f"EpsilonDetectorMatchscale_{physical_filter}_Plot",
+                     "Plot",
+                     "Focal plane map of background over/undersubtraction."),
+                ]
+            )
+            for epoch in epochs:
+                plotConnections.extend(
+                    [
+                        (
+                            f"Superstar_{physical_filter}_{epoch}_Plot",
+                            "Plot",
+                            "Plot of illumination Correction.",
+                        )
+                    ]
+                )
+
+        if config.doMultipleCycles:
+            # Multiple cycle run.
+
+            # All but the final cycle get appended here.
+            for cycle in range(config.multipleCyclesFinalCycleNumber):
+                outputConnections = copy.copy(inputAndOutputConnections)
+                outputConnections.extend(multicycleOutputConnections)
+                if config.outputZeropointsBeforeFinalCycle:
+                    outputConnections.extend(optionalZpOutputConnections)
+                if config.outputStandardsBeforeFinalCycle:
+                    outputConnections.extend(optionalStarOutputConnections)
+
+                if config.doPlots:
+                    # We will make the plots if doPlots is True and either
+                    # it is the next-to-last cycle or the
+                    # doPlotsBeforeFinalCycles configuration is set which
+                    # means we want plots for all cycles.
+                    # The final cycle doPlots is configured below.
+                    if cycle == (config.multipleCyclesFinalCycleNumber - 1) \
+                       or config.doPlotsBeforeFinalCycles:
+                        outputConnections.extend(plotConnections)
+
+                for (name, storageClass, doc) in outputConnections:
+                    connectionName = f"fgcm_Cycle{cycle}_{name}"
+                    storageName = connectionName
+                    outConnection = connectionTypes.Output(
+                        name=storageName,
+                        storageClass=storageClass,
+                        doc=doc,
+                        dimensions=("instrument",),
+                    )
+                    object.__setattr__(self, connectionName, outConnection)
+                    self.outputs.add(connectionName)
+
+            # The final cycle has everything.
+            outputConnections = copy.copy(inputAndOutputConnections)
+            outputConnections.extend(multicycleOutputConnections)
+            outputConnections.extend(optionalZpOutputConnections)
+            outputConnections.extend(optionalStarOutputConnections)
+            if config.doPlots:
+                outputConnections.extend(plotConnections)
+            for (name, storageClass, doc) in outputConnections:
+                connectionName = f"fgcm_Cycle{config.multipleCyclesFinalCycleNumber}_{name}"
+                storageName = connectionName
+                outConnection = connectionTypes.Output(
+                    name=storageName,
+                    storageClass=storageClass,
+                    doc=doc,
+                    dimensions=("instrument",),
+                )
+                object.__setattr__(self, connectionName, outConnection)
+                self.outputs.add(connectionName)
+        else:
+            # Single cycle run.
+            if config.cycleNumber > 0:
+                inputConnections = copy.copy(inputAndOutputConnections)
+            else:
+                inputConnections = []
+            outputConnections = copy.copy(inputAndOutputConnections)
+            # The following configurations are also useful for runs
+            # where fit cycles are run one-at-a-time since it is
+            # not typical to look at these outputs for intermediate
+            # steps.
+            if config.isFinalCycle or config.outputZeropointsBeforeFinalCycle:
+                outputConnections.extend(optionalZpOutputConnections)
+            if config.isFinalCycle or config.outputStandardsBeforeFinalCycle:
+                outputConnections.extend(optionalStarOutputConnections)
+
+            if config.doPlots:
+                outputConnections.extend(plotConnections)
+
+            for (name, storageClass, doc) in inputConnections:
+                connectionName = f"fgcm{name}Input"
+                storageName = f"fgcm_Cycle{config.cycleNumber - 1}_{name}"
+                inConnection = connectionTypes.PrerequisiteInput(
+                    name=storageName,
+                    storageClass=storageClass,
+                    doc=doc,
+                    dimensions=("instrument",),
+                )
+                object.__setattr__(self, connectionName, inConnection)
+                self.prerequisiteInputs.add(connectionName)
+
+            for (name, storageClass, doc) in outputConnections:
+                connectionName = f"fgcm{name}"
+                storageName = f"fgcm_Cycle{config.cycleNumber}_{name}"
+                # Plots have unique names as well.
+                if storageClass == "Plot":
+                    connectionName = storageName
+                outConnection = connectionTypes.Output(
+                    name=storageName,
+                    storageClass=storageClass,
+                    doc=doc,
+                    dimensions=("instrument",),
+                )
+                object.__setattr__(self, connectionName, outConnection)
+                self.outputs.add(connectionName)
 
         if not config.doReferenceCalibration:
             self.inputs.remove("fgcmReferenceStars")
@@ -252,60 +434,6 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
             self.inputs.remove("fgcmStarIdsParquet")
             if config.doReferenceCalibration:
                 self.inputs.remove("fgcmReferenceStarsParquet")
-
-        if str(int(config.connections.cycleNumber)) != config.connections.cycleNumber:
-            raise ValueError("cycleNumber must be of integer format")
-        if str(int(config.connections.previousCycleNumber)) != config.connections.previousCycleNumber:
-            raise ValueError("previousCycleNumber must be of integer format")
-        if int(config.connections.previousCycleNumber) != (int(config.connections.cycleNumber) - 1):
-            raise ValueError("previousCycleNumber must be 1 less than cycleNumber")
-
-        if int(config.connections.cycleNumber) == 0:
-            self.prerequisiteInputs.remove("fgcmFlaggedStarsInput")
-            self.prerequisiteInputs.remove("fgcmFitParametersInput")
-
-        if not self.config.doMultipleCycles:
-            # Single-cycle run
-            if not self.config.isFinalCycle and not self.config.outputStandardsBeforeFinalCycle:
-                self.outputs.remove("fgcmStandardStars")
-
-            if not self.config.isFinalCycle and not self.config.outputZeropointsBeforeFinalCycle:
-                self.outputs.remove("fgcmZeropoints")
-                self.outputs.remove("fgcmAtmosphereParameters")
-
-            # Remove all multiple cycle outputs
-            for cycle in range(0, MULTIPLE_CYCLES_MAX):
-                self.outputs.remove(f"fgcmFitParameters{cycle}")
-                self.outputs.remove(f"fgcmFlaggedStars{cycle}")
-                self.outputs.remove(f"fgcmZeropoints{cycle}")
-                self.outputs.remove(f"fgcmAtmosphereParameters{cycle}")
-                self.outputs.remove(f"fgcmStandardStars{cycle}")
-
-        else:
-            # Multiple-cycle run
-            # Remove single-cycle outputs
-            self.outputs.remove("fgcmFitParameters")
-            self.outputs.remove("fgcmFlaggedStars")
-            self.outputs.remove("fgcmZeropoints")
-            self.outputs.remove("fgcmAtmosphereParameters")
-            self.outputs.remove("fgcmStandardStars")
-
-            # Remove outputs from cycles that are not used
-            for cycle in range(self.config.multipleCyclesFinalCycleNumber + 1,
-                               MULTIPLE_CYCLES_MAX):
-                self.outputs.remove(f"fgcmFitParameters{cycle}")
-                self.outputs.remove(f"fgcmFlaggedStars{cycle}")
-                self.outputs.remove(f"fgcmZeropoints{cycle}")
-                self.outputs.remove(f"fgcmAtmosphereParameters{cycle}")
-                self.outputs.remove(f"fgcmStandardStars{cycle}")
-
-            # Remove non-final-cycle outputs if necessary
-            for cycle in range(self.config.multipleCyclesFinalCycleNumber):
-                if not self.config.outputZeropointsBeforeFinalCycle:
-                    self.outputs.remove(f"fgcmZeropoints{cycle}")
-                    self.outputs.remove(f"fgcmAtmosphereParameters{cycle}")
-                if not self.config.outputStandardsBeforeFinalCycle:
-                    self.outputs.remove(f"fgcmStandardStars{cycle}")
 
 
 class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
@@ -840,6 +968,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=True,
     )
+    doPlotsBeforeFinalCycles = pexConfig.Field(
+        doc="Make fgcm QA plots before the final two fit cycles? This only applies in"
+            "multi-cycle mode, and if doPlots is True. These are typically the most"
+            "important QA plots to inspect.",
+        dtype=bool,
+        default=False,
+    )
     randomSeed = pexConfig.Field(
         doc="Random seed for fgcm for consistency in tests.",
         dtype=int,
@@ -1029,22 +1164,55 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                     handleDict['fgcmFlaggedStars'] = fgcmDatasetDict['fgcmFlaggedStars']
                     handleDict['fgcmFitParameters'] = fgcmDatasetDict['fgcmFitParameters']
 
-                fgcmDatasetDict, config = self._fgcmFitCycle(camera, handleDict, config=config, nCore=nCore)
+                # Set up plot outputs.
+                # Note that nothing will go in the dict if doPlots is False.
+                plotHandleDict = {}
+                for outputRefName in outputRefs.keys():
+                    if outputRefName.endswith("Plot") and f"Cycle{cycle}" in outputRefName:
+                        ref = getattr(outputRefs, outputRefName)
+                        plotHandleDict[outputRefName] = ref
+
+                fgcmDatasetDict, config = self._fgcmFitCycle(
+                    camera,
+                    handleDict,
+                    butlerQC=butlerQC,
+                    plotHandleDict=plotHandleDict,
+                    config=config,
+                    nCore=nCore,
+                )
                 butlerQC.put(fgcmDatasetDict['fgcmFitParameters'],
-                             getattr(outputRefs, f'fgcmFitParameters{cycle}'))
+                             getattr(outputRefs, f'fgcm_Cycle{cycle}_FitParameters'))
                 butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'],
-                             getattr(outputRefs, f'fgcmFlaggedStars{cycle}'))
+                             getattr(outputRefs, f'fgcm_Cycle{cycle}_FlaggedStars'))
+                butlerQC.put(config,
+                             getattr(outputRefs, f'fgcm_Cycle{cycle}_OutputConfig'))
                 if self.outputZeropoints:
                     butlerQC.put(fgcmDatasetDict['fgcmZeropoints'],
-                                 getattr(outputRefs, f'fgcmZeropoints{cycle}'))
+                                 getattr(outputRefs, f'fgcm_Cycle{cycle}_Zeropoints'))
                     butlerQC.put(fgcmDatasetDict['fgcmAtmosphereParameters'],
-                                 getattr(outputRefs, f'fgcmAtmosphereParameters{cycle}'))
+                                 getattr(outputRefs, f'fgcm_Cycle{cycle}_AtmosphereParameters'))
                 if self.outputStandards:
                     butlerQC.put(fgcmDatasetDict['fgcmStandardStars'],
-                                 getattr(outputRefs, f'fgcmStandardStars{cycle}'))
+                                 getattr(outputRefs, f'fgcm_Cycle{cycle}_StandardStars'))
         else:
             # Run a single cycle
-            fgcmDatasetDict, _ = self._fgcmFitCycle(camera, handleDict, nCore=nCore)
+
+            # Set up plot outputs.
+            # Note that nothing will go in the dict if doPlots is False.
+            plotHandleDict = {}
+            for outputRefName in outputRefs.keys():
+                if outputRefName.endswith("Plot") and f"Cycle{self.config.cycleNumber}" in outputRefName:
+                    ref = getattr(outputRefs, outputRefName)
+                    plotHandleDict[outputRefName] = ref
+
+            fgcmDatasetDict, _ = self._fgcmFitCycle(
+                camera,
+                handleDict,
+                nCore=nCore,
+                butlerQC=butlerQC,
+                plotHandleDict=plotHandleDict,
+                multiCycle=False,
+            )
 
             butlerQC.put(fgcmDatasetDict['fgcmFitParameters'], outputRefs.fgcmFitParameters)
             butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'], outputRefs.fgcmFlaggedStars)
@@ -1054,7 +1222,16 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             if self.outputStandards:
                 butlerQC.put(fgcmDatasetDict['fgcmStandardStars'], outputRefs.fgcmStandardStars)
 
-    def _fgcmFitCycle(self, camera, handleDict, config=None, nCore=1):
+    def _fgcmFitCycle(
+        self,
+        camera,
+        handleDict,
+        butlerQC=None,
+        plotHandleDict=None,
+        config=None,
+        nCore=1,
+        multiCycle=True,
+    ):
         """
         Run the fit cycle
 
@@ -1081,10 +1258,16 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                 handle for flagged star catalog.
             ``"fgcmFitParameters"``
                 handle for fit parameter catalog.
+        butlerQC : `lsst.pipe.base.QuantumContext`, optional
+            Quantum context used for serializing plots.
+        plotHandleDict : `dict` [`str`, `lsst.daf.butler.DatasetRef`], optional
+            Dictionary of plot dataset refs, keyed by plot name.
         config : `lsst.pex.config.Config`, optional
             Configuration to use to override self.config.
         nCore : `int`, optional
             Number of cores to use during fitting.
+        multiCycle : `bool`, optional
+            Is this part of a multicycle run?
 
         Returns
         -------
@@ -1116,11 +1299,19 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                                                          dict(_config.physicalFilterMap))
         del lutCat
 
+        # Check if we want to do plots.
+        doPlots = _config.doPlots
+        if doPlots and multiCycle:
+            if _config.cycleNumber < (_config.multipleCyclesFinalCycleNumber - 1) \
+               and not _config.doPlotsBeforeFinalCycles:
+                doPlots = False
+
         configDict = makeConfigDict(_config, self.log, camera,
                                     self.maxIter, self.resetFitParameters,
                                     self.outputZeropoints,
                                     lutIndexVals[0]['FILTERNAMES'],
-                                    nCore=nCore)
+                                    nCore=nCore,
+                                    doPlots=doPlots)
 
         # next we need the exposure/visit information
         visitCat = handleDict['fgcmVisitCatalog'].get()
@@ -1136,15 +1327,23 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                       'focalPlaneProjector': focalPlaneProjector}
 
         # set up the fitter object
-        fgcmFitCycle = fgcm.FgcmFitCycle(configDict, useFits=False,
-                                         noFitsDict=noFitsDict, noOutput=True)
+        fgcmFitCycle = fgcm.FgcmFitCycle(
+            configDict,
+            useFits=False,
+            noFitsDict=noFitsDict,
+            noOutput=True,
+            butlerQC=butlerQC,
+            plotHandleDict=plotHandleDict,
+        )
 
         # create the parameter object
         if (fgcmFitCycle.initialCycle):
             # cycle = 0, initial cycle
             fgcmPars = fgcm.FgcmParameters.newParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                              fgcmLut,
-                                                             fgcmExpInfo)
+                                                             fgcmExpInfo,
+                                                             butlerQC=butlerQC,
+                                                             plotHandleDict=plotHandleDict)
         else:
             if isinstance(handleDict['fgcmFitParameters'], afwTable.BaseCatalog):
                 parCat = handleDict['fgcmFitParameters']
@@ -1156,10 +1355,12 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                                                               fgcmExpInfo,
                                                               inParInfo,
                                                               inParams,
-                                                              inSuperStar)
+                                                              inSuperStar,
+                                                              butlerQC=butlerQC,
+                                                              plotHandleDict=plotHandleDict)
 
         # set up the stars...
-        fgcmStars = fgcm.FgcmStars(fgcmFitCycle.fgcmConfig)
+        fgcmStars = fgcm.FgcmStars(fgcmFitCycle.fgcmConfig, butlerQC=butlerQC, plotHandleDict=plotHandleDict)
 
         starObs = handleDict['fgcmStarObservations'].get()
         starIds = handleDict['fgcmStarIds'].get()
@@ -1323,20 +1524,21 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         outConfig.connections.update(previousCycleNumber=str(_config.cycleNumber),
                                      cycleNumber=str(_config.cycleNumber + 1))
 
-        configFileName = '%s_cycle%02d_config.py' % (outConfig.outfileBase,
-                                                     outConfig.cycleNumber)
-        outConfig.save(configFileName)
+        if not multiCycle:
+            configFileName = '%s_cycle%02d_config.py' % (outConfig.outfileBase,
+                                                         outConfig.cycleNumber)
+            outConfig.save(configFileName)
 
-        if _config.isFinalCycle == 1:
-            # We are done, ready to output products
-            self.log.info("Everything is in place to run fgcmOutputProducts.py")
-        else:
-            self.log.info("Saved config for next cycle to %s" % (configFileName))
-            self.log.info("Be sure to look at:")
-            self.log.info("   config.expGrayPhotometricCut")
-            self.log.info("   config.expGrayHighCut")
-            self.log.info("If you are satisfied with the fit, please set:")
-            self.log.info("   config.isFinalCycle = True")
+            if _config.isFinalCycle == 1:
+                # We are done, ready to output products
+                self.log.info("Everything is in place to run fgcmOutputProducts.py")
+            else:
+                self.log.info("Saved config for next cycle to %s" % (configFileName))
+                self.log.info("Be sure to look at:")
+                self.log.info("   config.expGrayPhotometricCut")
+                self.log.info("   config.expGrayHighCut")
+                self.log.info("If you are satisfied with the fit, please set:")
+                self.log.info("   config.isFinalCycle = True")
 
         fgcmFitCycle.freeSharedMemory()
 
