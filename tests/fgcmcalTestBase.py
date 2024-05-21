@@ -29,7 +29,6 @@ data from testdata_jointcal for Gen3 repos.
 import os
 import shutil
 import numpy as np
-import glob
 import esutil
 
 import lsst.daf.butler as dafButler
@@ -417,15 +416,14 @@ class FgcmcalTestBase(object):
 
         butler = dafButler.Butler(self.repo)
 
-        config = butler.get('fgcmFitCycle_config', collections=[outputCollection])
-
         # Check that the expected number of plots are there.
-        plots = glob.glob(os.path.join(runDir, config.outfileBase
-                                       + '_cycle%02d_plots/' % (cycleNumber)
-                                       + '*.png'))
-        self.assertEqual(len(plots), nPlots)
+        plotDatasets = list(butler.registry.queryDatasets(
+            f"fgcm_Cycle{cycleNumber}_*Plot",
+            collections=[outputCollection],
+        ))
+        self.assertEqual(len(plotDatasets), nPlots)
 
-        zps = butler.get('fgcmZeropoints%d' % (cycleNumber),
+        zps = butler.get(f'fgcm_Cycle{cycleNumber}_Zeropoints',
                          collections=[outputCollection],
                          instrument=instName)
         self.assertEqual(len(zps), nZp)
@@ -443,7 +441,7 @@ class FgcmcalTestBase(object):
         test, = np.where(zps['fgcmZpt'][gd] < -9000.0)
         self.assertEqual(len(test), 0)
 
-        stds = butler.get('fgcmStandardStars%d' % (cycleNumber),
+        stds = butler.get(f'fgcm_Cycle{cycleNumber}_StandardStars',
                           collections=[outputCollection],
                           instrument=instName)
 
@@ -499,11 +497,11 @@ class FgcmcalTestBase(object):
         config = butler.get('fgcmOutputProducts_config',
                             collections=[outputCollection], instrument=instName)
 
-        rawStars = butler.get('fgcmStandardStars' + config.connections.cycleNumber,
+        rawStars = butler.get(f'fgcm_Cycle{config.connections.cycleNumber}_StandardStars',
                               collections=[inputCollection], instrument=instName)
 
         # Test the fgcm_photoCalib output
-        zptCat = butler.get('fgcmZeropoints' + config.connections.cycleNumber,
+        zptCat = butler.get(f'fgcm_Cycle{config.connections.cycleNumber}_Zeropoints',
                             collections=[inputCollection], instrument=instName)
 
         good = (zptCat['fgcmFlag'] < 16)
