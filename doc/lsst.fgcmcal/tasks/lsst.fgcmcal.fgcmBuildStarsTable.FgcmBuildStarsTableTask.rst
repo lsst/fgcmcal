@@ -9,6 +9,7 @@ This task additionally uses fgcm to match star observations into unique stars, a
 
 This is the second task in a typical ``fgcmcal`` processing chain.
 The first is :doc:`lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`, the third is :doc:`lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask`, and the fourth is :doc:`lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask`.
+This task is still usable and tested, but the replacement :doc:`lsst.fgcmcal.fgcmBuildFromIsolatedStars.FgcmBuildFromIsolatedStarsTask` is preferred for modern pipelines.
 
 .. _lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTableTask-summary:
 
