@@ -821,4 +821,4 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         h_use, = np.where(h >= 3)
         for index in h_use:
             i1a = rev[rev[index]: rev[index + 1]]
-            visit_cat["deltaAper"][index] = np.median(star_obs["delta_mag_aper"][ok[i1a]])
+            visit_cat["deltaAper"][index] = np.median(np.asarray(star_obs["delta_mag_aper"][ok[i1a]]))
