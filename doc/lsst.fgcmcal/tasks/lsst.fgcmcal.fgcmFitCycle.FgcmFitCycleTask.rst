@@ -12,6 +12,12 @@ This task will produce a large number of QA plots which will be put into the but
 This template makes it easy to see all the plots from a single fit cycle sorted together.
 By default, only QA plots from the final two fit cycles (the next-to-last cycle is a full fit and the last cycle is the post-fit cleanup) will be output, unless ``config.doPlotsBeforeFinalCycles = True``.
 
+The plots can either be accessed via a dedicated interface to butler plots, or they may be downloaded to the current directory with the following butler command:
+
+.. code-block :: bash
+
+    butler retrieve-artifacts REPO ./ --collections COLLECTION -d "fgcm_CycleN_*_Plot" --no-preserve-path
+
 This is the third task in a typical ``fgcmcal`` processing chain.  The first is :doc:`lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`, the second is :doc:`lsst.fgcmcal.fgcmBuildFromIsolatedStars.FgcmBuildFromIsolatedStarsTask`, and the fourth is :doc:`lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask`.
 
 .. _lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask-summary:
