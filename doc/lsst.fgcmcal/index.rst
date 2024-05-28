@@ -14,13 +14,11 @@ Please see `Burke, Rykoff, et al. 2018 <http://adsabs.harvard.edu/abs/2018AJ....
 Using lsst.fgcmcal
 ==================
 
-Please see the `cookbook <https://github.com/lsst/fgcmcal/tree/master/cookbook/README.md>`_ for a runthrough on how to use ``lsst.fgcmcal``.
-
 There are four tasks to be run in a typical global ``fgcmcal`` processing chain.  They are:
 
 #. Make a look-up table: :doc:`tasks/lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask`
 
-#. Build the star lists: :doc:`tasks/lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask` (if ``sourceTable_visit`` parquet tables are available) or :doc:`tasks/lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`
+#. Build the list of input stars: :doc:`tasks/lsst.fgcmcal.fgcmBuildFromIsolatedStars.FgcmBuildFromIsolatedStarsTask`
 
 #. Run the fitter: :doc:`tasks/lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask`
 

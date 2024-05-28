@@ -6,7 +6,8 @@ FgcmMakeLutTask
 
 ``FgcmMakeLutTask`` computes a look-up table tracking atmosphere and instrumental variations for use in the ``fgcmcal`` fits.  The intention is that this is run once for a given observatory/instrument and should only be updated when instrumental parameters change (e.g., updated filter and ccd throughput curves), or in the extremely rare case if an observatory is relocated to a different elevation or latitude.
 
-This is the first task in a typical ``fgcmcal`` processing chain.  The second is :doc:`lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask` or :doc:`lsst.fgcmcal.fgcmBuildStars.FgcmBuildStarsTask`, the third is :doc:`lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask`, and the fourth is :doc:`lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask`.
+This is the first task in a typical ``fgcmcal`` processing chain.
+The second is :doc:`lsst.fgcmcal.fgcmBuildFromIsolatedStars.FgcmBuildFromIsolatedStarsTask`, the third is :doc:`lsst.fgcmcal.fgcmFitCycle.FgcmFitCycleTask`, and the fourth is :doc:`lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask`.
 
 .. _lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask-summary:
 

@@ -46,7 +46,7 @@ FGCM_ILLEGAL_VALUE = -9999.0
 
 def makeConfigDict(config, log, camera, maxIter,
                    resetFitParameters, outputZeropoints,
-                   lutFilterNames, tract=None, nCore=1):
+                   lutFilterNames, tract=None, nCore=1, doPlots=False):
     """
     Make the FGCM fit cycle configuration dict
 
@@ -71,6 +71,8 @@ def makeConfigDict(config, log, camera, maxIter,
         Default is None.
     nCore : `int`, optional
         Number of cores to use.
+    doPlots : `bool`, optional
+        Make FGCM QA plots?
 
     Returns
     -------
@@ -240,7 +242,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'clobber': True,
                   'useSedLUT': False,
                   'resetParameters': resetFitParameters,
-                  'doPlots': config.doPlots,
+                  'doPlots': doPlots,
                   'outputFgcmcalZpts': True,  # when outputting zpts, use fgcmcal format
                   'outputZeropoints': outputZeropoints}
 
