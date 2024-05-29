@@ -169,7 +169,8 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
             ("FlaggedStars", "Catalog", "Catalog of flagged stars for fgcm calibration."),
         ]
         multicycleOutputConnections = [
-            ("OutputConfig", "Config", "Configuration for next fgcm fit cycle."),
+            # TODO: DM-44583 persist configs when mocking system allows it.
+            # ("OutputConfig", "Config", "Configuration for next fgcm fit cycle."),
         ]
         optionalZpOutputConnections = [
             ("Zeropoints", "Catalog", "Catalog of fgcm zeropoint data."),
@@ -1184,8 +1185,9 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                              getattr(outputRefs, f'fgcm_Cycle{cycle}_FitParameters'))
                 butlerQC.put(fgcmDatasetDict['fgcmFlaggedStars'],
                              getattr(outputRefs, f'fgcm_Cycle{cycle}_FlaggedStars'))
-                butlerQC.put(config,
-                             getattr(outputRefs, f'fgcm_Cycle{cycle}_OutputConfig'))
+                # TODO: DM-44583 persist configs when mocking system allows it.
+                # butlerQC.put(config,
+                #              getattr(outputRefs, f'fgcm_Cycle{cycle}_OutputConfig'))
                 if self.outputZeropoints:
                     butlerQC.put(fgcmDatasetDict['fgcmZeropoints'],
                                  getattr(outputRefs, f'fgcm_Cycle{cycle}_Zeropoints'))
