@@ -352,8 +352,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                         doc=doc,
                         dimensions=("instrument",),
                     )
-                    object.__setattr__(self, connectionName, outConnection)
-                    self.outputs.add(connectionName)
+                    setattr(self, connectionName, outConnection)
 
             # The final cycle has everything.
             outputConnections = copy.copy(inputAndOutputConnections)
@@ -371,8 +370,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                     doc=doc,
                     dimensions=("instrument",),
                 )
-                object.__setattr__(self, connectionName, outConnection)
-                self.outputs.add(connectionName)
+                setattr(self, connectionName, outConnection)
         else:
             # Single cycle run.
             if config.cycleNumber > 0:
@@ -401,8 +399,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                     doc=doc,
                     dimensions=("instrument",),
                 )
-                object.__setattr__(self, connectionName, inConnection)
-                self.prerequisiteInputs.add(connectionName)
+                setattr(self, connectionName, inConnection)
 
             for (name, storageClass, doc) in outputConnections:
                 connectionName = f"fgcm{name}"
@@ -416,8 +413,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                     doc=doc,
                     dimensions=("instrument",),
                 )
-                object.__setattr__(self, connectionName, outConnection)
-                self.outputs.add(connectionName)
+                setattr(self, connectionName, outConnection)
 
         if not config.doReferenceCalibration:
             self.inputs.remove("fgcmReferenceStars")
