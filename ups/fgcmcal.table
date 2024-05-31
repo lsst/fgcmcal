@@ -19,6 +19,7 @@ setupRequired(fgcm)
 # data files for the unittests, and the obs package for that data
 setupOptional(testdata_jointcal)
 setupOptional(obs_subaru)
+setupOptional(obs_lsst)
 
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envPrepend(PATH, ${PRODUCT_DIR}/bin)
