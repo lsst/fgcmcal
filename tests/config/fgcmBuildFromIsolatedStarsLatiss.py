@@ -27,6 +27,7 @@ config.doSubtractLocalBackground = True
 config.sourceSelector["science"].flags.bad.append("localBackground_flag")
 config.sourceSelector["science"].signalToNoise.fluxField = "apFlux_35_0_instFlux"
 config.sourceSelector["science"].signalToNoise.errField = "apFlux_35_0_instFluxErr"
+config.sourceSelector["science"].signalToNoise.minimum = 11.0
 config.fgcmLoadReferenceCatalog.load(os.path.join(configDir, "filterMapLatiss.py"))
 config.fgcmLoadReferenceCatalog.applyColorTerms = True
 config.fgcmLoadReferenceCatalog.colorterms.load(os.path.join(configDir, "colortermsLatiss.py"))
