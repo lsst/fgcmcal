@@ -160,7 +160,7 @@ class FgcmBuildFromIsolatedStarsConfig(FgcmBuildStarsConfigBase, pipeBase.Pipeli
         self.reserve_selection.reserve_fraction = 0.1
 
         # The names here correspond to the isolated_star_sources.
-        self.instFluxField = 'apFlux_12_0_instFlux'
+        self.instFluxField = 'normCompTophatFlux_instFlux'
         self.localBackgroundFluxField = 'localBackground_instFlux'
         self.apertureInnerInstFluxField = 'apFlux_12_0_instFlux'
         self.apertureOuterInstFluxField = 'apFlux_17_0_instFlux'
@@ -176,7 +176,7 @@ class FgcmBuildFromIsolatedStarsConfig(FgcmBuildStarsConfigBase, pipeBase.Pipeli
 
         source_selector.flags.bad = []
 
-        source_selector.signalToNoise.minimum = 11.0
+        source_selector.signalToNoise.minimum = 9.0
         source_selector.signalToNoise.maximum = 1000.0
         source_selector.signalToNoise.fluxField = self.instFluxField
         source_selector.signalToNoise.errField = self.instFluxField + 'Err'
@@ -394,7 +394,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         if self.sourceSelector.config.doFlags:
             source_columns.extend(self.sourceSelector.config.flags.bad)
 
-        local_background_area = np.pi*calib_flux_aperture_radius**2.
+        if self.config.doSubtractLocalBackground:
+            local_background_area = np.pi*calib_flux_aperture_radius**2.
 
         # Compute the approximate pixel area over the full focal plane
         # from the WCS jacobian using the camera model.
