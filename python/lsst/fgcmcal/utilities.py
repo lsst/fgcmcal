@@ -54,8 +54,8 @@ def makeConfigDict(config, log, camera, maxIter,
     ----------
     config : `lsst.fgcmcal.FgcmFitCycleConfig`
         Configuration object
-    log : `lsst.log.Log`
-        LSST log object
+    log : `logging.Logger`
+        Log object.
     camera : `lsst.afw.cameraGeom.Camera`
         Camera from the butler
     maxIter : `int`
