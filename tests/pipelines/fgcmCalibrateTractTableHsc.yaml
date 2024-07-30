@@ -3,3 +3,7 @@ instrument: lsst.obs.subaru.HyperSuprimeCam
 tasks:
    fgcmCalibrateTractTable:
      class: lsst.fgcmcal.fgcmCalibrateTractTable.FgcmCalibrateTractTableTask
+     config:
+        # Preserve test dataset names from testdata_jointcal.
+      connections.sourceSchema: src_schema
+      connections.background: calexpBackground
