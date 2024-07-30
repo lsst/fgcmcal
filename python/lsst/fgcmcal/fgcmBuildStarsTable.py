@@ -69,7 +69,7 @@ class FgcmBuildStarsTableConnections(pipeBase.PipelineTaskConnections,
 
     sourceSchema = connectionTypes.InitInput(
         doc="Schema for source catalogs",
-        name="src_schema",
+        name="initial_stars_schema",
         storageClass="SourceCatalog",
     )
 

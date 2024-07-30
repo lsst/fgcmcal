@@ -3,3 +3,6 @@ instrument: lsst.obs.subaru.HyperSuprimeCam
 tasks:
   fgcmBuildStarsTable:
     class: lsst.fgcmcal.fgcmBuildStarsTable.FgcmBuildStarsTableTask
+    config:
+      # Preserve test dataset names from testdata_jointcal.
+      connections.sourceSchema: src_schema
