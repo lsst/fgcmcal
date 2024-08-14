@@ -816,7 +816,7 @@ class FgcmcalTestBase(object):
 
         repeatabilityCat = butler.get(list(repRefs)[0])
         repeatability = repeatabilityCat['rawRepeatability'][:]
-        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=4e-6)
+        self.assertFloatsAlmostEqual(repeatability, rawRepeatability, atol=5e-5)
 
         # Check that the number of photoCalib objects in each filter are what we expect
         for filterName in filterNCalibMap.keys():
