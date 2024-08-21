@@ -452,7 +452,7 @@ def computeReferencePixelScale(camera):
     pixelScales = np.zeros(len(camera))
     for i, detector in enumerate(camera):
         wcs = createInitialSkyWcs(visitInfo, detector, flipX)
-        pixelScales[i] = wcs.getPixelScale().asArcseconds()
+        pixelScales[i] = wcs.getPixelScale(detector.getBBox().getCenter()).asArcseconds()
 
     ok, = np.where(pixelScales > 0.0)
     return np.median(pixelScales[ok])
