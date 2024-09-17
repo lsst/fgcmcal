@@ -58,7 +58,7 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
 
     sourceSchema = connectionTypes.InitInput(
         doc="Schema for source catalogs",
-        name="src_schema",
+        name="initial_stars_schema",
         storageClass="SourceCatalog",
     )
 
@@ -90,8 +90,8 @@ class FgcmCalibrateTractTableConnections(pipeBase.PipelineTaskConnections,
     )
 
     background = connectionTypes.Input(
-        doc="Calexp background model",
-        name="calexpBackground",
+        doc="Single exposure background model",
+        name="initial_pvi_background",
         storageClass="Background",
         dimensions=("instrument", "visit", "detector"),
         deferLoad=True,
