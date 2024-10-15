@@ -23,6 +23,9 @@ config.doModelErrorsWithBackground = False
 
 config.minPerBand = 2
 config.connections.ref_cat = "ps1_pv3_3pi_20170110"
+config.connections.isolated_star_cats = "isolated_star_cat"
+config.connections.isolated_star_sources = "isolated_star_sources"
+
 # This is set low enough to ensure that this code path is triggered.
 config.densityCutMaxPerPixel = 200
 

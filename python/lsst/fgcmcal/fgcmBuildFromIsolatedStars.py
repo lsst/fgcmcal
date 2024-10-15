@@ -78,7 +78,7 @@ class FgcmBuildFromIsolatedStarsConnections(pipeBase.PipelineTaskConnections,
     isolated_star_cats = pipeBase.connectionTypes.Input(
         doc=("Catalog of isolated stars with average positions, number of associated "
              "sources, and indexes to the isolated_star_sources catalogs."),
-        name="isolated_star_cat",
+        name="isolated_star_presource_associations",
         storageClass="ArrowAstropy",
         dimensions=("instrument", "tract", "skymap"),
         deferLoad=True,
@@ -87,7 +87,7 @@ class FgcmBuildFromIsolatedStarsConnections(pipeBase.PipelineTaskConnections,
     isolated_star_sources = pipeBase.connectionTypes.Input(
         doc=("Catalog of isolated star sources with sourceIds, and indexes to the "
              "isolated_star_cats catalogs."),
-        name="isolated_star_sources",
+        name="isolated_star_presources",
         storageClass="ArrowAstropy",
         dimensions=("instrument", "tract", "skymap"),
         deferLoad=True,
