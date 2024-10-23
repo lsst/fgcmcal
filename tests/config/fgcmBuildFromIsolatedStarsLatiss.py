@@ -20,6 +20,8 @@ config.apertureOuterInstFluxField = "apFlux_50_0_instFlux"
 
 config.minPerBand = 2
 config.connections.ref_cat = "atlas_refcat2_20220201"
+config.connections.isolated_star_cats = "isolated_star_cat"
+config.connections.isolated_star_sources = "isolated_star_sources"
 
 configDir = os.path.join(os.path.dirname(__file__))
 config.physicalFilterMap = LATISS_FILTER_DEFINITIONS.physical_to_band
