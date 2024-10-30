@@ -1,0 +1,10 @@
+description: Make LSSTComCam fgcmcal look-up table
+instrument: lsst.obs.lsst.LsstComCam
+imports:
+  - location: $FGCMCAL_DIR/pipelines/_ingredients/fgcmMakeLUT.yaml
+tasks:
+  fgcmMakeLut:
+    class: lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask
+    config:
+      physicalFilters: ["u_02", "g_01", "r_03", "i_06", "z_03", "y_04"]
+      atmosphereTableName: fgcm_atm_lsst2.fits
