@@ -688,6 +688,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         default=None,
         optional=True,
     )
+    cameraGain = pexConfig.Field(
+        doc="Average camera gain. If not set, will use the median of the "
+            "camera model/detector/amplifier gains.",
+        dtype=float,
+        default=None,
+        optional=True,
+    )
     defaultCameraOrientation = pexConfig.Field(
         doc="Default camera orientation for QA plots.",
         dtype=float,

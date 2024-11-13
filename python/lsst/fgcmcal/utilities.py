@@ -109,9 +109,12 @@ def makeConfigDict(config, log, camera, maxIter,
         # Convert to square cm.
         mirrorArea = config.mirrorArea * 100.**2.
 
-    # Get approximate average camera gain:
-    gains = [amp.getGain() for detector in camera for amp in detector.getAmplifiers()]
-    cameraGain = float(np.median(gains))
+    if config.cameraGain is None:
+        # Get approximate average camera gain:
+        gains = [amp.getGain() for detector in camera for amp in detector.getAmplifiers()]
+        cameraGain = float(np.median(gains))
+    else:
+        cameraGain = config.cameraGain
 
     # Cut down the filter map to those that are in the LUT
     filterToBand = {filterName: config.physicalFilterMap[filterName] for
