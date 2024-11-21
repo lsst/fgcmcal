@@ -1,0 +1,3 @@
+description: Make fgcmcal look-up table
+tasks:
+  fgcmMakeLut: lsst.fgcmcal.fgcmMakeLut.FgcmMakeLutTask
