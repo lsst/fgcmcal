@@ -33,6 +33,7 @@ from lsst.daf.base.dateTime import DateTime
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
 from .fgcmLoadReferenceCatalog import FgcmLoadReferenceCatalogTask
+from .utilities import computeReferencePixelScale
 
 import fgcm
 
@@ -259,13 +260,15 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         visitCat['used'] = 0
         visitCat['sources_read'] = False
 
+        defaultPixelScale = computeReferencePixelScale(camera)
+
         # No matter what, fill the catalog. This will check if it was
         # already read.
-        self._fillVisitCatalog(visitCat, groupedHandles)
+        self._fillVisitCatalog(visitCat, groupedHandles, defaultPixelScale)
 
         return visitCat
 
-    def _fillVisitCatalog(self, visitCat, groupedHandles):
+    def _fillVisitCatalog(self, visitCat, groupedHandles, defaultPixelScale):
         """
         Fill the visit catalog with visit metadata
 
@@ -275,6 +278,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             Visit catalog.  See _makeFgcmVisitSchema() for schema definition.
         groupedHandles : `dict` [`list` [`lsst.daf.butler.DeferredDatasetHandle`]]
             Dataset handles, grouped by visit.
+        defaultPixelScale : `float`
+            Default pixel scale to use if not in visit summary (arcsecond/pixel).
         """
 
         # Guarantee that these are sorted.
@@ -292,15 +297,24 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
 
             visitInfo = summaryRow.getVisitInfo()
             physicalFilter = summaryRow['physical_filter']
-            # Compute the median psf sigma if possible
-            goodSigma, = np.where(summary['psfSigma'] > 0)
+            # Compute the median psf sigma and fwhm if possible.
+            if 'pixelScale' in summary.schema:
+                # This is not available in the older test summaries
+                pixelScales = summary['pixelScale']
+            else:
+                pixelScales = np.full(len(summary['psfSigma']), defaultPixelScale)
+            psfSigmas = summary['psfSigma']
+            goodSigma, = np.where((np.nan_to_num(psfSigmas) > 0) & (np.nan_to_num(pixelScales) > 0))
             if goodSigma.size > 2:
-                psfSigma = np.median(summary['psfSigma'][goodSigma])
+                psfSigma = np.median(psfSigmas[goodSigma])
+                psfFwhm = np.median(psfSigmas[goodSigma] * pixelScales[goodSigma]) * np.sqrt(8.*np.log(2.))
             elif goodSigma.size > 0:
-                psfSigma = summary['psfSigma'][goodSigma[0]]
+                psfSigma = psfSigmas[goodSigma[0]]
+                psfFwhm = psfSigmas[goodSigma[0]] * pixelScales[goodSigma[0]] * np.sqrt(8.)*np.log(2.)
             else:
                 self.log.warning("Could not find any good summary psfSigma for visit %d", visit)
                 psfSigma = 0.0
+                psfFwhm = 0.0
             # Compute median background if possible
             goodBackground, = np.where(np.nan_to_num(summary['skyBg']) > 0.0)
             if goodBackground.size > 2:
@@ -332,6 +346,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             # Median delta aperture, to be measured from stars
             rec['deltaAper'] = 0.0
             rec['psfSigma'] = psfSigma
+            rec['psfFwhm'] = psfFwhm
             rec['skyBackground'] = skyBackground
             rec['used'] = 1
 
@@ -559,7 +574,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         schema.addField('mjd', type=np.float64, doc="MJD of visit")
         schema.addField('exptime', type=np.float32, doc="Exposure time")
         schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
-        schema.addField('psfSigma', type=np.float32, doc="PSF sigma (reference CCD)")
+        schema.addField('psfSigma', type=np.float32, doc="PSF sigma (median); pixels")
+        schema.addField('psfFwhm', type=np.float32, doc="PSF FWHM (median); arcseconds")
         schema.addField('deltaAper', type=np.float32, doc="Delta-aperture")
         schema.addField('skyBackground', type=np.float32, doc="Sky background (ADU) (reference CCD)")
         # the following field is not used yet

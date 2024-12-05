@@ -138,7 +138,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'expField': FGCM_EXP_FIELD,
                   'ccdField': FGCM_CCD_FIELD,
                   'seeingField': 'DELTA_APER',
-                  'fwhmField': 'PSFSIGMA',
+                  'fwhmField': 'PSFFWHM',
                   'skyBrightnessField': 'SKYBACKGROUND',
                   'deepFlag': 'DEEPFLAG',  # unused
                   'bands': list(config.bands),
@@ -404,7 +404,7 @@ def translateVisitCatalog(visitCat):
     fgcmExpInfo = np.zeros(len(visitCat), dtype=[('VISIT', 'i8'),
                                                  ('MJD', 'f8'),
                                                  ('EXPTIME', 'f8'),
-                                                 ('PSFSIGMA', 'f8'),
+                                                 ('PSFFWHM', 'f8'),
                                                  ('DELTA_APER', 'f8'),
                                                  ('SKYBACKGROUND', 'f8'),
                                                  ('DEEPFLAG', 'i2'),
@@ -423,7 +423,7 @@ def translateVisitCatalog(visitCat):
     fgcmExpInfo['TELDEC'][:] = visitCat['teldec']
     fgcmExpInfo['TELROT'][:] = visitCat['telrot']
     fgcmExpInfo['PMB'][:] = visitCat['pmb']
-    fgcmExpInfo['PSFSIGMA'][:] = visitCat['psfSigma']
+    fgcmExpInfo['PSFFWHM'][:] = visitCat['psfFwhm']
     fgcmExpInfo['DELTA_APER'][:] = visitCat['deltaAper']
     fgcmExpInfo['SKYBACKGROUND'][:] = visitCat['skyBackground']
     # Note that we have to go through asAstropy() to get a string
