@@ -164,162 +164,191 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         if int(config.connections.previousCycleNumber) != (int(config.connections.cycleNumber) - 1):
             raise ValueError("previousCycleNumber must be 1 less than cycleNumber")
 
+        instDims = ("instrument",)
+        bandDims = ("instrument", "band")
+        filterDims = ("instrument", "physical_filter")
+
         inputAndOutputConnections = [
-            ("FitParameters", "Catalog", "Catalog of fgcm fit parameters."),
-            ("FlaggedStars", "Catalog", "Catalog of flagged stars for fgcm calibration."),
+            ("FitParameters", "Catalog", "Catalog of fgcm fit parameters.", instDims),
+            ("FlaggedStars", "Catalog", "Catalog of flagged stars for fgcm calibration.", instDims),
         ]
         multicycleOutputConnections = [
-            ("OutputConfig", "Config", "Configuration for next fgcm fit cycle."),
+            ("OutputConfig", "Config", "Configuration for next fgcm fit cycle.", instDims),
         ]
         optionalZpOutputConnections = [
-            ("Zeropoints", "Catalog", "Catalog of fgcm zeropoint data."),
-            ("AtmosphereParameters", "Catalog", "Catalog of atmospheric fit parameters."),
+            ("Zeropoints", "Catalog", "Catalog of fgcm zeropoint data.", instDims),
+            ("AtmosphereParameters", "Catalog", "Catalog of atmospheric fit parameters.", instDims),
         ]
         optionalStarOutputConnections = [
-            ("StandardStars", "SimpleCatalog", "Catalog of standard star magnitudes."),
+            ("StandardStars", "SimpleCatalog", "Catalog of standard star magnitudes.", instDims),
         ]
-
-        # Some plots are per band, some are per filter.
-        bands = config.bands
-        physical_filters = []
-        for band in bands:
-            for key, val in config.physicalFilterMap.items():
-                if band == val:
-                    # We cannot have dashes or spaces or tildes in the name.
-                    physical_filters.append(key.replace("-", "_").replace(" ", "_").replace("~", "_"))
 
         epochs = [f"epoch{i}" for i in range(len(config.epochMjds))]
 
         # All names will be preceeded with ``fgcm_CycleN_``.
         plotConnections = [
-            ("Zeropoints_Plot", "Plot", "Plot of fgcm zeropoints."),
-            ("ExpgrayDeep_Plot", "Plot", "Plot of gray term per exposure per time for deep fields."),
-            ("NightlyAlpha_Plot", "Plot", "Plot of nightly AOD alpha term."),
-            ("NightlyTau_Plot", "Plot", "Plot of nightly aerosol optical depth (tau)."),
-            ("NightlyPwv_Plot", "Plot", "Plot of nightly water vapor."),
-            ("NightlyO3_Plot", "Plot", "Plot of nightly ozone."),
-            ("FilterOffsets_Plot", "Plot", "Plot of in-band filter offsets."),
-            ("AbsThroughputs_Plot", "Plot", "Plot of absolute throughput fractions."),
-            ("QESysWashesInitial_Plot", "Plot", "Plot of initial system QE with mirror washes."),
-            ("QESysWashesFinal_Plot", "Plot", "Plot of final system QE with mirror washes."),
+            ("Zeropoints_Plot", "Plot", "Plot of fgcm zeropoints.", instDims),
+            ("ExpgrayDeep_Plot",
+             "Plot",
+             "Plot of gray term per exposure per time for deep fields.",
+             instDims),
+            ("NightlyAlpha_Plot", "Plot", "Plot of nightly AOD alpha term.", instDims),
+            ("NightlyTau_Plot", "Plot", "Plot of nightly aerosol optical depth (tau).", instDims),
+            ("NightlyPwv_Plot", "Plot", "Plot of nightly water vapor.", instDims),
+            ("NightlyO3_Plot", "Plot", "Plot of nightly ozone.", instDims),
+            ("FilterOffsets_Plot", "Plot", "Plot of in-band filter offsets.", instDims),
+            ("AbsThroughputs_Plot", "Plot", "Plot of absolute throughput fractions.", instDims),
+            ("QESysWashesInitial_Plot", "Plot", "Plot of initial system QE with mirror washes.", instDims),
+            ("QESysWashesFinal_Plot", "Plot", "Plot of final system QE with mirror washes.", instDims),
             ("RpwvVsRpwvInput_Plot",
              "Plot",
-             "Plot of change in per-visit ``retrieved`` PWV from previous fit cycle."),
+             "Plot of change in per-visit ``retrieved`` PWV from previous fit cycle.",
+             instDims),
             ("RpwvVsRpwvSmooth_Plot",
              "Plot",
-             "Plot of per-visit ``retrieved`` PWV vs. smoothed PWV."),
+             "Plot of per-visit ``retrieved`` PWV vs. smoothed PWV.",
+             instDims),
             ("ModelPwvVsRpwv_Plot",
              "Plot",
-             "Plot of model PWV vs. per-visit ``retrieved`` PWV."),
+             "Plot of model PWV vs. per-visit ``retrieved`` PWV.",
+             instDims),
             ("ChisqFit_Plot",
              "Plot",
-             "Plot of chisq as a function of iteration."),
+             "Plot of chisq as a function of iteration.",
+             instDims),
         ]
-        for band in bands:
+
+        plotConnections.extend(
+            [
+                ("Apercorr_Plot", "Plot", "Plot of fgcm aperture corrections.", bandDims),
+                ("EpsilonGlobal_Plot",
+                 "Plot",
+                 "Plot of global background over/undersubtraction.",
+                 bandDims),
+                ("EpsilonMap_Plot",
+                 "Plot",
+                 "Map of spatially varying background over/undersubtraction.",
+                 bandDims),
+                ("ExpgrayInitial_Plot",
+                 "Plot",
+                 "Histogram of initial gray term per exposure.",
+                 bandDims),
+                ("CompareRedblueExpgray_Plot",
+                 "Plot",
+                 "Plot of red/blue split gray term per exposure",
+                 bandDims),
+                ("Expgray_Plot", "Plot", "Histogram of gray term per exposure.", bandDims),
+                ("ExpgrayAirmass_Plot",
+                 "Plot",
+                 "Plot of exposure gray term as a function of airmass.",
+                 bandDims),
+                ("ExpgrayCompareMjdRedblue_Plot",
+                 "Plot",
+                 "Plot of red/blue split gray term per exposure as a function of time.",
+                 bandDims),
+                ("ExpgrayUT_Plot",
+                 "Plot",
+                 "Plot of grey term per exposure as a function of time of night.",
+                 bandDims),
+                ("ExpgrayCompareBands_Plot",
+                 "Plot",
+                 "Plot of gray term per exposure between bands nearby in time.",
+                 bandDims),
+                ("ExpgrayReference_Plot",
+                 "Plot",
+                 "Histogram of gray term per exposure compared to reference mags.",
+                 bandDims),
+                ("QESysRefstarsStdInitial_Plot",
+                 "Plot",
+                 "Plot of reference mag - calibrated (standard) mag vs. time (before fit).",
+                 bandDims),
+                ("QESysRefstarsStdFinal_Plot",
+                 "Plot",
+                 "Plot of reference mag - calibrated (standard) mag vs. time (after fit).",
+                 bandDims),
+                ("QESysRefstarsObsInitial_Plot",
+                 "Plot",
+                 "Plot of reference mag - observed (instrumental) mag vs. time (before fit).",
+                 bandDims),
+                ("QESysRefstarsObsFinal_Plot",
+                 "Plot",
+                 "Plot of reference mag - observed (instrumental) mag vs. time (after fit).",
+                 bandDims),
+                ("ModelMagerrInitial_Plot",
+                 "Plot",
+                 "Plots for magnitude error model, initial estimate.",
+                 bandDims),
+                ("ModelMagerrPostfit_Plot",
+                 "Plot",
+                 "Plots for magnitude error model, after fitting.",
+                 bandDims),
+                ("SigmaFgcmAllStars_Plot",
+                 "Plot",
+                 "Histograms for intrinsic scatter for all bright stars.",
+                 bandDims),
+                ("SigmaFgcmReservedStars_Plot",
+                 "Plot",
+                 "Histograms for intrinsic scatter for reserved bright stars.",
+                 bandDims),
+                ("SigmaFgcmReservedStarsCrunched_Plot",
+                 "Plot",
+                 "Histograms for intrinsic scatter for reserved bright stars (after gray correction).",
+                 bandDims),
+                ("SigmaCal_Plot",
+                 "Plot",
+                 "Plot showing scatter as a function of systematic error floor.",
+                 bandDims),
+                ("SigmaRef_Plot",
+                 "Plot",
+                 "Histograms of scatter with respect to reference stars.",
+                 bandDims),
+                ("RefResidVsColorAll_Plot",
+                 "Plot",
+                 "Plot of reference star residuals vs. color (all stars).",
+                 bandDims),
+                ("RefResidVsColorCut_Plot",
+                 "Plot",
+                 "Plot of reference star residuals vs. color (reference star color cuts).",
+                 bandDims),
+            ]
+        )
+
+        plotConnections.extend(
+            [
+                ("I1R1_Plot", "Plot", "Plot of fgcm R1 vs. I1.", filterDims),
+                ("I1_Plot", "Plot", "Focal plane map of fgcm I1.", filterDims),
+                ("R1_Plot", "Plot", "Focal plane map of fgcm R1.", filterDims),
+                ("R1mI1_Plot", "Plot", "Focal plane map of fgcm R1 - I1.", filterDims),
+                ("R1mI1_vs_mjd_Plot", "Plot", "R1 - I1 residuals vs. mjd.", filterDims),
+                ("CompareRedblueMirrorchrom_Plot",
+                 "Plot",
+                 "Comparison of mirror chromaticity residuals for red/blue stars.",
+                 filterDims),
+                ("CcdChromaticity_Plot",
+                 "Plot",
+                 "Focal plane map of fgcm ccd chromaticity.",
+                 filterDims),
+                ("EpsilonDetector_Plot",
+                 "Plot",
+                 "Focal plane map of background over/undersubtraction.",
+                 filterDims),
+                ("EpsilonDetectorMatchscale_Plot",
+                 "Plot",
+                 "Focal plane map of background over/undersubtraction.",
+                 filterDims),
+            ]
+        )
+        for epoch in epochs:
             plotConnections.extend(
                 [
-                    (f"Apercorr_{band}_Plot", "Plot", "Plot of fgcm aperture corrections."),
-                    (f"EpsilonGlobal_{band}_Plot",
-                     "Plot",
-                     "Plot of global background over/undersubtraction."),
-                    (f"EpsilonMap_{band}_Plot",
-                     "Plot",
-                     "Map of spatially varying background over/undersubtraction."),
-                    (f"ExpgrayInitial_{band}_Plot",
-                     "Plot",
-                     "Histogram of initial gray term per exposure."),
-                    (f"CompareRedblueExpgray_{band}_Plot",
-                     "Plot",
-                     "Plot of red/blue split gray term per exposure"),
-                    (f"Expgray_{band}_Plot", "Plot", "Histogram of gray term per exposure."),
-                    (f"ExpgrayAirmass_{band}_Plot",
-                     "Plot",
-                     "Plot of exposure gray term as a function of airmass."),
-                    (f"ExpgrayCompareMjdRedblue_{band}_Plot",
-                     "Plot",
-                     "Plot of red/blue split gray term per exposure as a function of time."),
-                    (f"ExpgrayUT_{band}_Plot",
-                     "Plot",
-                     "Plot of grey term per exposure as a function of time of night."),
-                    (f"ExpgrayCompareBands_{band}_Plot",
-                     "Plot",
-                     "Plot of gray term per exposure between bands nearby in time."),
-                    (f"ExpgrayReference_{band}_Plot",
-                     "Plot",
-                     "Histogram of gray term per exposure compared to reference mags."),
-                    (f"QESysRefstarsStdInitial_{band}_Plot",
-                     "Plot",
-                     "Plot of reference mag - calibrated (standard) mag vs. time (before fit)."),
-                    (f"QESysRefstarsStdFinal_{band}_Plot",
-                     "Plot",
-                     "Plot of reference mag - calibrated (standard) mag vs. time (after fit)."),
-                    (f"QESysRefstarsObsInitial_{band}_Plot",
-                     "Plot",
-                     "Plot of reference mag - observed (instrumental) mag vs. time (before fit)."),
-                    (f"QESysRefstarsObsFinal_{band}_Plot",
-                     "Plot",
-                     "Plot of reference mag - observed (instrumental) mag vs. time (after fit)."),
-                    (f"ModelMagerrInitial_{band}_Plot",
-                     "Plot",
-                     "Plots for magnitude error model, initial estimate."),
-                    (f"ModelMagerrPostfit_{band}_Plot",
-                     "Plot",
-                     "Plots for magnitude error model, after fitting."),
-                    (f"SigmaFgcmAllStars_{band}_Plot",
-                     "Plot",
-                     "Histograms for intrinsic scatter for all bright stars."),
-                    (f"SigmaFgcmReservedStars_{band}_Plot",
-                     "Plot",
-                     "Histograms for intrinsic scatter for reserved bright stars."),
-                    (f"SigmaFgcmReservedStarsCrunched_{band}_Plot",
-                     "Plot",
-                     "Histograms for intrinsic scatter for reserved bright stars (after gray correction)."),
-                    (f"SigmaCal_{band}_Plot",
-                     "Plot",
-                     "Plot showing scatter as a function of systematic error floor."),
-                    (f"SigmaRef_{band}_Plot",
-                     "Plot",
-                     "Histograms of scatter with respect to reference stars."),
-                    (f"RefResidVsColorAll_{band}_Plot",
-                     "Plot",
-                     "Plot of reference star residuals vs. color (all stars)."),
-                    (f"RefResidVsColorCut_{band}_Plot",
-                     "Plot",
-                     "Plot of reference star residuals vs. color (reference star color cuts)."),
+                    (
+                        f"Superstar_{epoch}_Plot",
+                        "Plot",
+                        "Plot of illumination Correction.",
+                        filterDims,
+                    )
                 ]
             )
-        for physical_filter in physical_filters:
-            plotConnections.extend(
-                [
-                    (f"I1R1_{physical_filter}_Plot", "Plot", "Plot of fgcm R1 vs. I1."),
-                    (f"I1_{physical_filter}_Plot", "Plot", "Focal plane map of fgcm I1."),
-                    (f"R1_{physical_filter}_Plot", "Plot", "Focal plane map of fgcm R1."),
-                    (f"R1mI1_{physical_filter}_Plot", "Plot", "Focal plane map of fgcm R1 - I1."),
-                    (f"R1mI1_vs_mjd_{physical_filter}_Plot", "Plot", "R1 - I1 residuals vs. mjd."),
-                    (f"CompareRedblueMirrorchrom_{physical_filter}_Plot",
-                     "Plot",
-                     "Comparison of mirror chromaticity residuals for red/blue stars."),
-                    (f"CcdChromaticity_{physical_filter}_Plot",
-                     "Plot",
-                     "Focal plane map of fgcm ccd chromaticity."),
-                    (f"EpsilonDetector_{physical_filter}_Plot",
-                     "Plot",
-                     "Focal plane map of background over/undersubtraction."),
-                    (f"EpsilonDetectorMatchscale_{physical_filter}_Plot",
-                     "Plot",
-                     "Focal plane map of background over/undersubtraction."),
-                ]
-            )
-            for epoch in epochs:
-                plotConnections.extend(
-                    [
-                        (
-                            f"Superstar_{physical_filter}_{epoch}_Plot",
-                            "Plot",
-                            "Plot of illumination Correction.",
-                        )
-                    ]
-                )
 
         if config.doMultipleCycles:
             # Multiple cycle run.
@@ -343,14 +372,15 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                        or config.doPlotsBeforeFinalCycles:
                         outputConnections.extend(plotConnections)
 
-                for (name, storageClass, doc) in outputConnections:
+                for (name, storageClass, doc, dims) in outputConnections:
                     connectionName = f"fgcm_Cycle{cycle}_{name}"
                     storageName = connectionName
                     outConnection = connectionTypes.Output(
                         name=storageName,
                         storageClass=storageClass,
                         doc=doc,
-                        dimensions=("instrument",),
+                        dimensions=dims,
+                        multiple=(len(dims) > 1),
                     )
                     setattr(self, connectionName, outConnection)
 
@@ -361,14 +391,15 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
             outputConnections.extend(optionalStarOutputConnections)
             if config.doPlots:
                 outputConnections.extend(plotConnections)
-            for (name, storageClass, doc) in outputConnections:
+            for (name, storageClass, doc, dims) in outputConnections:
                 connectionName = f"fgcm_Cycle{config.multipleCyclesFinalCycleNumber}_{name}"
                 storageName = connectionName
                 outConnection = connectionTypes.Output(
                     name=storageName,
                     storageClass=storageClass,
                     doc=doc,
-                    dimensions=("instrument",),
+                    dimensions=dims,
+                    multiple=(len(dims) > 1),
                 )
                 setattr(self, connectionName, outConnection)
         else:
@@ -390,18 +421,18 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
             if config.doPlots:
                 outputConnections.extend(plotConnections)
 
-            for (name, storageClass, doc) in inputConnections:
+            for (name, storageClass, doc, dims) in inputConnections:
                 connectionName = f"fgcm{name}Input"
                 storageName = f"fgcm_Cycle{config.cycleNumber - 1}_{name}"
                 inConnection = connectionTypes.PrerequisiteInput(
                     name=storageName,
                     storageClass=storageClass,
                     doc=doc,
-                    dimensions=("instrument",),
+                    dimensions=dims,
                 )
                 setattr(self, connectionName, inConnection)
 
-            for (name, storageClass, doc) in outputConnections:
+            for (name, storageClass, doc, dims) in outputConnections:
                 connectionName = f"fgcm{name}"
                 storageName = f"fgcm_Cycle{config.cycleNumber}_{name}"
                 # Plots have unique names as well.
@@ -411,7 +442,8 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                     name=storageName,
                     storageClass=storageClass,
                     doc=doc,
-                    dimensions=("instrument",),
+                    dimensions=dims,
+                    multiple=(len(dims) > 1),
                 )
                 setattr(self, connectionName, outConnection)
 
@@ -1173,7 +1205,17 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                 for outputRefName in outputRefs.keys():
                     if outputRefName.endswith("Plot") and f"Cycle{cycle}" in outputRefName:
                         ref = getattr(outputRefs, outputRefName)
-                        plotHandleDict[outputRefName] = ref
+                        if isinstance(ref, (tuple, list)):
+                            if "physical_filter" in ref[0].dimensions:
+                                for filterRef in ref:
+                                    handleDictKey = f"{outputRefName}_{filterRef.dataId['physical_filter']}"
+                                    plotHandleDict[handleDictKey] = filterRef
+                            if "band" in ref[0].dimensions:
+                                for bandRef in ref:
+                                    handleDictKey = f"{outputRefName}_{bandRef.dataId['band']}"
+                                    plotHandleDict[handleDictKey] = bandRef
+                        else:
+                            plotHandleDict[outputRefName] = ref
 
                 fgcmDatasetDict, config = self._fgcmFitCycle(
                     camera,
@@ -1206,7 +1248,17 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             for outputRefName in outputRefs.keys():
                 if outputRefName.endswith("Plot") and f"Cycle{self.config.cycleNumber}" in outputRefName:
                     ref = getattr(outputRefs, outputRefName)
-                    plotHandleDict[outputRefName] = ref
+                    if isinstance(ref, (tuple, list)):
+                        if "physical_filter" in ref[0].dimensions:
+                            for filterRef in ref:
+                                handleDictKey = f"{outputRefName}_{filterRef.dataId['physical_filter']}"
+                                plotHandleDict[handleDictKey] = filterRef
+                        if "band" in ref[0].dimensions:
+                            for bandRef in ref:
+                                handleDictKey = f"{outputRefName}_{bandRef.dataId['band']}"
+                                plotHandleDict[handleDictKey] = bandRef
+                    else:
+                        plotHandleDict[outputRefName] = ref
 
             fgcmDatasetDict, _ = self._fgcmFitCycle(
                 camera,
