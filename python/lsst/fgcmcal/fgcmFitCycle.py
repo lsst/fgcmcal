@@ -772,6 +772,15 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=float,
         default=-0.25,
     )
+    expFwhmCutDict = pexConfig.DictField(
+        doc=("Per-band specification on maximum exposure FWHM (arcseconds) that will "
+             "be considered for the model fit. Exposures with median FWHM larger "
+             "than this threshold will get zeropoints based on matching to good "
+             "stars."),
+        keytype=str,
+        itemtype=float,
+        default={},
+    )
     expGrayPhotometricCutDict = pexConfig.DictField(
         doc=("Per-band specification on maximum (negative) achromatic exposure residual "
              "('gray term') for a visit to be considered photometric.  Must have one "
