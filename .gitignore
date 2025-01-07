@@ -23,3 +23,4 @@ bin/
 pytest_session.txt
 .cache/
 .pytest_cache/
+python/*.dist-info/
