@@ -625,6 +625,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=False,
     )
+    superStarForceZeroMean = pexConfig.Field(
+        doc="When computing the super-star flat, force the focal-plane mean to "
+            "zero (per band)? This should only be used when computing stand-alone "
+            "illumination corrections.",
+        dtype=bool,
+        default=False,
+    )
     focalPlaneSigmaClip = pexConfig.Field(
         doc="Number of sigma to clip outliers per focal-plane.",
         dtype=float,
