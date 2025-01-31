@@ -818,7 +818,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
         zptVisitCatalog.sort()
         yield (int(lastVisit), zptVisitCatalog)
 
-    def _getChebyshevBoundedField(self, coefficients, xyMax, offset=0.0, scaling=1.0):
+    @staticmethod
+    def _getChebyshevBoundedField(coefficients, xyMax, offset=0.0, scaling=1.0):
         """
         Make a ChebyshevBoundedField from fgcm coefficients, with optional offset
         and scaling.
