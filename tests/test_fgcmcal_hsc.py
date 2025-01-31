@@ -195,6 +195,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self._testFgcmOutputProducts(instName, testName,
                                      zpOffsets, 36236, 87, 'i', 1)
 
+        self._testFgcmOutputIlluminationCorrection(instName, testName)
+
     def test_fgcmcalMultipleFitPipeline(self):
         # Set numpy seed for stability
         np.random.seed(seed=1000)
