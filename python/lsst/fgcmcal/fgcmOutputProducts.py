@@ -842,8 +842,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
         orderPlus1 = int(np.sqrt(coefficients.size))
         pars = np.zeros((orderPlus1, orderPlus1))
 
-        bbox = lsst.geom.Box2I(lsst.geom.Point2I(0.0, 0.0),
-                               lsst.geom.Point2I(*xyMax))
+        bbox = lsst.geom.Box2I(minimum=lsst.geom.Point2I(0, 0),
+                               maximum=lsst.geom.Point2I(*xyMax))
 
         pars[:, :] = (coefficients.reshape(orderPlus1, orderPlus1)
                       * (10.**(offset/-2.5))*scaling)
