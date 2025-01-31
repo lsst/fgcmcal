@@ -9,6 +9,7 @@ from .fgcmBuildStarsBase import *
 from .fgcmBuildStarsTable import *
 from .fgcmMakeLut import *
 from .fgcmOutputProducts import *
+from .fgcmOutputIlluminationCorrection import *
 from .fgcmLoadReferenceCatalog import *
 from .fgcmCalibrateTractBase import *
 from .fgcmCalibrateTractTable import *
