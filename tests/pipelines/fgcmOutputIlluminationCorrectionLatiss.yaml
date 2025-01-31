@@ -1,0 +1,5 @@
+description: Output illumination corrections
+instrument: lsst.obs.lsst.Latiss
+tasks:
+  fgcmOutputIlluminationCorrection:
+    class: lsst.fgcmcal.fgcmOutputIlluminationCorrection.FgcmOutputIlluminationCorrectionTask

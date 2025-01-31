@@ -160,6 +160,8 @@ class FgcmcalTestLatiss(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCa
             testSrc=False,
         )
 
+        self._testFgcmOutputIlluminationCorrection(instName, testName)
+
     def test_fgcmcalMultipleFitPipeline(self):
         np.random.seed(seed=1000)
 
