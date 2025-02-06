@@ -649,7 +649,7 @@ class FgcmcalTestBase(object):
         ratio = np.median(testResp/testResp2)
         self.assertFloatsAlmostEqual(testResp/ratio, testResp2, atol=0.04)
 
-    def _testFgcmOutputIlluminationCorrection(self, instName, testName):
+    def _testFgcmOutputIlluminationCorrection(self, instName, testName, detector):
         """Test running of FgcmOutputIlluminationCorrectionTask.
 
         Parameters
@@ -658,6 +658,8 @@ class FgcmcalTestBase(object):
             Short name of the instrument.
         testName : `str`
             Base name of the test collection.
+        detector : `int`
+            Detector ID to test illumination correction output.
         """
         instCamel = instName.title()
 
@@ -684,6 +686,7 @@ class FgcmcalTestBase(object):
             inputCollections=[inputCollection],
             outputCollection=outputCollection,
             registerDatasetTypes=True,
+            queryString=f"detector = {detector}",
         )
 
         butler = dafButler.Butler(self.repo)

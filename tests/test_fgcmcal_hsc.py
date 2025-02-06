@@ -195,7 +195,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         self._testFgcmOutputProducts(instName, testName,
                                      zpOffsets, 36236, 87, 'i', 1)
 
-        self._testFgcmOutputIlluminationCorrection(instName, testName)
+        # Test a single detector illumination correction.
+        self._testFgcmOutputIlluminationCorrection(instName, testName, 51)
 
     def test_fgcmcalMultipleFitPipeline(self):
         # Set numpy seed for stability
