@@ -33,6 +33,7 @@ from lsst.pipe.base import PipelineTaskConnections, PipelineTaskConfig, connecti
 import lsst.pex.config
 
 from .fgcmOutputProducts import FgcmOutputProductsTask
+from .utilities import computePixelAreaFieldDetector, computeReferencePixelScale
 
 __all__ = ["FgcmOutputIlluminationCorrectionConfig", "FgcmOutputIlluminationCorrectionTask"]
 
@@ -84,7 +85,7 @@ class FgcmOutputIlluminationCorrectionConnections(
         if str(int(config.connections.cycleNumber)) != config.connections.cycleNumber:
             raise ValueError("cycleNumber must be of integer format")
 
-        if not config.useFlatMetadata:
+        if not config.use_flat_metadata:
             del self.flat
         else:
             def lookup_flat(dataset_type, registry, data_id, collections):
@@ -114,7 +115,7 @@ class FgcmOutputIlluminationCorrectionConfig(
 ):
     """Configuration for FgcmOutputIlluminationCorrectionTask."""
 
-    useFlatMetadata = lsst.pex.config.Field(
+    use_flat_metadata = lsst.pex.config.Field(
         doc="Use flat-field metadata for illumination correction metadata?",
         dtype=bool,
         default=True,
@@ -134,6 +135,16 @@ class FgcmOutputIlluminationCorrectionConfig(
         doc="List of physical filters to produce illumination corrections.",
         dtype=str,
         default=[],
+    )
+    include_wcs_jacobian = lsst.pex.config.Field(
+        doc="Include WCS jacobian in illumination correction?",
+        dtype=bool,
+        default=True,
+    )
+    approximate_wcs_jacobian = lsst.pex.config.Field(
+        doc="Use a Chebyshev approximation of the WCS jacobian in illumination correction?",
+        dtype=bool,
+        default=True,
     )
 
     def validate(self):
@@ -160,7 +171,7 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
                              for ref in outputRefs.illumination_corrections}
 
         flat_dict = {}
-        if self.config.useFlatMetadata:
+        if self.config.use_flat_metadata:
             for i, flat in enumerate(inputs["flat"]):
                 ref = inputRefs.flat[i]
                 flat_dict[ref.dataId["physical_filter"]] = (ref.id, flat)
@@ -234,6 +245,7 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
 
         detector = camera[detector_id]
         xymax = np.array([detector.getBBox().getMaxX(), detector.getBBox().getMaxY()])
+        area_scaling = 1. / computeReferencePixelScale(camera)**2.
 
         illum_corr_dict = {}
 
@@ -304,14 +316,28 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
                     xymax,
                 )
 
+                # Check if this is the correct operation!
                 illum_corr_field.multiplyImage(illum_corr.image)
                 # fgcm includes an additional clipping for strongly vignetted regions.
                 illum_corr.image.array[:, :] = np.clip(illum_corr.image.array[:, :], 0.1, None)
+
             else:
                 self.log.warning(
                     f"Invalid illumination correction found for detector {physical_filter} {detector_id}; "
                     "setting to all 1.0s.",
                 )
+
+            if self.config.include_wcs_jacobian:
+                # This code is here (per-filter) because in the future
+                # we plan to allow for a different field per band.
+                pixel_area_field = computePixelAreaFieldDetector(
+                    camera[detector_id],
+                    areaScaling=area_scaling,
+                    approximate=self.config.approximate_wcs_jacobian,
+                )
+
+                # Check if this is the correct operation!
+                pixel_area_field.multiplyImage(illum_corr.image)
 
             count += 1
             illum_corr_dict[physical_filter] = illum_corr
