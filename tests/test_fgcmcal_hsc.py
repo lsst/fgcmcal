@@ -103,7 +103,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nOkZp = 27
         nBadZp = 1093
         nStdStars = 237
-        nPlots = 47
+        nPlots = 53
 
         # We need an extra config file to turn off parquet format.
         extraConfigFile = os.path.join(self.testDir, "turn_off_parquet.py")
@@ -170,7 +170,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nOkZp = 27
         nBadZp = 1093
         nStdStars = 227
-        nPlots = 47
+        nPlots = 53
 
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
