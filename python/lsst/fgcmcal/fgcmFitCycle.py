@@ -294,6 +294,18 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                  "Plot",
                  "Histograms for intrinsic scatter for reserved bright stars (after gray correction).",
                  bandDims),
+                ("SigmaFgcmPullsAllStars_Plot",
+                 "Plot",
+                 "Histograms for pulls for all bright stars.",
+                 bandDims),
+                ("SigmaFgcmPullsReservedStars_Plot",
+                 "Plot",
+                 "Histograms for pulls for reserved bright stars.",
+                 bandDims),
+                ("SigmaFgcmPullsReservedStarsCrunched_Plot",
+                 "Plot",
+                 "Histograms for pulls for reserved bright stars (after gray correction).",
+                 bandDims),
                 ("SigmaCal_Plot",
                  "Plot",
                  "Plot showing scatter as a function of systematic error floor.",
@@ -610,6 +622,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         doc="If plotting is enabled, should per-detector residuals be plotted? "
             "This may produce a lot of output, and should be used only for "
             "debugging purposes.",
+        dtype=bool,
+        default=False,
+    )
+    superStarForceZeroMean = pexConfig.Field(
+        doc="When computing the super-star flat, force the focal-plane mean to "
+            "zero (per band)? This should only be used when computing stand-alone "
+            "illumination corrections.",
         dtype=bool,
         default=False,
     )

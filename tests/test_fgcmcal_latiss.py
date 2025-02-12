@@ -127,7 +127,7 @@ class FgcmcalTestLatiss(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCa
         nOkZp = 13
         nBadZp = 7
         nStdStars = 48
-        nPlots = 38
+        nPlots = 44
 
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
