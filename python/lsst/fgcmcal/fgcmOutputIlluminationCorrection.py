@@ -226,9 +226,9 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
         detector_index = detector_id - camera[0].getId()
 
         # This is the illumination correction array from fgcm.
-        fgcm_illum_corr = np.zeros(fgcm_fit_parameters_catalog["superstarSize"][0, :], dtype="f8")
-        fgcm_illum_corr[:, :, :, :] = fgcm_fit_parameters_catalog["superstar"][0, :].reshape(
-            fgcm_illum_corr.shape,
+        fgcm_star_flat = np.zeros(fgcm_fit_parameters_catalog["superstarSize"][0, :], dtype="f8")
+        fgcm_star_flat[:, :, :, :] = fgcm_fit_parameters_catalog["superstar"][0, :].reshape(
+            fgcm_star_flat.shape,
         )
 
         # These are the filter names associated with the illumination
@@ -265,7 +265,7 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
 
             filter_index, = np.where(fgcm_filter_names == physical_filter)
 
-            illum_corr_pars = fgcm_illum_corr[epoch_index, filter_index, detector_index, :].ravel()
+            star_flat_pars = fgcm_star_flat[epoch_index, filter_index, detector_index, :].ravel()
 
             illum_corr = ExposureF(detector.getBBox())
             illum_corr.image.array[:, :] = 1.0
@@ -310,20 +310,19 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
 
             # Make sure this is a legal illumination correction; fgcm
             # uses 100.0 as a sentinel for unfit detectors.
-            if illum_corr_pars[0] < 100.0:
-                illum_corr_field = FgcmOutputProductsTask._getChebyshevBoundedField(
-                    illum_corr_pars,
+            if star_flat_pars[0] < 100.0:
+                star_flat_field = FgcmOutputProductsTask._getChebyshevBoundedField(
+                    star_flat_pars,
                     xymax,
                 )
 
-                # Check if this is the correct operation!
-                illum_corr_field.multiplyImage(illum_corr.image)
+                star_flat_field.divideImage(illum_corr.image)
                 # fgcm includes an additional clipping for strongly vignetted regions.
-                illum_corr.image.array[:, :] = np.clip(illum_corr.image.array[:, :], 0.1, None)
+                illum_corr.image.array[:, :] = np.clip(illum_corr.image.array[:, :], None, 10.0)
 
             else:
                 self.log.warning(
-                    f"Invalid illumination correction found for detector {physical_filter} {detector_id}; "
+                    f"Invalid star flat found for detector {physical_filter} {detector_id}; "
                     "setting to all 1.0s.",
                 )
 
@@ -336,8 +335,7 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
                     approximate=self.config.approximate_wcs_jacobian,
                 )
 
-                # Check if this is the correct operation!
-                pixel_area_field.multiplyImage(illum_corr.image)
+                pixel_area_field.divideImage(illum_corr.image)
 
             count += 1
             illum_corr_dict[physical_filter] = illum_corr
