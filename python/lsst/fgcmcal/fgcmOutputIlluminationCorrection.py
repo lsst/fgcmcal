@@ -62,10 +62,10 @@ class FgcmOutputIlluminationCorrectionConnections(
         storageClass="Catalog",
         dimensions=("instrument",),
     )
-    flat = connectionTypes.PrerequisiteInput(
-        doc="Flat fields associated with illumination correction epoch.",
-        name="flat",
-        storageClass="ExposureF",
+    flat_metadata = connectionTypes.PrerequisiteInput(
+        doc="Flat field metadata associated with illumination correction epoch.",
+        name="flat.metadata",
+        storageClass="PropertyList",
         dimensions=["instrument", "detector", "physical_filter"],
         isCalibration=True,
         multiple=True,
@@ -86,15 +86,15 @@ class FgcmOutputIlluminationCorrectionConnections(
             raise ValueError("cycleNumber must be of integer format")
 
         if not config.use_flat_metadata:
-            del self.flat
+            del self.flat_metadata
         else:
-            def lookup_flat(dataset_type, registry, data_id, collections):
+            def lookup_flat_metadata(dataset_type, registry, data_id, collections):
 
                 time = Time(config.epoch_time, format=config.epoch_format)
 
                 return [
                     registry.findDataset(
-                        dataset_type,
+                        dataset_type.makeCompositeDatasetType(),
                         data_id,
                         physical_filter=physical_filter,
                         timespan=Timespan(
@@ -102,11 +102,11 @@ class FgcmOutputIlluminationCorrectionConnections(
                             time + TimeDelta(1, format="sec"),
                         ),
                         collections=collections,
-                    )
+                    ).makeComponentRef("metadata")
                     for physical_filter in config.physical_filters
                 ]
 
-            self.flat = dataclasses.replace(self.flat, lookupFunction=lookup_flat)
+            self.flat_metadata = dataclasses.replace(self.flat_metadata, lookupFunction=lookup_flat_metadata)
 
 
 class FgcmOutputIlluminationCorrectionConfig(
@@ -170,18 +170,18 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
                              FilterLabel(physical=ref.dataId["physical_filter"], band=ref.dataId["band"])
                              for ref in outputRefs.illumination_corrections}
 
-        flat_dict = {}
+        flat_metadata_dict = {}
         if self.config.use_flat_metadata:
-            for i, flat in enumerate(inputs["flat"]):
-                ref = inputRefs.flat[i]
-                flat_dict[ref.dataId["physical_filter"]] = (ref.id, flat)
+            for i, flat_metadata in enumerate(inputs["flat_metadata"]):
+                ref = inputRefs.flat_metadata[i]
+                flat_metadata_dict[ref.dataId["physical_filter"]] = (ref.id, flat_metadata)
 
         retval = self.run(
             camera=inputs["camera"],
             detector_id=detector_id,
             fgcm_fit_parameters_catalog=inputs["fgcm_fit_parameters_catalog"],
             filter_label_dict=filter_label_dict,
-            flat_dict=flat_dict,
+            flat_metadata_dict=flat_metadata_dict,
         )
 
         # And put the outputs.
@@ -196,7 +196,15 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
                 )
                 butlerQC.put(retval.illum_corr_dict[physical_filter], illum_corr_ref_dict[physical_filter])
 
-    def run(self, *, camera, detector_id, fgcm_fit_parameters_catalog, filter_label_dict, flat_dict={}):
+    def run(
+        self,
+        *,
+        camera,
+        detector_id,
+        fgcm_fit_parameters_catalog,
+        filter_label_dict,
+        flat_metadata_dict={},
+    ):
         """Run the illumination correction output task.
 
         Parameters
@@ -209,8 +217,8 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
             Catalog of fgcm fit parameters.
         filter_label_dict : `dict` [`str`: `lsst.afw.image.FilterLabel`]
             Dictionary of filter labels, keyed by physical_filter.
-        flat_dict : `dict` [`str`: (`uuid.UUID`, `lsst.afw.image.ExposureF`]
-            Dictionary of UUIDs and flats, keyed by physical_filter.
+        flat_metadata_dict : `dict` [`str`: (`uuid.UUID`, `lsst.pipe.base.PropertyList`]
+            Dictionary of UUIDs and flat metadata, keyed by physical_filter.
 
         Returns
         -------
@@ -271,9 +279,9 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
             illum_corr.image.array[:, :] = 1.0
 
             # Get the flat uuid and units if available.
-            if physical_filter in flat_dict:
-                flat_uuid = str(flat_dict[physical_filter][0])
-                flat_md = flat_dict[physical_filter][1].metadata
+            if physical_filter in flat_metadata_dict:
+                flat_uuid = str(flat_metadata_dict[physical_filter][0])
+                flat_md = flat_metadata_dict[physical_filter][1]
                 units = flat_md["LSST ISR UNITS"]
             else:
                 # This is used for testdata_jointcal testing only.
