@@ -30,7 +30,9 @@ import os
 import shutil
 import numpy as np
 import esutil
+import warnings
 
+import lsst.afw.image
 import lsst.daf.butler as dafButler
 import lsst.pipe.base as pipeBase
 import lsst.geom as geom
@@ -647,6 +649,68 @@ class FgcmcalTestBase(object):
         ratio = np.median(testResp/testResp2)
         self.assertFloatsAlmostEqual(testResp/ratio, testResp2, atol=0.04)
 
+    def _testFgcmOutputIlluminationCorrection(self, instName, testName, detector):
+        """Test running of FgcmOutputIlluminationCorrectionTask.
+
+        Parameters
+        ----------
+        instName : `str`
+            Short name of the instrument.
+        testName : `str`
+            Base name of the test collection.
+        detector : `int`
+            Detector ID to test illumination correction output.
+        """
+        instCamel = instName.title()
+
+        configFiles = {
+            "fgcmOutputIlluminationCorrection": [
+                os.path.join(
+                    ROOT,
+                    "config",
+                    f"fgcmOutputIlluminationCorrection{instCamel}.py",
+                ),
+            ],
+        }
+        inputCollection = f"{instName}/{testName}/fit"
+        outputCollection = f"{instName}/{testName}/fit/illumcorr"
+
+        self._runPipeline(
+            self.repo,
+            os.path.join(
+                ROOT,
+                "pipelines",
+                f"fgcmOutputIlluminationCorrection{instCamel}.yaml",
+            ),
+            configFiles=configFiles,
+            inputCollections=[inputCollection],
+            outputCollection=outputCollection,
+            registerDatasetTypes=True,
+            queryString=f"detector = {detector}",
+        )
+
+        butler = dafButler.Butler(self.repo)
+
+        # Check for illumination correction files.
+        illumCorrRefs = butler.query_datasets(
+            "illuminationCorrection",
+            collections=[outputCollection],
+        )
+        self.assertGreater(len(illumCorrRefs), 0)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            testCorr = butler.get(illumCorrRefs[0])
+
+            self.assertEqual(len(w), 0, "Reading an illumination correction had a warning!")
+        self.assertIsInstance(testCorr, lsst.afw.image.ExposureF)
+
+        self.assertIsNotNone(testCorr.metadata.get("CALIB_CREATION_DATETIME"))
+        self.assertIsNotNone(testCorr.metadata.get("CALIB_CREATION_DATE"))
+        self.assertIsNotNone(testCorr.metadata.get("CALIB_CREATION_TIME"))
+        self.assertIsNotNone(testCorr.metadata.get("LSST CALIB UUID FLAT"))
+        self.assertIsNotNone(testCorr.metadata.get("LSST ISR UNITS"))
+
     def _testFgcmMultiFit(self, instName, testName, queryString, visits, zpOffsets,
                           refcatCollection="refcats/gen2"):
         """Test running the full pipeline with multiple fit cycles.
@@ -668,17 +732,29 @@ class FgcmcalTestBase(object):
         """
         instCamel = instName.title()
 
-        configFiles = {'fgcmBuildFromIsolatedStars': [
-            os.path.join(ROOT,
-                         'config',
-                         f'fgcmBuildFromIsolatedStars{instCamel}.py'
-                         )],
-                       'fgcmFitCycle': [os.path.join(ROOT,
-                                                     'config',
-                                                     f'fgcmFitCycle{instCamel}.py')],
-                       'fgcmOutputProducts': [os.path.join(ROOT,
-                                                           'config',
-                                                           f'fgcmOutputProducts{instCamel}.py')]}
+        configFiles = {
+            'fgcmBuildFromIsolatedStars': [
+                os.path.join(
+                    ROOT,
+                    'config',
+                    f'fgcmBuildFromIsolatedStars{instCamel}.py',
+                ),
+            ],
+            'fgcmFitCycle': [
+                os.path.join(
+                    ROOT,
+                    'config',
+                    f'fgcmFitCycle{instCamel}.py',
+                ),
+            ],
+            'fgcmOutputProducts': [
+                os.path.join(
+                    ROOT,
+                    'config',
+                    f'fgcmOutputProducts{instCamel}.py',
+                ),
+            ],
+        }
         outputCollection = f'{instName}/{testName}/unified'
 
         cwd = os.getcwd()

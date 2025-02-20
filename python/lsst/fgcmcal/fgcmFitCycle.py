@@ -2043,6 +2043,12 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         parSchema.addField('compEpsilonCcdNStarMap', type='ArrayI',
                            doc='Number of stars per ccd bin in epsilon ccd maps',
                            size=pars['COMPEPSILONCCDNSTARMAP'].size)
+        parSchema.addField('epochMjdStart', type='ArrayD',
+                           doc='Epoch MJD start times',
+                           size=pars['EPOCHMJDSTART'].size)
+        parSchema.addField('epochMjdEnd', type='ArrayD',
+                           doc='EpochMJD end times',
+                           size=pars['EPOCHMJDEND'].size)
         # superstarflat section
         parSchema.addField('superstarSize', type='ArrayI', doc='Superstar matrix size',
                            size=4)
@@ -2109,7 +2115,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                     'compRetrievedLnPwv', 'compRetrievedLnPwvRaw', 'compRetrievedLnPwvFlag',
                     'compRetrievedTauNight', 'compEpsilon', 'compMedDeltaAper',
                     'compGlobalEpsilon', 'compEpsilonMap', 'compEpsilonNStarMap',
-                    'compEpsilonCcdMap', 'compEpsilonCcdNStarMap', 'compExpRefOffset']
+                    'compEpsilonCcdMap', 'compEpsilonCcdNStarMap', 'compExpRefOffset',
+                    'epochMjdStart', 'epochMjdEnd']
 
         for scalarName in scalarNames:
             rec[scalarName] = pars[scalarName.upper()][0]

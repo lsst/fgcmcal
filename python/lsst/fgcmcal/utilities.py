@@ -435,6 +435,28 @@ def translateVisitCatalog(visitCat):
     return fgcmExpInfo
 
 
+def _computeDefaultVisitInfo():
+    """
+    Compute a default visitInfo for use with pixel scale / jacobians.
+
+    Returns
+    -------
+    visitInfo : `lsst.afw.image.VisitInfo`
+        The visit info object.
+    """
+    # Generate fake WCSs centered at 180/0 to avoid the RA=0/360 problem,
+    # since we are looking for relative scales
+    boresight = geom.SpherePoint(180.0*geom.degrees, 0.0*geom.degrees)
+    orientation = 0.0*geom.degrees
+
+    # Create a temporary visitInfo for input to createInitialSkyWcs
+    # The orientation does not matter for the area computation
+    visitInfo = afwImage.VisitInfo(boresightRaDec=boresight,
+                                   boresightRotAngle=orientation,
+                                   rotType=afwImage.RotType.SKY)
+    return visitInfo
+
+
 def computeReferencePixelScale(camera):
     """
     Compute the median pixel scale in the camera
@@ -444,23 +466,56 @@ def computeReferencePixelScale(camera):
     pixelScale: `float`
        Average pixel scale (arcsecond) over the camera
     """
-
-    boresight = geom.SpherePoint(180.0*geom.degrees, 0.0*geom.degrees)
-    orientation = 0.0*geom.degrees
-    flipX = False
-
-    # Create a temporary visitInfo for input to createInitialSkyWcs
-    visitInfo = afwImage.VisitInfo(boresightRaDec=boresight,
-                                   boresightRotAngle=orientation,
-                                   rotType=afwImage.RotType.SKY)
+    visitInfo = _computeDefaultVisitInfo()
 
     pixelScales = np.zeros(len(camera))
     for i, detector in enumerate(camera):
-        wcs = createInitialSkyWcs(visitInfo, detector, flipX)
+        wcs = createInitialSkyWcs(visitInfo, detector, False)
         pixelScales[i] = wcs.getPixelScale(detector.getBBox().getCenter()).asArcseconds()
 
     ok, = np.where(pixelScales > 0.0)
     return np.median(pixelScales[ok])
+
+
+def computePixelAreaFieldDetector(detector, visitInfo=None, areaScaling=1.0, approximate=False):
+    """
+    Compute the reference pixel area field for a detector.
+
+    Parameters
+    ----------
+    visitInfo : `lsst.afw.image.VisitInfo`
+        The visit info object.
+    detector : `lsst.afw.cameraGeom.detector`
+        The detector object.
+    visitInfo : `lsst.afw.image.VisitInfo`, optional
+        If not supplied, will compute a default visitInfo.
+    areaScaling : `float`, optional
+        Area scaling factor.
+    approximate : `bool`, optional
+        Compute Chebyshev approximation to pixel area field?
+
+    Returns
+    -------
+    pixelAreaField : `lsst.afw.math.BoundedField`
+        Bounded field describing the pixel area from the detector model.
+    """
+    if visitInfo is None:
+        visitInfo = _computeDefaultVisitInfo()
+
+    wcs = createInitialSkyWcs(visitInfo, detector, False)
+    bbox = detector.getBBox()
+
+    pixelAreaField = afwMath.PixelAreaBoundedField(
+        bbox,
+        wcs,
+        unit=geom.arcseconds,
+        scaling=areaScaling,
+    )
+
+    if approximate:
+        pixelAreaField = afwMath.ChebyshevBoundedField.approximate(pixelAreaField)
+
+    return pixelAreaField
 
 
 def computeApproxPixelAreaFields(camera):
@@ -480,28 +535,19 @@ def computeApproxPixelAreaFields(camera):
 
     areaScaling = 1. / computeReferencePixelScale(camera)**2.
 
-    # Generate fake WCSs centered at 180/0 to avoid the RA=0/360 problem,
-    # since we are looking for relative scales
-    boresight = geom.SpherePoint(180.0*geom.degrees, 0.0*geom.degrees)
-
-    flipX = False
-    # Create a temporary visitInfo for input to createInitialSkyWcs
-    # The orientation does not matter for the area computation
-    visitInfo = afwImage.VisitInfo(boresightRaDec=boresight,
-                                   boresightRotAngle=0.0*geom.degrees,
-                                   rotType=afwImage.RotType.SKY)
+    visitInfo = _computeDefaultVisitInfo()
 
     approxPixelAreaFields = {}
 
     for i, detector in enumerate(camera):
         key = detector.getId()
 
-        wcs = createInitialSkyWcs(visitInfo, detector, flipX)
-        bbox = detector.getBBox()
-
-        areaField = afwMath.PixelAreaBoundedField(bbox, wcs,
-                                                  unit=geom.arcseconds, scaling=areaScaling)
-        approxAreaField = afwMath.ChebyshevBoundedField.approximate(areaField)
+        approxAreaField = computePixelAreaFieldDetector(
+            detector,
+            visitInfo=visitInfo,
+            areaScaling=areaScaling,
+            approximate=True,
+        )
 
         approxPixelAreaFields[key] = approxAreaField
 
