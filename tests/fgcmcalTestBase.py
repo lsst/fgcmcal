@@ -710,6 +710,8 @@ class FgcmcalTestBase(object):
         self.assertIsNotNone(testCorr.metadata.get("CALIB_CREATION_TIME"))
         self.assertIsNotNone(testCorr.metadata.get("LSST CALIB UUID FLAT"))
         self.assertIsNotNone(testCorr.metadata.get("LSST ISR UNITS"))
+        self.assertIsNotNone(testCorr.getDetector())
+        self.assertEqual(testCorr.getDetector().getId(), illumCorrRefs[0].dataId["detector"])
 
     def _testFgcmMultiFit(self, instName, testName, queryString, visits, zpOffsets,
                           refcatCollection="refcats/gen2"):

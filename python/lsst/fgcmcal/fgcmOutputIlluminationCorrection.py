@@ -277,6 +277,7 @@ class FgcmOutputIlluminationCorrectionTask(PipelineTask):
 
             illum_corr = ExposureF(detector.getBBox())
             illum_corr.image.array[:, :] = 1.0
+            illum_corr.setDetector(detector)
 
             # Get the flat uuid and units if available.
             if physical_filter in flat_metadata_dict:
