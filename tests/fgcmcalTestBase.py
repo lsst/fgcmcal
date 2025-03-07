@@ -451,7 +451,7 @@ class FgcmcalTestBase(object):
 
     def _testFgcmOutputProducts(self, instName, testName,
                                 zpOffsets, testVisit, testCcd, testFilter, testBandIndex,
-                                testSrc=True):
+                                skymapName=None, testSrc=True):
         """Test running of FgcmOutputProductsTask.
 
         Parameters
@@ -470,6 +470,8 @@ class FgcmcalTestBase(object):
             Filtername for testVisit/testCcd.
         testBandIndex : `int`
             Band index for testVisit/testCcd.
+        skymapName : `str`, optional
+            Name of a skymap to use if sharding by tract.
         testSrc : `bool`, optional
             Test the source catalogs?  (Only if available in dataset.)
         """
@@ -480,13 +482,18 @@ class FgcmcalTestBase(object):
                                                            f'fgcmOutputProducts{instCamel}.py')]}
         inputCollection = f'{instName}/{testName}/fit'
         outputCollection = f'{instName}/{testName}/fit/output'
+        if skymapName is not None:
+            queryString = f"skymap='{skymapName:s}'"
+        else:
+            queryString = ""
 
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
                                        'pipelines',
                                        'fgcmOutputProducts%s.yaml' % (instCamel)),
+                          queryString=queryString,
                           configFiles=configFiles,
-                          inputCollections=[inputCollection],
+                          inputCollections=[inputCollection, 'skymaps'],
                           outputCollection=outputCollection,
                           registerDatasetTypes=True)
 
@@ -531,6 +538,18 @@ class FgcmcalTestBase(object):
 
         # We do round-trip value checking on just the final one (chosen arbitrarily)
         testCal = photoCalibDict[(testVisit, testCcd)]
+
+        # Check the output standard star catalogs.
+        if skymapName is not None:
+            refs = butler.query_datasets(
+                "fgcm_standard_star",
+                collections=[outputCollection],
+                instrument=instName,
+            )
+            self.assertEqual(len(refs), 1)
+            catalog = butler.get(refs[0])
+            self.assertEqual(len(catalog), len(rawStars))
+            np.testing.assert_array_equal(catalog["id"], rawStars["id"])
 
         if testSrc:
             src = butler.get('src', visit=int(testVisit), detector=int(testCcd),
@@ -770,7 +789,8 @@ class FgcmcalTestBase(object):
                                        f'fgcmFullPipeline{instCamel}.yaml'),
                           configFiles=configFiles,
                           inputCollections=[f'{instName}/{testName}/lut',
-                                            refcatCollection],
+                                            refcatCollection,
+                                            'skymaps'],
                           outputCollection=outputCollection,
                           queryString=queryString,
                           registerDatasetTypes=True)

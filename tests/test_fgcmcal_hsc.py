@@ -193,7 +193,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                               0.005496968515217304])
 
         self._testFgcmOutputProducts(instName, testName,
-                                     zpOffsets, 36236, 87, 'i', 1)
+                                     zpOffsets, 36236, 87, 'i', 1, 'hsc_rings_v1')
 
         # Test a single detector illumination correction.
         self._testFgcmOutputIlluminationCorrection(instName, testName, 51)
@@ -222,7 +222,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                               0.004101278726011515])
 
         self._testFgcmMultiFit(instName, testName,
-                               "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I')",
+                               "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I') and skymap='hsc_rings_v1'",
                                visits, zpOffsets)
 
     def test_fgcmcalTractPipeline(self):
