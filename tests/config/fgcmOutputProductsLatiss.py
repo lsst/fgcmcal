@@ -6,6 +6,7 @@ config.connections.cycleNumber = 2
 config.doReferenceCalibration = True
 config.referencePixelizationMinStars = 20
 config.referenceMinMatch = 15
+config.doTractStars = False
 
 from lsst.obs.lsst.filters import LATISS_FILTER_DEFINITIONS
 

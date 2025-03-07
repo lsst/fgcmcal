@@ -1529,7 +1529,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                                 refMagErr=refMagErr,
                                 flagID=flagId,
                                 flagFlag=flagFlag,
-                                computeNobs=True)
+                                computeNobs=True,
+                                objIDAlternate=starIds['isolated_star_id'])
         else:
             # We determine the conversion from the native units (typically radians) to
             # degrees for the first star.  This allows us to treat coord_ra/coord_dec as
