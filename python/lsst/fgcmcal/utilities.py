@@ -767,6 +767,7 @@ def makeStdSchema(nBands):
     """
 
     stdSchema = afwTable.SimpleTable.makeMinimalSchema()
+    stdSchema.addField('isolated_star_id', type='L', doc='ID from isolated star table')
     stdSchema.addField('ngood', type='ArrayI', doc='Number of good observations',
                        size=nBands)
     stdSchema.addField('ntotal', type='ArrayI', doc='Number of total observations',
@@ -810,6 +811,7 @@ def makeStdCat(stdSchema, stdStruct, goodBands):
     stdCat.resize(stdStruct.size)
 
     stdCat['id'][:] = stdStruct['FGCM_ID']
+    stdCat['isolated_star_id'][:] = stdStruct['ALTERNATE_ID']
     stdCat['coord_ra'][:] = stdStruct['RA'] * geom.degrees
     stdCat['coord_dec'][:] = stdStruct['DEC'] * geom.degrees
     stdCat['ngood'][:, :] = stdStruct['NGOOD'][:, :]

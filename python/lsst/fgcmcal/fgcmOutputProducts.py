@@ -997,7 +997,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
         bands = md.getArray('BANDS')
 
         dtype = [
-            ("id", "i8"),
+            ("fgcm_id", "i8"),
+            ("isolated_star_id", "i8"),
             ("ra", "f8"),
             ("dec", "f8"),
         ]
@@ -1022,7 +1023,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
             tractId = tractIds[i1a[0]]
 
             table = Table(np.zeros(len(i1a), dtype=dtype))
-            table["id"] = stdCat["id"][i1a]
+            table["fgcm_id"] = stdCat["id"][i1a]
+            table["isolated_star_id"] = stdCat["isolated_star_id"][i1a]
             table["ra"] = np.rad2deg(stdCat["coord_ra"][i1a])*units.degree
             table["dec"] = np.rad2deg(stdCat["coord_dec"][i1a])*units.degree
 
