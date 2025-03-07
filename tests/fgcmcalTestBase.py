@@ -497,9 +497,8 @@ class FgcmcalTestBase(object):
                           outputCollection=outputCollection,
                           registerDatasetTypes=True)
 
-        butler = dafButler.Butler(self.repo)
-        offsetCat = butler.get('fgcmReferenceCalibrationOffsets',
-                               collections=[outputCollection], instrument=instName)
+        butler = dafButler.Butler(self.repo, collections=[outputCollection], instrument=instName)
+        offsetCat = butler.get('fgcmReferenceCalibrationOffsets')
         offsets = offsetCat['offset'][:]
         self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-6)
 
@@ -507,11 +506,10 @@ class FgcmcalTestBase(object):
                             collections=[outputCollection], instrument=instName)
 
         rawStars = butler.get(f'fgcm_Cycle{config.connections.cycleNumber}_StandardStars',
-                              collections=[inputCollection], instrument=instName)
+                              collections=[inputCollection])
 
         # Test the fgcm_photoCalib output
-        zptCat = butler.get(f'fgcm_Cycle{config.connections.cycleNumber}_Zeropoints',
-                            collections=[inputCollection], instrument=instName)
+        zptCat = butler.get(f'fgcm_Cycle{config.connections.cycleNumber}_Zeropoints')
 
         good = (zptCat['fgcmFlag'] < 16)
         bad = (zptCat['fgcmFlag'] >= 16)
@@ -522,8 +520,7 @@ class FgcmcalTestBase(object):
         photoCalibDict = {}
         for visit in visits:
             expCat = butler.get('fgcmPhotoCalibCatalog',
-                                visit=visit,
-                                collections=[outputCollection], instrument=instName)
+                                visit=visit)
             for row in expCat:
                 if row['visit'] == visit:
                     photoCalibDict[(visit, row['id'])] = row.getPhotoCalib()
@@ -541,15 +538,30 @@ class FgcmcalTestBase(object):
 
         # Check the output standard star catalogs.
         if skymapName is not None:
-            refs = butler.query_datasets(
-                "fgcm_standard_star",
-                collections=[outputCollection],
-                instrument=instName,
-            )
+            refs = butler.query_datasets("fgcm_standard_star")
             self.assertEqual(len(refs), 1)
             catalog = butler.get(refs[0])
             self.assertEqual(len(catalog), len(rawStars))
-            np.testing.assert_array_equal(catalog["id"], rawStars["id"])
+
+            # Check that the fgcm_id array is what we expect.
+            np.testing.assert_array_equal(catalog["fgcm_id"], rawStars["id"])
+
+            # Check ids against inputs.
+            isoConfig = butler.get("fgcmBuildFromIsolatedStars_config")
+            isolatedCatalog = butler.get(
+                isoConfig.connections.isolated_star_cats,
+                tract=refs[0].dataId["tract"],
+            )
+
+            a, b = esutil.numpy_util.match(
+                np.asarray(catalog["isolated_star_id"]),
+                np.asarray(isolatedCatalog["isolated_star_id"]),
+            )
+
+            # All of the stars should be matched, and we can confirm
+            # that the RA values are equal as an additional check.
+            self.assertEqual(len(a), len(catalog))
+            np.testing.assert_array_almost_equal(catalog["ra"][a], isolatedCatalog["ra"][b])
 
         if testSrc:
             src = butler.get('src', visit=int(testVisit), detector=int(testCcd),
