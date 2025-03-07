@@ -1033,4 +1033,9 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
                 table[f"magErr_{band}"] = stdCat["magErr_std"][i1a, i]*units.ABmag
                 table[f"ngood_{band}"] = stdCat["ngood"][i1a, i]
 
+                # Use NaN as a sentinel for missing values instead of 99.
+                bad = (table[f"mag_{band}"] > 90.0)
+                table[f"mag_{band}"][bad] = np.nan
+                table[f"magErr_{band}"][bad] = np.nan
+
             yield (int(tractId), table)
