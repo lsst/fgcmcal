@@ -451,7 +451,7 @@ class FgcmcalTestBase(object):
 
     def _testFgcmOutputProducts(self, instName, testName,
                                 zpOffsets, testVisit, testCcd, testFilter, testBandIndex,
-                                testSrc=True):
+                                skymapName=None, testSrc=True):
         """Test running of FgcmOutputProductsTask.
 
         Parameters
@@ -470,6 +470,8 @@ class FgcmcalTestBase(object):
             Filtername for testVisit/testCcd.
         testBandIndex : `int`
             Band index for testVisit/testCcd.
+        skymapName : `str`, optional
+            Name of a skymap to use if sharding by tract.
         testSrc : `bool`, optional
             Test the source catalogs?  (Only if available in dataset.)
         """
@@ -480,19 +482,23 @@ class FgcmcalTestBase(object):
                                                            f'fgcmOutputProducts{instCamel}.py')]}
         inputCollection = f'{instName}/{testName}/fit'
         outputCollection = f'{instName}/{testName}/fit/output'
+        if skymapName is not None:
+            queryString = f"skymap='{skymapName:s}'"
+        else:
+            queryString = ""
 
         self._runPipeline(self.repo,
                           os.path.join(ROOT,
                                        'pipelines',
                                        'fgcmOutputProducts%s.yaml' % (instCamel)),
+                          queryString=queryString,
                           configFiles=configFiles,
-                          inputCollections=[inputCollection],
+                          inputCollections=[inputCollection, 'skymaps'],
                           outputCollection=outputCollection,
                           registerDatasetTypes=True)
 
-        butler = dafButler.Butler(self.repo)
-        offsetCat = butler.get('fgcmReferenceCalibrationOffsets',
-                               collections=[outputCollection], instrument=instName)
+        butler = dafButler.Butler(self.repo, collections=[outputCollection], instrument=instName)
+        offsetCat = butler.get('fgcmReferenceCalibrationOffsets')
         offsets = offsetCat['offset'][:]
         self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-6)
 
@@ -500,11 +506,10 @@ class FgcmcalTestBase(object):
                             collections=[outputCollection], instrument=instName)
 
         rawStars = butler.get(f'fgcm_Cycle{config.connections.cycleNumber}_StandardStars',
-                              collections=[inputCollection], instrument=instName)
+                              collections=[inputCollection])
 
         # Test the fgcm_photoCalib output
-        zptCat = butler.get(f'fgcm_Cycle{config.connections.cycleNumber}_Zeropoints',
-                            collections=[inputCollection], instrument=instName)
+        zptCat = butler.get(f'fgcm_Cycle{config.connections.cycleNumber}_Zeropoints')
 
         good = (zptCat['fgcmFlag'] < 16)
         bad = (zptCat['fgcmFlag'] >= 16)
@@ -515,8 +520,7 @@ class FgcmcalTestBase(object):
         photoCalibDict = {}
         for visit in visits:
             expCat = butler.get('fgcmPhotoCalibCatalog',
-                                visit=visit,
-                                collections=[outputCollection], instrument=instName)
+                                visit=visit)
             for row in expCat:
                 if row['visit'] == visit:
                     photoCalibDict[(visit, row['id'])] = row.getPhotoCalib()
@@ -531,6 +535,33 @@ class FgcmcalTestBase(object):
 
         # We do round-trip value checking on just the final one (chosen arbitrarily)
         testCal = photoCalibDict[(testVisit, testCcd)]
+
+        # Check the output standard star catalogs.
+        if skymapName is not None:
+            refs = butler.query_datasets("fgcm_standard_star")
+            self.assertEqual(len(refs), 1)
+            catalog = butler.get(refs[0])
+            self.assertEqual(len(catalog), len(rawStars))
+
+            # Check that the fgcm_id array is what we expect.
+            np.testing.assert_array_equal(catalog["fgcm_id"], rawStars["id"])
+
+            # Check ids against inputs.
+            isoConfig = butler.get("fgcmBuildFromIsolatedStars_config")
+            isolatedCatalog = butler.get(
+                isoConfig.connections.isolated_star_cats,
+                tract=refs[0].dataId["tract"],
+            )
+
+            a, b = esutil.numpy_util.match(
+                np.asarray(catalog["isolated_star_id"]),
+                np.asarray(isolatedCatalog["isolated_star_id"]),
+            )
+
+            # All of the stars should be matched, and we can confirm
+            # that the RA values are equal as an additional check.
+            self.assertEqual(len(a), len(catalog))
+            np.testing.assert_array_almost_equal(catalog["ra"][a], isolatedCatalog["ra"][b])
 
         if testSrc:
             src = butler.get('src', visit=int(testVisit), detector=int(testCcd),
@@ -770,7 +801,8 @@ class FgcmcalTestBase(object):
                                        f'fgcmFullPipeline{instCamel}.yaml'),
                           configFiles=configFiles,
                           inputCollections=[f'{instName}/{testName}/lut',
-                                            refcatCollection],
+                                            refcatCollection,
+                                            'skymaps'],
                           outputCollection=outputCollection,
                           queryString=queryString,
                           registerDatasetTypes=True)

@@ -36,6 +36,8 @@ import copy
 import numpy as np
 import hpgeom as hpg
 from astropy import units
+from astropy.table import Table
+import esutil
 
 import lsst.daf.base as dafBase
 import lsst.pex.config as pexConfig
@@ -48,6 +50,7 @@ import lsst.geom
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
 import lsst.afw.table as afwTable
+from lsst.skymap import BaseSkyMap
 
 from .utilities import computeApproxPixelAreaFields
 from .utilities import FGCM_ILLEGAL_VALUE
@@ -66,6 +69,13 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         storageClass="Camera",
         dimensions=("instrument",),
         isCalibration=True,
+    )
+
+    skymap = connectionTypes.Input(
+        doc="Skymap used for tract sharding of output catalog.",
+        name=BaseSkyMap.SKYMAP_DATASET_TYPE_NAME,
+        storageClass="SkyMap",
+        dimensions=("skymap",),
     )
 
     fgcmLookUpTable = connectionTypes.PrerequisiteInput(
@@ -145,6 +155,14 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
         multiple=False,
     )
 
+    fgcmTractStars = connectionTypes.Output(
+        doc="Per-tract fgcm calibrated stars.",
+        name="fgcm_standard_star",
+        storageClass="ArrowAstropy",
+        dimensions=("instrument", "tract", "skymap"),
+        multiple=True,
+    )
+
     def __init__(self, *, config=None):
         super().__init__(config=config)
 
@@ -159,6 +177,9 @@ class FgcmOutputProductsConnections(pipeBase.PipelineTaskConnections,
             self.inputs.remove("fgcmZeropoints")
         if not config.doReferenceCalibration:
             self.outputs.remove("fgcmOffsets")
+        if not config.doTractStars:
+            del self.skymap
+            del self.fgcmTractStars
 
     def getSpatialBoundsConnections(self):
         return ("fgcmPhotoCalib",)
@@ -202,6 +223,12 @@ class FgcmOutputProductsConfig(pipeBase.PipelineTaskConfig,
         doc="Apply the mean chromatic correction to the zeropoints?",
         dtype=bool,
         default=True,
+    )
+    doTractStars = pexConfig.Field(
+        doc="Output tract-sharded standard stars?",
+        dtype=bool,
+        default=True,
+        # default=False,
     )
     photoCal = pexConfig.ConfigurableField(
         target=PhotoCalTask,
@@ -298,6 +325,11 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
         else:
             self.refObjLoader = None
 
+        if self.config.doTractStars:
+            handleDict['skymap'] = butlerQC.get(inputRefs.skymap)
+            tractStarRefDict = {tractStarRef.dataId["tract"]: tractStarRef for
+                                tractStarRef in outputRefs.fgcmTractStars}
+
         struct = self.run(handleDict, self.config.physicalFilterMap)
 
         # Output the photoCalib exposure catalogs
@@ -325,6 +357,11 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
 
             butlerQC.put(offsetCat, outputRefs.fgcmOffsets)
 
+        if self.config.doTractStars:
+            self.log.info("Outputting standard stars per-tract.")
+            for tractId, catalog in struct.tractStars:
+                butlerQC.put(catalog, tractStarRefDict[tractId])
+
         return
 
     def run(self, handleDict, physicalFilterMap):
@@ -350,6 +387,9 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
                 handle for the atmosphere parameter catalog.
             ``"fgcmBuildStarsTableConfig"``
                 Config for `lsst.fgcmcal.fgcmBuildStarsTableTask`.
+            ``"skymap"``
+                Skymap for sharding standard stars (optional).
+
         physicalFilterMap : `dict`
             Dictionary of mappings from physical filter to FGCM band.
 
@@ -375,8 +415,6 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
         else:
             offsets = np.zeros(len(bands))
 
-        del stdCat
-
         if self.config.doZeropointOutput:
             zptCat = handleDict['fgcmZeropoints'].get()
             visitCat = handleDict['fgcmVisitCatalog'].get()
@@ -392,8 +430,15 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
         else:
             atmgen = None
 
+        if self.config.doTractStars:
+            skymap = handleDict['skymap']
+            tractstargen = self._outputTractStars(skymap, stdCat)
+        else:
+            tractstargen = None
+
         retStruct = pipeBase.Struct(offsets=offsets,
-                                    atmospheres=atmgen)
+                                    atmospheres=atmgen,
+                                    tractStars=tractstargen)
         retStruct.photoCalibCatalogs = pcgen
 
         return retStruct
@@ -932,3 +977,65 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
                                                             throughputAtMax=atmVals[-1])
 
             yield (int(visit), curve)
+
+    def _outputTractStars(self, skymap, stdCat):
+        """Output the tract-sharded stars.
+
+        Parameters
+        ----------
+        skymap : `lsst.skymap.SkyMap`
+            Skymap for tract id information.
+        stdCat : `lsst.afw.table.SimpleCatalog`
+            FGCM standard star catalog from ``FgcmFitCycleTask``
+
+        Returns
+        -------
+        tractgen : `generator` [(`int`, `astropy.table.Table`)]
+            Generator that returns (tractId, Table) tuples.
+        """
+        md = stdCat.getMetadata()
+        bands = md.getArray('BANDS')
+
+        dtype = [
+            ("fgcm_id", "i8"),
+            ("isolated_star_id", "i8"),
+            ("ra", "f8"),
+            ("dec", "f8"),
+        ]
+
+        for band in bands:
+            dtype.extend(
+                (
+                    (f"mag_{band}", "f4"),
+                    (f"magErr_{band}", "f4"),
+                    (f"ngood_{band}", "i4"),
+                ),
+            )
+
+        tractIds = skymap.findTractIdArray(stdCat["coord_ra"], stdCat["coord_dec"])
+
+        h, rev = esutil.stat.histogram(tractIds, rev=True)
+
+        good, = np.where(h > 0)
+
+        for index in good:
+            i1a = rev[rev[index]: rev[index + 1]]
+            tractId = tractIds[i1a[0]]
+
+            table = Table(np.zeros(len(i1a), dtype=dtype))
+            table["fgcm_id"] = stdCat["id"][i1a]
+            table["isolated_star_id"] = stdCat["isolated_star_id"][i1a]
+            table["ra"] = np.rad2deg(stdCat["coord_ra"][i1a])*units.degree
+            table["dec"] = np.rad2deg(stdCat["coord_dec"][i1a])*units.degree
+
+            for i, band in enumerate(bands):
+                table[f"mag_{band}"] = stdCat["mag_std_noabs"][i1a, i]*units.ABmag
+                table[f"magErr_{band}"] = stdCat["magErr_std"][i1a, i]*units.ABmag
+                table[f"ngood_{band}"] = stdCat["ngood"][i1a, i]
+
+                # Use NaN as a sentinel for missing values instead of 99.
+                bad = (table[f"mag_{band}"] > 90.0)
+                table[f"mag_{band}"][bad] = np.nan
+                table[f"magErr_{band}"][bad] = np.nan
+
+            yield (int(tractId), table)

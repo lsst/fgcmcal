@@ -429,7 +429,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         """
         # get filter names into a numpy array...
         # This is the type that is expected by the fgcm code
-        visitFilterNames = np.zeros(len(visitCat), dtype='a30')
+        visitFilterNames = np.zeros(len(visitCat), dtype='S30')
         for i in range(len(visitCat)):
             visitFilterNames[i] = visitCat[i]['physicalFilter']
 
