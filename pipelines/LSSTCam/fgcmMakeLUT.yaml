@@ -1,0 +1,4 @@
+description: Make LSSTCam fgcmcal look-up table
+instrument: lsst.obs.lsst.LsstCam
+imports:
+  - location: $FGCMCAL_DIR/pipelines/_ingredients/fgcmMakeLUT.yaml
