@@ -4,6 +4,9 @@ config.stdPhysicalFilterOverrideMap = {'HSC-R': 'HSC-R',
                                        'HSC-I': 'HSC-I'}
 config.atmosphereTableName = 'fgcm_atm_subaru2_test'
 
+# Create a LUT for all detectors (for backwards compatibility).
+config.useScienceDetectors = False
+
 from lsst.fgcmcal import SensorCorrectionTerms
 
 hsc_g_sensor_terms = SensorCorrectionTerms(

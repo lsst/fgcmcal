@@ -103,6 +103,17 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         multiple=True,
     )
 
+    transmission_filter_detector = connectionTypes.PrerequisiteInput(
+        doc="Filter transmission curve per detector",
+        name="transmission_filter_detector",
+        storageClass="TransmissionCurve",
+        dimensions=("instrument", "physical_filter", "detector",),
+        lookupFunction=lookupStaticCalibrations,
+        isCalibration=True,
+        deferLoad=True,
+        multiple=True,
+    )
+
     fgcmLookUpTable = connectionTypes.Output(
         doc=("Atmosphere + instrument look-up-table for FGCM throughput and "
              "chromatic corrections."),
@@ -131,6 +142,10 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
             del self.transmission_optics
         if not config.doSensorTransmission:
             del self.transmission_sensor
+        if not config.doFilterDetectorTransmission:
+            del self.transmission_filter_detector
+        else:
+            del self.transmission_filter
 
 
 class FgcmMakeLutParametersConfig(pexConfig.Config):
@@ -281,6 +296,11 @@ class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
         default=None,
         optional=True,
     )
+    useScienceDetectors = pexConfig.Field(
+        doc="Only use science detectors in LUT?",
+        dtype=bool,
+        default=True,
+    )
     doOpticsTransmission = pexConfig.Field(
         doc="Include optics transmission?",
         dtype=bool,
@@ -290,6 +310,12 @@ class FgcmMakeLutConfig(pipeBase.PipelineTaskConfig,
         doc="Include sensor transmission?",
         dtype=bool,
         default=True,
+    )
+    doFilterDetectorTransmission = pexConfig.Field(
+        doc="Use filter transmissions that are specified per-detector, rather "
+            "than a constant or radially-dependent filter transmission?",
+        dtype=bool,
+        default=False,
     )
     sensorCorrectionTermDict = pexConfig.ConfigDictField(
         doc="Mapping of filter name to sensor correction terms.",
@@ -356,9 +382,16 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
         else:
             sensorHandleDict = {}
 
-        filterHandles = butlerQC.get(inputRefs.transmission_filter)
-        filterHandleDict = {filterHandle.dataId['physical_filter']: filterHandle for
-                            filterHandle in filterHandles}
+        if self.config.doFilterDetectorTransmission:
+            filterHandles = butlerQC.get(inputRefs.transmission_filter_detector)
+            filterHandleDict = {
+                (filterHandle.dataId["physical_filter"], filterHandle.dataId["detector"]): filterHandle
+                for filterHandle in filterHandles
+            }
+        else:
+            filterHandles = butlerQC.get(inputRefs.transmission_filter)
+            filterHandleDict = {filterHandle.dataId['physical_filter']: filterHandle for
+                                filterHandle in filterHandles}
 
         struct = self._fgcmMakeLut(camera,
                                    opticsHandle,
@@ -389,7 +422,8 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
             be detector id.
         filterHandleDict : `dict` of [`str`, `lsst.daf.butler.DeferredDatasetHandle`]
             Dictionary of references to filter transmission curves.  Key will
-            be physical filter label.
+            be physical filter label or tuple of physical filter label and
+            detector.
 
         Returns
         -------
@@ -405,7 +439,13 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
                 physical filter name.
         """
         # number of ccds from the length of the camera iterator
-        nCcd = len(camera)
+        nCcd = 0
+        for detector in camera:
+            if self.config.useScienceDetectors:
+                if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                    continue
+            nCcd += 1
+
         self.log.info("Found %d ccds for look-up table" % (nCcd))
 
         # Load in optics, etc.
@@ -438,6 +478,9 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
             tDict = {}
             tDict['LAMBDA'] = throughputLambda
             for ccdIndex, detector in enumerate(camera):
+                if self.config.useScienceDetectors:
+                    if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                        continue
                 tDict[ccdIndex] = self._getThroughputDetector(detector, physicalFilter, throughputLambda)
             throughputDict[physicalFilter] = tDict
 
@@ -596,6 +639,9 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
 
         self._sensorsTransmission = {}
         for detector in camera:
+            if self.config.useScienceDetectors:
+                if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                    continue
             if self.config.doSensorTransmission:
                 self._sensorsTransmission[detector.getId()] = sensorHandleDict[detector.getId()].get()
             else:
@@ -611,8 +657,17 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
                 )
 
         self._filtersTransmission = {}
-        for physicalFilter in self.config.physicalFilters:
-            self._filtersTransmission[physicalFilter] = filterHandleDict[physicalFilter].get()
+        if self.config.doFilterDetectorTransmission:
+            for physicalFilter in self.config.physicalFilters:
+                for detector in camera:
+                    if self.config.useScienceDetectors:
+                        if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                            continue
+                    key = (physicalFilter, detector.getId())
+                    self._filtersTransmission[key] = filterHandleDict[key].get()
+        else:
+            for physicalFilter in self.config.physicalFilters:
+                self._filtersTransmission[physicalFilter] = filterHandleDict[physicalFilter].get()
 
     def _getThroughputDetector(self, detector, physicalFilter, throughputLambda):
         """Internal method to get throughput for a detector.
@@ -643,8 +698,16 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
         throughput *= self._sensorsTransmission[detector.getId()].sampleAt(position=c,
                                                                            wavelengths=throughputLambda)
 
-        throughput *= self._filtersTransmission[physicalFilter].sampleAt(position=c,
-                                                                         wavelengths=throughputLambda)
+        if self.config.doFilterDetectorTransmission:
+            throughput *= self._filtersTransmission[(physicalFilter, detector.getId())].sampleAt(
+                position=c,
+                wavelengths=throughputLambda,
+            )
+        else:
+            throughput *= self._filtersTransmission[physicalFilter].sampleAt(
+                position=c,
+                wavelengths=throughputLambda,
+            )
 
         # Clip the throughput from 0 to 1
         throughput = np.clip(throughput, 0.0, 1.0)
