@@ -674,6 +674,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=int,
         default=3,
     )
+    ccdGrayFocalPlaneMaxStars = pexConfig.Field(
+        doc="Maximum number of stars to use for focal plane fit. Required to keep "
+            "matrix memory usage from running away. If there are more stars than "
+            "this will be down-sampled.",
+        dtype=int,
+        default=50_000,
+    )
     cycleNumber = pexConfig.Field(
         doc=("FGCM fit cycle number.  This is automatically incremented after each run "
              "and stage of outlier rejection.  See cookbook for details."),
