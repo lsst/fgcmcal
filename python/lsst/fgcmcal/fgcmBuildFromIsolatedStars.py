@@ -133,7 +133,6 @@ class FgcmBuildFromIsolatedStarsConnections(pipeBase.PipelineTaskConnections,
 
         if not config.doReferenceMatches:
             self.prerequisiteInputs.remove("ref_cat")
-            self.prerequisiteInputs.remove("fgcm_lookup_table")
             self.outputs.remove("fgcm_reference_stars")
 
     def getSpatialBoundsConnections(self):
@@ -214,8 +213,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             if tract not in isolated_star_source_handle_dict:
                 raise RuntimeError(f"tract {tract} in isolated_star_cats but not isolated_star_sources")
 
+        lookup_table_handle = input_ref_dict["fgcm_lookup_table"]
         if self.config.doReferenceMatches:
-            lookup_table_handle = input_ref_dict["fgcm_lookup_table"]
 
             # Prepare the reference catalog loader
             ref_config = LoadReferenceObjectsConfig()
@@ -229,8 +228,6 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             self.makeSubtask('fgcmLoadReferenceCatalog',
                              refObjLoader=ref_obj_loader,
                              refCatName=self.config.connections.ref_cat)
-        else:
-            lookup_table_handle = None
 
         # The visit summary handles for use with fgcmMakeVisitCatalog must be keyed with
         # visit, and values are a list with the first value being the visit_summary_handle,
@@ -256,7 +253,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             butlerQC.put(struct.fgcm_reference_stars, outputRefs.fgcm_reference_stars)
 
     def run(self, *, camera, visit_summary_handle_dict, isolated_star_cat_handle_dict,
-            isolated_star_source_handle_dict, lookup_table_handle=None):
+            isolated_star_source_handle_dict, lookup_table_handle):
         """Run the fgcmBuildFromIsolatedStarsTask.
 
         Parameters
@@ -269,8 +266,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             Isolated star catalog dataset handles, with the tract as key.
         isolated_star_source_handle_dict : `dict` [`int`, `lsst.daf.butler.DeferredDatasetHandle`]
             Isolated star source dataset handles, with the tract as key.
-        lookup_table_handle : `lsst.daf.butler.DeferredDatasetHandle`, optional
-            Data reference to fgcm look-up table (used if matching reference stars).
+        lookup_table_handle : `lsst.daf.butler.DeferredDatasetHandle`
+            Data reference to fgcm look-up table.
 
         Returns
         -------
@@ -302,7 +299,21 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             if lookup_table_handle is None:
                 raise RuntimeError("Must supply lookup_table_handle if config.doReferenceMatches is True.")
 
-        visit_cat = self.fgcmMakeVisitCatalog(camera, visit_summary_handle_dict)
+        lut_cat = lookup_table_handle.get()
+        if len(camera) == lut_cat[0]["nCcd"]:
+            use_science_detectors = False
+        else:
+            # If the LUT has a different number of detectors than
+            # the camera, then we only want to use science detectors
+            # in the focal plane projector.
+            use_science_detectors = True
+        del lut_cat
+
+        visit_cat = self.fgcmMakeVisitCatalog(
+            camera,
+            visit_summary_handle_dict,
+            useScienceDetectors=use_science_detectors,
+        )
 
         # Select and concatenate the isolated stars and sources.
         fgcm_obj, star_obs = self._make_all_star_obs_from_isolated_stars(
