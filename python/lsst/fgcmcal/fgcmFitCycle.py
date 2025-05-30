@@ -1408,8 +1408,19 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         fgcmExpInfo = translateVisitCatalog(visitCat)
         del visitCat
 
-        focalPlaneProjector = FocalPlaneProjector(camera,
-                                                  self.config.defaultCameraOrientation)
+        if len(camera) == fgcmLut.nCCD:
+            useScienceDetectors = False
+        else:
+            # If the LUT has a different number of detectors than
+            # the camera, then we only want to use science detectors
+            # in the focal plane projector.
+            useScienceDetectors = True
+
+        focalPlaneProjector = FocalPlaneProjector(
+            camera,
+            self.config.defaultCameraOrientation,
+            useScienceDetectors=useScienceDetectors,
+        )
 
         noFitsDict = {'lutIndex': lutIndexVals,
                       'lutStd': lutStd,
