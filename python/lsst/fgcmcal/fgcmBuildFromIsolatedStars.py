@@ -214,6 +214,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             if tract not in isolated_star_source_handle_dict:
                 raise RuntimeError(f"tract {tract} in isolated_star_cats but not isolated_star_sources")
 
+        lookup_table_handle = input_ref_dict["fgcm_lookup_table"]
         if self.config.doReferenceMatches:
 
             # Prepare the reference catalog loader
