@@ -40,7 +40,7 @@ from lsst.pipe.base import connectionTypes
 import lsst.afw.table as afwTable
 import lsst.afw.cameraGeom as afwCameraGeom
 from lsst.afw.image import TransmissionCurve
-from .utilities import lookupStaticCalibrations
+from .utilities import lookupStaticCalibrations, countDetectors
 
 import fgcm
 
@@ -439,12 +439,7 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
                 physical filter name.
         """
         # number of ccds from the length of the camera iterator
-        nCcd = 0
-        for detector in camera:
-            if self.config.useScienceDetectors:
-                if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
-                    continue
-            nCcd += 1
+        nCcd = countDetectors(camera, self.config.useScienceDetectors)
 
         self.log.info("Found %d ccds for look-up table" % (nCcd))
 

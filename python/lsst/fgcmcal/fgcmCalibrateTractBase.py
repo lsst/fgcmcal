@@ -174,7 +174,23 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
         # Note that we will need visitCat at the end of the procedure for the outputs
         groupedHandles = self.fgcmBuildStars._groupHandles(handleDict['sourceTableHandleDict'],
                                                            handleDict['visitSummaryHandleDict'])
-        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(handleDict['camera'], groupedHandles)
+
+        lutCat = handleDict["fgcmLookUpTable"].get()
+        camera = handleDict["camera"]
+        if len(camera) == lutCat[0]["nCcd"]:
+            useScienceDetectors = False
+        else:
+            # If the LUT has a different number of detectors than
+            # the camera, then we only want to use science detectors
+            # in the focal plane projector.
+            useScienceDetectors = True
+        del lutCat
+
+        visitCat = self.fgcmBuildStars.fgcmMakeVisitCatalog(
+            camera,
+            groupedHandles,
+            useScienceDetectors=useScienceDetectors,
+        )
         rad = calibFluxApertureRadius
         fgcmStarObservationCat = self.fgcmBuildStars.fgcmMakeAllStarObservations(groupedHandles,
                                                                                  visitCat,

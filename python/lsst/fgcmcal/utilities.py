@@ -30,6 +30,7 @@ import re
 
 from lsst.daf.base import PropertyList
 from lsst.daf.butler import Timespan
+import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -458,19 +459,24 @@ def _computeDefaultVisitInfo():
     return visitInfo
 
 
-def computeReferencePixelScale(camera):
+def computeReferencePixelScale(camera, useScienceDetectors=False):
     """
     Compute the median pixel scale in the camera
 
     Returns
     -------
-    pixelScale: `float`
-       Average pixel scale (arcsecond) over the camera
+    pixelScale : `float`
+        Average pixel scale (arcsecond) over the camera
+    useScienceDetectors : `bool`, optional
+        Limit to just science detectors?
     """
     visitInfo = _computeDefaultVisitInfo()
 
     pixelScales = np.zeros(len(camera))
     for i, detector in enumerate(camera):
+        if useScienceDetectors:
+            if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                continue
         wcs = createInitialSkyWcs(visitInfo, detector, False)
         pixelScales[i] = wcs.getPixelScale(detector.getBBox().getCenter()).asArcseconds()
 
@@ -932,3 +938,27 @@ def lookupStaticCalibrations(datasetType, registry, quantumDataId, collections):
         if ref := registry.findDataset(datasetType, dataId, collections=collections, timespan=timespan):
             result.append(ref)
     return result
+
+
+def countDetectors(camera, useScienceDetectors):
+    """Count the detectors in the camera.
+
+    This may be limited to just the science detectors.
+
+    Parameters
+    ----------
+    camera : `lsst.afw.cameraGeom.Camera`
+        Camera object.
+    useScienceDetectors : `bool`, optional
+        Limit to just science detectors?
+    """
+    if not useScienceDetectors:
+        return len(camera)
+
+    nDetector = 0
+    for detector in camera:
+        if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+            continue
+        nDetector += 1
+
+    return nDetector
