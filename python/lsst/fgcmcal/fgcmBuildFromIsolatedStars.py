@@ -42,6 +42,7 @@ import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 from lsst.meas.algorithms import ReferenceObjectLoader, LoadReferenceObjectsConfig
 from lsst.pipe.tasks.reserveIsolatedStars import ReserveIsolatedStarsTask
+import lsst.afw.cameraGeom as afwCameraGeom
 
 from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsBaseTask
 from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromName
@@ -322,6 +323,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             visit_cat,
             camera,
             calib_flux_aperture_radius=calib_flux_aperture_radius,
+            use_science_detectors=use_science_detectors,
         )
 
         self._compute_delta_aper_summary_statistics(
@@ -355,6 +357,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             visit_cat,
             camera,
             calib_flux_aperture_radius=None,
+            use_science_detectors=False,
     ):
         """Make all star observations from isolated star catalogs.
 
@@ -370,6 +373,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             The camera object.
         calib_flux_aperture_radius : `float`, optional
             Radius for the calibration flux aperture.
+        use_science_detectors : `bool`, optional
+            Only use science detectors?
 
         Returns
         -------
@@ -579,6 +584,10 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
 
             # Need to loop over detectors here.
             for detector in camera:
+                if use_science_detectors:
+                    if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                        continue
+
                 detector_id = detector.getId()
                 # used index for all observations with a given detector
                 (use,) = (star_obs["detector"][obs_match] == detector_id).nonzero()
