@@ -218,8 +218,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # These are slightly different from above due to the configuration change
         # mid-way in the separate fits.
-        zpOffsets = np.array([-0.0022663213312625885,
-                              0.004101278726011515])
+        zpOffsets = np.array([-0.0015136072179302573,
+                              0.0019038696773350239])
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I') and skymap='hsc_rings_v1'",

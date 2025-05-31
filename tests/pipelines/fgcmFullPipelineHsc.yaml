@@ -8,5 +8,6 @@ tasks:
     config:
       doMultipleCycles: true
       multipleCyclesFinalCycleNumber: 2
+      aperCorrPerCcd: true
   fgcmOutputProducts:
     class: lsst.fgcmcal.fgcmOutputProducts.FgcmOutputProductsTask
