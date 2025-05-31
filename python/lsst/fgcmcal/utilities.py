@@ -126,6 +126,11 @@ def makeConfigDict(config, log, camera, maxIter,
     else:
         outfileBase = '%s-%06d' % (config.outfileBase, tract)
 
+    if config.aperCorrPerCcd:
+        seeingField = 'DELTA_APER_DETECTOR'
+    else:
+        seeingField = 'DELTA_APER'
+
     # create a configuration dictionary for fgcmFitCycle
     configDict = {'outfileBase': outfileBase,
                   'logger': log,
@@ -138,7 +143,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'ccdStartIndex': camera[0].getId(),
                   'expField': FGCM_EXP_FIELD,
                   'ccdField': FGCM_CCD_FIELD,
-                  'seeingField': 'DELTA_APER',
+                  'seeingField': seeingField,
                   'fwhmField': 'PSFFWHM',
                   'skyBrightnessField': 'SKYBACKGROUND',
                   'deepFlag': 'DEEPFLAG',  # unused
@@ -405,11 +410,14 @@ def translateVisitCatalog(visitCat):
     After running this code, it is wise to `del visitCat` to clear the memory.
     """
 
+    nDetector = visitCat.schema["deltaAperDetector"].asKey().getSize()
+
     fgcmExpInfo = np.zeros(len(visitCat), dtype=[('VISIT', 'i8'),
                                                  ('MJD', 'f8'),
                                                  ('EXPTIME', 'f8'),
                                                  ('PSFFWHM', 'f8'),
                                                  ('DELTA_APER', 'f8'),
+                                                 ('DELTA_APER_DETECTOR', ('f8', nDetector)),
                                                  ('SKYBACKGROUND', 'f8'),
                                                  ('DEEPFLAG', 'i2'),
                                                  ('TELHA', 'f8'),
@@ -429,6 +437,7 @@ def translateVisitCatalog(visitCat):
     fgcmExpInfo['PMB'][:] = visitCat['pmb']
     fgcmExpInfo['PSFFWHM'][:] = visitCat['psfFwhm']
     fgcmExpInfo['DELTA_APER'][:] = visitCat['deltaAper']
+    fgcmExpInfo['DELTA_APER_DETECTOR'][:, :] = visitCat['deltaAperDetector']
     fgcmExpInfo['SKYBACKGROUND'][:] = visitCat['skyBackground']
     # Note that we have to go through asAstropy() to get a string
     #  array out of an afwTable.  This is faster than a row-by-row loop.

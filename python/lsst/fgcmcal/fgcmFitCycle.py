@@ -845,6 +845,11 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=float,
         default=0.05,
     )
+    aperCorrPerCcd = pexConfig.Field(
+        doc="Use aperture corrections per-ccd (detector) instead of per-visit?",
+        dtype=bool,
+        default=False,
+    )
     aperCorrFitNBins = pexConfig.Field(
         doc=("Number of aperture bins used in aperture correction fit.  When set to 0"
              "no fit will be performed, and the config.aperCorrInputSlopes will be "
