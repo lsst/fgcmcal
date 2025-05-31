@@ -846,7 +846,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
 
         n_detector = visit_cat.schema["deltaAperDetector"].asKey().getSize()
 
-        visit_detector_hash = visit_index * (n_detector + 1) + star_obs["detector"]
+        visit_detector_hash = visit_index * (n_detector + 1) + star_obs["detector"][ok]
 
         h, rev = histogram_rev_sorted(visit_detector_hash)
 
