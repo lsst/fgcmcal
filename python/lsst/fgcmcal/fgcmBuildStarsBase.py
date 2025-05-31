@@ -347,6 +347,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             rec['scaling'][:] = 1.0
             # Median delta aperture, to be measured from stars
             rec['deltaAper'] = 0.0
+            rec['deltaAperDetector'][:] = 0.0
             rec['psfSigma'] = psfSigma
             rec['psfFwhm'] = psfFwhm
             rec['skyBackground'] = skyBackground
@@ -579,6 +580,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         schema.addField('psfSigma', type=np.float32, doc="PSF sigma (median); pixels")
         schema.addField('psfFwhm', type=np.float32, doc="PSF FWHM (median); arcseconds")
         schema.addField('deltaAper', type=np.float32, doc="Delta-aperture")
+        schema.addField('deltaAperDetector', type='ArrayF', doc='Delta-aperture per detector', size=nCcd)
         schema.addField('skyBackground', type=np.float32, doc="Sky background (ADU) (reference CCD)")
         # the following field is not used yet
         schema.addField('deepFlag', type=np.int32, doc="Deep observation")

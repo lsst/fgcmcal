@@ -834,3 +834,18 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         for index in h_use:
             i1a = rev[rev[index]: rev[index + 1]]
             visit_cat["deltaAper"][index] = np.median(np.asarray(star_obs["delta_mag_aper"][ok[i1a]]))
+
+        n_detector = visit_cat.schema["deltaAperDetector"].asKey().getSize()
+
+        visit_detector_hash = visit_index * (n_detector + 1) + star_obs["detector"]
+
+        h, rev = histogram_rev_sorted(visit_detector_hash)
+
+        visit_cat["deltaAperDetector"][:] = -9999.0
+        h_use, = np.where(h >= 3)
+        for index in h_use:
+            i1a = rev[rev[index]: rev[index + 1]]
+            v_ind = visit_index[i1a[0]]
+            d_ind = visit_detector_hash[i1a[0]] % (n_detector + 1)
+            delta_mag = np.median(np.asarray(star_obs["delta_mag_aper"][ok[i1a]]))
+            visit_cat["deltaAperDetector"][v_ind, d_ind] = delta_mag
