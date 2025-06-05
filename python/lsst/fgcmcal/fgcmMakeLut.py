@@ -41,6 +41,8 @@ import lsst.afw.table as afwTable
 import lsst.afw.cameraGeom as afwCameraGeom
 from lsst.afw.image import TransmissionCurve
 from .utilities import lookupStaticCalibrations
+from astropy.table import Table
+import astropy.units as units
 
 import fgcm
 
@@ -134,6 +136,14 @@ class FgcmMakeLutConnections(pipeBase.PipelineTaskConnections,
         name="fgcm_standard_passband",
         storageClass="TransmissionCurve",
         dimensions=("instrument", "physical_filter"),
+        multiple=True,
+    )
+
+    standardPassbands = connectionTypes.Output(
+        doc="Standard passbands, in astropy table format.",
+        name="standard_passband",
+        storageClass="ArrowAstropy",
+        dimensions=("instrument", "band"),
         multiple=True,
     )
 
@@ -393,10 +403,18 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
             filterHandleDict = {filterHandle.dataId['physical_filter']: filterHandle for
                                 filterHandle in filterHandles}
 
-        struct = self._fgcmMakeLut(camera,
-                                   opticsHandle,
-                                   sensorHandleDict,
-                                   filterHandleDict)
+        filterToBand = {
+            filterHandle.dataId["physical_filter"]: filterHandle.dataId["band"]
+            for filterHandle in filterHandles
+        }
+
+        struct = self._fgcmMakeLut(
+            camera,
+            opticsHandle,
+            sensorHandleDict,
+            filterHandleDict,
+            filterToBand,
+        )
 
         butlerQC.put(struct.fgcmLookUpTable, outputRefs.fgcmLookUpTable)
         butlerQC.put(struct.fgcmStandardAtmosphere, outputRefs.fgcmStandardAtmosphere)
@@ -406,8 +424,13 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
         for physical_filter, passband in struct.fgcmStandardPassbands.items():
             butlerQC.put(passband, refDict[physical_filter])
 
+        bandRefDict = {passbandRef.dataId["band"]: passbandRef for
+                       passbandRef in outputRefs.standardPassbands}
+        for band, passband in struct.standardPassbands.items():
+            butlerQC.put(passband, bandRefDict[band])
+
     def _fgcmMakeLut(self, camera, opticsHandle, sensorHandleDict,
-                     filterHandleDict):
+                     filterHandleDict, filterToBand):
         """
         Make a FGCM Look-up Table
 
@@ -424,6 +447,8 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
             Dictionary of references to filter transmission curves.  Key will
             be physical filter label or tuple of physical filter label and
             detector.
+        filterToBand : `dict` [`str`: `str`]
+            Mapping of physical filter to band name.
 
         Returns
         -------
@@ -435,8 +460,11 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
             fgcmStandardAtmosphere : `lsst.afw.image.TransmissionCurve`
                 Transmission curve for the FGCM standard atmosphere.
             fgcmStandardPassbands : `dict` [`str`, `lsst.afw.image.TransmissionCurve`]
-                Dictionary of standard passbands, with the key as the
+                Dictionary of fgcm standard passbands, with the key as the
                 physical filter name.
+            standardPassbands : `dict` [`str`, `astropy.table.Table`]
+                Dictionary of standard passbands in astropy table format, with
+                the key as the band name.
         """
         # number of ccds from the length of the camera iterator
         nCcd = 0
@@ -525,10 +553,29 @@ class FgcmMakeLutTask(pipeBase.PipelineTask):
                 throughputAtMax=passband[-1],
             )
 
+        standardPassbands = {}
+        for i, physical_filter in enumerate(self.fgcmLutMaker.filterNames):
+            if physical_filter != self.fgcmLutMaker.stdFilterNames[i]:
+                # This filter does not map onto one of the "standard"
+                # passbands.  E.g., for HSC we have HSC-R and HSC-R2 which
+                # both map onto HSC-R2 which sets the "standard".
+                continue
+            band = filterToBand[physical_filter]
+            passband = self.fgcmLutMaker.throughputs[i]['THROUGHPUT_AVG']*self.fgcmLutMaker.atmStdTrans
+            passbandTable = Table(
+                {
+                    "wavelength": (self.fgcmLutMaker.atmLambda.astype(np.float64)/10.)*units.nm,
+                    "throughput": (passband*100.)*units.percent,
+                },
+            )
+            passbandTable["wavelength"].description = "Wavelength bin centers"
+            standardPassbands[band] = passbandTable
+
         retStruct = pipeBase.Struct(
             fgcmLookUpTable=lutCat,
             fgcmStandardAtmosphere=atmStd,
             fgcmStandardPassbands=fgcmStandardPassbands,
+            standardPassbands=standardPassbands,
         )
 
         return retStruct

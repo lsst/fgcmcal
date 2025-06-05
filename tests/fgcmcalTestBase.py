@@ -230,6 +230,18 @@ class FgcmcalTestBase(object):
             self.assertEqual(np.min(tputs), 0.0)
             self.assertGreater(np.max(tputs), 0.0)
 
+        # Check that the standard passband tables were output and non-zero.
+        refs = butler.query_datasets(
+            "standard_passband",
+            collections=[outputCollection],
+            instrument=instName,
+        )
+        self.assertEqual(len(refs), len(fgcmLut.filterNames))
+        for ref in refs:
+            passbandTable = butler.get(ref)
+            self.assertEqual(np.min(passbandTable["throughput"]), 0.0)
+            self.assertGreater(np.max(passbandTable["throughput"]), 0.0)
+
     def _testFgcmBuildStarsTable(self, instName, testName, queryString, visits, nStar, nObs,
                                  refcatCollection="refcats/gen2"):
         """Test running of FgcmBuildStarsTableTask
