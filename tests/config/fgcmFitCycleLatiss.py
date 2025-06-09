@@ -57,7 +57,6 @@ config.precomputeSuperStarInitialCycle = False
 config.superStarSubCcdDict = {"g": True,
                               "r": True,
                               "i": True}
-config.superStarPlotCcdResiduals = True
 # Allow calibration to work with just 1 exposure on a night.
 config.minExpPerNight = 1
 # Allow calibration to work with very few stars per exposure.
