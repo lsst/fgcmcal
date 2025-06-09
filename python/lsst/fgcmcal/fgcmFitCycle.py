@@ -167,6 +167,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         instDims = ("instrument",)
         bandDims = ("instrument", "band")
         filterDims = ("instrument", "physical_filter")
+        filterDetectorDims = ("instrument", "physical_filter", "detector")
 
         inputAndOutputConnections = [
             ("FitParameters", "Catalog", "Catalog of fgcm fit parameters.", instDims),
@@ -358,7 +359,19 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                         "Plot",
                         "Plot of illumination Correction.",
                         filterDims,
-                    )
+                    ),
+                    (
+                        f"SuperstarResidual_{epoch}_Plot",
+                        "Plot",
+                        "Binned illumination correction residuals.",
+                        filterDetectorDims,
+                    ),
+                    (
+                        f"SuperstarResidualStd_{epoch}_Plot",
+                        "Plot",
+                        "Binned illumination correction residual stdev.",
+                        filterDetectorDims,
+                    ),
                 ]
             )
 
@@ -1232,18 +1245,24 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                 plotHandleDict = {}
                 for outputRefName in outputRefs.keys():
                     if outputRefName.endswith("Plot") and f"Cycle{cycle}" in outputRefName:
-                        ref = getattr(outputRefs, outputRefName)
-                        if isinstance(ref, (tuple, list)):
-                            if "physical_filter" in ref[0].dimensions:
-                                for filterRef in ref:
-                                    handleDictKey = f"{outputRefName}_{filterRef.dataId['physical_filter']}"
-                                    plotHandleDict[handleDictKey] = filterRef
-                            if "band" in ref[0].dimensions:
-                                for bandRef in ref:
-                                    handleDictKey = f"{outputRefName}_{bandRef.dataId['band']}"
-                                    plotHandleDict[handleDictKey] = bandRef
+                        refs = getattr(outputRefs, outputRefName)
+                        if isinstance(refs, (tuple, list)):
+                            if "physical_filter" in refs[0].dimensions and "detector" in refs[0].dimensions:
+                                for ref in refs:
+                                    physical_filter = ref.dataId["physical_filter"]
+                                    detector = ref.dataId["detector"]
+                                    handleDictKey = f"{outputRefName}_{physical_filter}_{detector}"
+                                    plotHandleDict[handleDictKey] = ref
+                            elif "physical_filter" in refs[0].dimensions:
+                                for ref in refs:
+                                    handleDictKey = f"{outputRefName}_{ref.dataId['physical_filter']}"
+                                    plotHandleDict[handleDictKey] = ref
+                            elif "band" in refs[0].dimensions:
+                                for ref in refs:
+                                    handleDictKey = f"{outputRefName}_{ref.dataId['band']}"
+                                    plotHandleDict[handleDictKey] = ref
                         else:
-                            plotHandleDict[outputRefName] = ref
+                            plotHandleDict[outputRefName] = refs
 
                 fgcmDatasetDict, config = self._fgcmFitCycle(
                     camera,
@@ -1275,18 +1294,24 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             plotHandleDict = {}
             for outputRefName in outputRefs.keys():
                 if outputRefName.endswith("Plot") and f"Cycle{self.config.cycleNumber}" in outputRefName:
-                    ref = getattr(outputRefs, outputRefName)
-                    if isinstance(ref, (tuple, list)):
-                        if "physical_filter" in ref[0].dimensions:
-                            for filterRef in ref:
-                                handleDictKey = f"{outputRefName}_{filterRef.dataId['physical_filter']}"
-                                plotHandleDict[handleDictKey] = filterRef
-                        if "band" in ref[0].dimensions:
-                            for bandRef in ref:
-                                handleDictKey = f"{outputRefName}_{bandRef.dataId['band']}"
-                                plotHandleDict[handleDictKey] = bandRef
+                    refs = getattr(outputRefs, outputRefName)
+                    if isinstance(refs, (tuple, list)):
+                        if "physical_filter" in refs[0].dimensions and "detector" in refs[0].dimensions:
+                            for ref in refs:
+                                physical_filter = ref.dataId["physical_filter"]
+                                detector = ref.dataId["detector"]
+                                handleDictKey = f"{outputRefName}_{physical_filter}_{detector}"
+                                plotHandleDict[handleDictKey] = ref
+                        elif "physical_filter" in refs[0].dimensions:
+                            for ref in refs:
+                                handleDictKey = f"{outputRefName}_{ref.dataId['physical_filter']}"
+                                plotHandleDict[handleDictKey] = ref
+                        elif "band" in refs[0].dimensions:
+                            for ref in refs:
+                                handleDictKey = f"{outputRefName}_{ref.dataId['band']}"
+                                plotHandleDict[handleDictKey] = ref
                     else:
-                        plotHandleDict[outputRefName] = ref
+                        plotHandleDict[outputRefName] = refs
 
             fgcmDatasetDict, _ = self._fgcmFitCycle(
                 camera,
