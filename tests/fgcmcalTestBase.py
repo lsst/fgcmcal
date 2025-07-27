@@ -37,7 +37,7 @@ import lsst.daf.butler as dafButler
 import lsst.pipe.base as pipeBase
 import lsst.geom as geom
 from lsst.pipe.base import Pipeline, ExecutionResources
-from lsst.ctrl.mpexec import SimplePipelineExecutor
+from lsst.pipe.base.simple_pipeline_executor import SimplePipelineExecutor
 
 import lsst.fgcmcal as fgcmcal
 
