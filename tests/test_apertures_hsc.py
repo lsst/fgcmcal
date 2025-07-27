@@ -25,7 +25,7 @@ import unittest
 import os
 import tempfile
 
-import lsst.daf.butler
+import lsst.daf.butler.cli.cliLog
 import lsst.utils
 
 from lsst.fgcmcal.utilities import computeApertureRadiusFromName
