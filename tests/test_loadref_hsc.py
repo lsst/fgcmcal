@@ -32,6 +32,7 @@ import esutil
 import tempfile
 
 import lsst.utils
+import lsst.daf.butler.cli.cliLog
 import lsst.pipe.tasks
 from lsst.meas.algorithms import ReferenceObjectLoader, LoadReferenceObjectsConfig
 

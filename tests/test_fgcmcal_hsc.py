@@ -35,7 +35,7 @@ matplotlib.use("Agg")
 
 import lsst.utils  # noqa: E402
 import lsst.pipe.tasks  # noqa: E402
-import lsst.daf.butler  # noqa: E402
+import lsst.daf.butler.cli.cliLog  # noqa: E402
 
 import fgcmcalTestBase  # noqa: E402
 
