@@ -470,6 +470,13 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 self.log.info("No good sources found in tract %d", tract)
                 continue
 
+            # We also need to make sure that all sources are in the
+            # input list of visits.
+            visit_match, sources_match = esutil.numpy_util.match(visit_cat_table["visit"], sources["visit"])
+            missing_sources = np.ones(len(sources), dtype=np.bool_)
+            missing_sources[sources_match] = False
+            good_sources &= (~missing_sources)
+
             # Need to count the observations of each star after cuts, per band.
             # If we have requiredBands specified, we must make sure that each star
             # has the minumum number of observations in each of thos bands.
