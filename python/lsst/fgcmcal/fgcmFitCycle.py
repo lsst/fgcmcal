@@ -696,7 +696,7 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
     ccdGrayFocalPlaneMaxStars = pexConfig.Field(
         doc="Maximum number of stars to use for focal plane fit. Required to keep "
             "matrix memory usage from running away. If there are more stars than "
-            "this will be down-sampled.",
+            "this then they will be down-sampled.",
         dtype=int,
         default=50_000,
     )
@@ -1259,7 +1259,9 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                     handleDict['fgcmFitParameters'] = fgcmDatasetDict['fgcmFitParameters']
 
                 # Set up plot outputs.
-                # Note that nothing will go in the dict if doPlots is False.
+                # Note that because the plot outputConnections are skipped in
+                # the connections class if config.doPlot is False, this will be
+                # a no-op in that case.
                 plotHandleDict = {}
                 for outputRefName in outputRefs.keys():
                     if outputRefName.endswith("Plot") and f"Cycle{cycle}" in outputRefName:
