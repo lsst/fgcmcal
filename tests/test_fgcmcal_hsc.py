@@ -103,7 +103,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nOkZp = 27
         nBadZp = 1093
         nStdStars = 237
-        nPlots = 53
+        nPlots = 55
 
         # We need an extra config file to turn off parquet format.
         extraConfigFile = os.path.join(self.testDir, "turn_off_parquet.py")
@@ -170,7 +170,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nOkZp = 27
         nBadZp = 1093
         nStdStars = 227
-        nPlots = 53
+        nPlots = 55
 
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -218,8 +218,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # These are slightly different from above due to the configuration change
         # mid-way in the separate fits.
-        zpOffsets = np.array([-0.0022663213312625885,
-                              0.004101278726011515])
+        zpOffsets = np.array([-0.0015136072179302573,
+                              0.0019038696773350239])
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I') and skymap='hsc_rings_v1'",

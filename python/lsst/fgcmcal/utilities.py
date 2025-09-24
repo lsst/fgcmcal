@@ -30,6 +30,7 @@ import re
 
 from lsst.daf.base import PropertyList
 from lsst.daf.butler import Timespan
+import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.afw.table as afwTable
 import lsst.afw.image as afwImage
 import lsst.afw.math as afwMath
@@ -125,6 +126,11 @@ def makeConfigDict(config, log, camera, maxIter,
     else:
         outfileBase = '%s-%06d' % (config.outfileBase, tract)
 
+    if config.aperCorrPerCcd:
+        seeingField = 'DELTA_APER_DETECTOR'
+    else:
+        seeingField = 'DELTA_APER'
+
     # create a configuration dictionary for fgcmFitCycle
     configDict = {'outfileBase': outfileBase,
                   'logger': log,
@@ -137,7 +143,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'ccdStartIndex': camera[0].getId(),
                   'expField': FGCM_EXP_FIELD,
                   'ccdField': FGCM_CCD_FIELD,
-                  'seeingField': 'DELTA_APER',
+                  'seeingField': seeingField,
                   'fwhmField': 'PSFFWHM',
                   'skyBrightnessField': 'SKYBACKGROUND',
                   'deepFlag': 'DEEPFLAG',  # unused
@@ -166,6 +172,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'ccdGrayFocalPlaneDict': dict(config.ccdGrayFocalPlaneDict),
                   'ccdGrayFocalPlaneChebyshevOrder': config.ccdGrayFocalPlaneChebyshevOrder,
                   'ccdGrayFocalPlaneFitMinCcd': config.ccdGrayFocalPlaneFitMinCcd,
+                  'ccdGrayFocalPlaneMaxStars': config.ccdGrayFocalPlaneMaxStars,
                   'cycleNumber': config.cycleNumber,
                   'maxIter': maxIter,
                   'deltaMagBkgOffsetPercentile': config.deltaMagBkgOffsetPercentile,
@@ -403,11 +410,14 @@ def translateVisitCatalog(visitCat):
     After running this code, it is wise to `del visitCat` to clear the memory.
     """
 
+    nDetector = visitCat.schema["deltaAperDetector"].asKey().getSize()
+
     fgcmExpInfo = np.zeros(len(visitCat), dtype=[('VISIT', 'i8'),
                                                  ('MJD', 'f8'),
                                                  ('EXPTIME', 'f8'),
                                                  ('PSFFWHM', 'f8'),
                                                  ('DELTA_APER', 'f8'),
+                                                 ('DELTA_APER_DETECTOR', ('f8', nDetector)),
                                                  ('SKYBACKGROUND', 'f8'),
                                                  ('DEEPFLAG', 'i2'),
                                                  ('TELHA', 'f8'),
@@ -427,6 +437,7 @@ def translateVisitCatalog(visitCat):
     fgcmExpInfo['PMB'][:] = visitCat['pmb']
     fgcmExpInfo['PSFFWHM'][:] = visitCat['psfFwhm']
     fgcmExpInfo['DELTA_APER'][:] = visitCat['deltaAper']
+    fgcmExpInfo['DELTA_APER_DETECTOR'][:, :] = visitCat['deltaAperDetector']
     fgcmExpInfo['SKYBACKGROUND'][:] = visitCat['skyBackground']
     # Note that we have to go through asAstropy() to get a string
     #  array out of an afwTable.  This is faster than a row-by-row loop.
@@ -457,19 +468,24 @@ def _computeDefaultVisitInfo():
     return visitInfo
 
 
-def computeReferencePixelScale(camera):
+def computeReferencePixelScale(camera, useScienceDetectors=False):
     """
     Compute the median pixel scale in the camera
 
     Returns
     -------
-    pixelScale: `float`
-       Average pixel scale (arcsecond) over the camera
+    pixelScale : `float`
+        Average pixel scale (arcsecond) over the camera
+    useScienceDetectors : `bool`, optional
+        Limit to just science detectors?
     """
     visitInfo = _computeDefaultVisitInfo()
 
     pixelScales = np.zeros(len(camera))
     for i, detector in enumerate(camera):
+        if useScienceDetectors:
+            if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                continue
         wcs = createInitialSkyWcs(visitInfo, detector, False)
         pixelScales[i] = wcs.getPixelScale(detector.getBBox().getCenter()).asArcseconds()
 
@@ -931,3 +947,27 @@ def lookupStaticCalibrations(datasetType, registry, quantumDataId, collections):
         if ref := registry.findDataset(datasetType, dataId, collections=collections, timespan=timespan):
             result.append(ref)
     return result
+
+
+def countDetectors(camera, useScienceDetectors):
+    """Count the detectors in the camera.
+
+    This may be limited to just the science detectors.
+
+    Parameters
+    ----------
+    camera : `lsst.afw.cameraGeom.Camera`
+        Camera object.
+    useScienceDetectors : `bool`, optional
+        Limit to just science detectors?
+    """
+    if not useScienceDetectors:
+        return len(camera)
+
+    nDetector = 0
+    for detector in camera:
+        if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+            continue
+        nDetector += 1
+
+    return nDetector

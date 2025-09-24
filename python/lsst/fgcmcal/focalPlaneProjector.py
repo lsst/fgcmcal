@@ -45,14 +45,17 @@ class FocalPlaneProjector(object):
     defaultOrientation : `int`
         Default camera orientation in degrees.  This angle is the position
         angle of the focal plane +Y with respect to north.
+    useScienceDetectors : `bool`, optional
+        Use only science detectors in projector?
     """
-    def __init__(self, camera, defaultOrientation):
+    def __init__(self, camera, defaultOrientation, useScienceDetectors=False):
         self.camera = camera
 
         # Put the reference boresight at the equator to avoid cos(dec) problems.
         self.boresight = geom.SpherePoint(180.0*geom.degrees, 0.0*geom.degrees)
         self.flipX = False
         self.defaultOrientation = int(defaultOrientation) % 360
+        self.useScienceDetectors = useScienceDetectors
 
     def _makeWcsDict(self, orientation):
         """
@@ -78,6 +81,10 @@ class FocalPlaneProjector(object):
         wcsDict = {}
 
         for detector in self.camera:
+            if self.useScienceDetectors:
+                if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                    continue
+
             detectorId = detector.getId()
             wcsDict[detectorId] = createInitialSkyWcs(visitInfo, detector, self.flipX)
 
@@ -161,17 +168,26 @@ class FocalPlaneProjector(object):
         wcsDict = self._makeWcsDict(orientation)
 
         # Need something for the max detector ...
-        deltaMapper = np.zeros(len(self.camera), dtype=[('id', 'i4'),
-                                                        ('x', 'f8', nstep**2),
-                                                        ('y', 'f8', nstep**2),
-                                                        ('x_size', 'i4'),
-                                                        ('y_size', 'i4'),
-                                                        ('delta_ra_cent', 'f8'),
-                                                        ('delta_dec_cent', 'f8'),
-                                                        ('delta_ra', 'f8', nstep**2),
-                                                        ('delta_dec', 'f8', nstep**2)])
+        deltaMapper = np.zeros(
+            len(wcsDict),
+            dtype=[
+                ('id', 'i4'),
+                ('x', 'f8', nstep**2),
+                ('y', 'f8', nstep**2),
+                ('x_size', 'i4'),
+                ('y_size', 'i4'),
+                ('delta_ra_cent', 'f8'),
+                ('delta_dec_cent', 'f8'),
+                ('delta_ra', 'f8', nstep**2),
+                ('delta_dec', 'f8', nstep**2)
+            ],
+        )
 
         for detector in self.camera:
+            if self.useScienceDetectors:
+                if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                    continue
+
             detectorId = detector.getId()
 
             deltaMapper['id'][detectorId] = detectorId

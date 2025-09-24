@@ -37,6 +37,7 @@ from astropy.table import Table, vstack
 
 from fgcm.fgcmUtilities import objFlagDict, histogram_rev_sorted
 
+import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
@@ -133,7 +134,6 @@ class FgcmBuildFromIsolatedStarsConnections(pipeBase.PipelineTaskConnections,
 
         if not config.doReferenceMatches:
             self.prerequisiteInputs.remove("ref_cat")
-            self.prerequisiteInputs.remove("fgcm_lookup_table")
             self.outputs.remove("fgcm_reference_stars")
 
     def getSpatialBoundsConnections(self):
@@ -215,7 +215,6 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 raise RuntimeError(f"tract {tract} in isolated_star_cats but not isolated_star_sources")
 
         if self.config.doReferenceMatches:
-            lookup_table_handle = input_ref_dict["fgcm_lookup_table"]
 
             # Prepare the reference catalog loader
             ref_config = LoadReferenceObjectsConfig()
@@ -229,8 +228,6 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             self.makeSubtask('fgcmLoadReferenceCatalog',
                              refObjLoader=ref_obj_loader,
                              refCatName=self.config.connections.ref_cat)
-        else:
-            lookup_table_handle = None
 
         # The visit summary handles for use with fgcmMakeVisitCatalog must be keyed with
         # visit, and values are a list with the first value being the visit_summary_handle,
@@ -240,6 +237,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                                      handle in input_ref_dict['visit_summaries']}
 
         camera = input_ref_dict["camera"]
+
+        lookup_table_handle = input_ref_dict["fgcm_lookup_table"]
 
         struct = self.run(
             camera=camera,
@@ -256,7 +255,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             butlerQC.put(struct.fgcm_reference_stars, outputRefs.fgcm_reference_stars)
 
     def run(self, *, camera, visit_summary_handle_dict, isolated_star_cat_handle_dict,
-            isolated_star_source_handle_dict, lookup_table_handle=None):
+            isolated_star_source_handle_dict, lookup_table_handle):
         """Run the fgcmBuildFromIsolatedStarsTask.
 
         Parameters
@@ -269,8 +268,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             Isolated star catalog dataset handles, with the tract as key.
         isolated_star_source_handle_dict : `dict` [`int`, `lsst.daf.butler.DeferredDatasetHandle`]
             Isolated star source dataset handles, with the tract as key.
-        lookup_table_handle : `lsst.daf.butler.DeferredDatasetHandle`, optional
-            Data reference to fgcm look-up table (used if matching reference stars).
+        lookup_table_handle : `lsst.daf.butler.DeferredDatasetHandle`
+            Data reference to fgcm look-up table.
 
         Returns
         -------
@@ -302,7 +301,23 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             if lookup_table_handle is None:
                 raise RuntimeError("Must supply lookup_table_handle if config.doReferenceMatches is True.")
 
-        visit_cat = self.fgcmMakeVisitCatalog(camera, visit_summary_handle_dict)
+        lut_cat = lookup_table_handle.get()
+        if len(camera) == lut_cat[0]["nCcd"]:
+            use_science_detectors = False
+        else:
+            # If the LUT has a different number of detectors than
+            # the camera, then we only want to use science detectors
+            # in the focal plane projector.
+            # Note that in the LUT building code we either have
+            # all detectors or only science detectors.
+            use_science_detectors = True
+        del lut_cat
+
+        visit_cat = self.fgcmMakeVisitCatalog(
+            camera,
+            visit_summary_handle_dict,
+            useScienceDetectors=use_science_detectors,
+        )
 
         # Select and concatenate the isolated stars and sources.
         fgcm_obj, star_obs = self._make_all_star_obs_from_isolated_stars(
@@ -311,6 +326,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             visit_cat,
             camera,
             calib_flux_aperture_radius=calib_flux_aperture_radius,
+            use_science_detectors=use_science_detectors,
         )
 
         self._compute_delta_aper_summary_statistics(
@@ -344,6 +360,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             visit_cat,
             camera,
             calib_flux_aperture_radius=None,
+            use_science_detectors=False,
     ):
         """Make all star observations from isolated star catalogs.
 
@@ -359,6 +376,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             The camera object.
         calib_flux_aperture_radius : `float`, optional
             Radius for the calibration flux aperture.
+        use_science_detectors : `bool`, optional
+            Only use science detectors?
 
         Returns
         -------
@@ -450,9 +469,38 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 local_background = local_background_area*sources[self.config.localBackgroundFluxField]
                 good_sources &= ((sources[self.config.instFluxField] - local_background) > 0)
 
+            # We need to do this check as early as possible to
+            # ensure we can do the match test below.
             if good_sources.sum() == 0:
                 self.log.info("No good sources found in tract %d", tract)
                 continue
+
+            # We also need to make sure that all sources are in the
+            # input list of visits and detectors.
+
+            detector_ids = []
+            for detector in camera:
+                if use_science_detectors:
+                    if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                        continue
+                detector_ids.append(detector.getId())
+
+            missing_sources1 = np.ones(len(sources), dtype=np.bool_)
+            _, sources_match = esutil.numpy_util.match(visit_cat_table["visit"], sources["visit"])
+            missing_sources1[sources_match] = False
+            good_sources &= (~missing_sources1)
+
+            missing_sources2 = np.ones(len(sources), dtype=np.bool_)
+            _, sources_match = esutil.numpy_util.match(detector_ids, sources["detector"])
+            missing_sources2[sources_match] = False
+            good_sources &= (~missing_sources2)
+
+            # Check again after further tests.
+            if good_sources.sum() == 0:
+                self.log.info("No good sources found in tract %d", tract)
+                continue
+
+            self.log.info("Tract %d contains %d good sources.", tract, good_sources.sum())
 
             # Need to count the observations of each star after cuts, per band.
             # If we have requiredBands specified, we must make sure that each star
@@ -568,6 +616,10 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
 
             # Need to loop over detectors here.
             for detector in camera:
+                if use_science_detectors:
+                    if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                        continue
+
                 detector_id = detector.getId()
                 # used index for all observations with a given detector
                 (use,) = (star_obs["detector"][obs_match] == detector_id).nonzero()
@@ -589,7 +641,9 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 star_obs["inst_mag"][obs_match[use]] = (-2.5 * np.log10(scaled_inst_flux
                                                                         / exp_time[use]))
 
-            # Compute instMagErr from inst_flux_err/inst_flux; scaling will cancel out.
+            # Compute instMagErr from inst_flux_err/inst_flux.
+            # This does not need to be computed per-detector because there
+            # is no need for the per-detector scaling which cancels out.
             star_obs["inst_mag_err"] = k*(sources[self.config.instFluxField + "Err"]
                                           / sources[self.config.instFluxField])
 
@@ -823,3 +877,20 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         for index in h_use:
             i1a = rev[rev[index]: rev[index + 1]]
             visit_cat["deltaAper"][index] = np.median(np.asarray(star_obs["delta_mag_aper"][ok[i1a]]))
+
+        n_detector = visit_cat.schema["deltaAperDetector"].asKey().getSize()
+
+        # This is a fast and clever way of doing a multi-dimensional grouping
+        # between visit + detector (hashed together).
+        visit_detector_hash = visit_index * (n_detector + 1) + star_obs["detector"][ok]
+
+        h, rev = histogram_rev_sorted(visit_detector_hash)
+
+        visit_cat["deltaAperDetector"][:] = -9999.0
+        h_use, = np.where(h >= 3)
+        for index in h_use:
+            i1a = rev[rev[index]: rev[index + 1]]
+            v_ind = visit_index[i1a[0]]
+            d_ind = visit_detector_hash[i1a[0]] % (n_detector + 1)
+            delta_mag = np.median(np.asarray(star_obs["delta_mag_aper"][ok[i1a]]))
+            visit_cat["deltaAperDetector"][v_ind, d_ind] = delta_mag

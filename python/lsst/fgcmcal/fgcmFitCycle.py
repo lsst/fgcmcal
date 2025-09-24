@@ -167,6 +167,7 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
         instDims = ("instrument",)
         bandDims = ("instrument", "band")
         filterDims = ("instrument", "physical_filter")
+        filterDetectorDims = ("instrument", "physical_filter", "detector")
 
         inputAndOutputConnections = [
             ("FitParameters", "Catalog", "Catalog of fgcm fit parameters.", instDims),
@@ -330,7 +331,8 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                 ("I1R1_Plot", "Plot", "Plot of fgcm R1 vs. I1.", filterDims),
                 ("I1_Plot", "Plot", "Focal plane map of fgcm I1.", filterDims),
                 ("R1_Plot", "Plot", "Focal plane map of fgcm R1.", filterDims),
-                ("R1mI1_Plot", "Plot", "Focal plane map of fgcm R1 - I1.", filterDims),
+                ("R1mI1Matchscale_Plot", "Plot", "Focal plane map of fgcm R1 - I1.", filterDims),
+                ("R1mI1_Plot", "Plot", "Focal plane map of fgcm R1 - I1 (rescaled).", filterDims),
                 ("R1mI1_vs_mjd_Plot", "Plot", "R1 - I1 residuals vs. mjd.", filterDims),
                 ("CompareRedblueMirrorchrom_Plot",
                  "Plot",
@@ -358,9 +360,26 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                         "Plot",
                         "Plot of illumination Correction.",
                         filterDims,
-                    )
-                ]
+                    ),
+                ],
             )
+            if self.config.superStarPlotCcdResiduals:
+                plotConnections.extend(
+                    [
+                        (
+                            f"SuperstarResidual_{epoch}_Plot",
+                            "Plot",
+                            "Binned illumination correction residuals.",
+                            filterDetectorDims,
+                        ),
+                        (
+                            f"SuperstarResidualStd_{epoch}_Plot",
+                            "Plot",
+                            "Binned illumination correction residual stdev.",
+                            filterDetectorDims,
+                        ),
+                    ],
+                )
 
         if config.doMultipleCycles:
             # Multiple cycle run.
@@ -674,6 +693,13 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=int,
         default=3,
     )
+    ccdGrayFocalPlaneMaxStars = pexConfig.Field(
+        doc="Maximum number of stars to use for focal plane fit. Required to keep "
+            "matrix memory usage from running away. If there are more stars than "
+            "this then they will be down-sampled.",
+        dtype=int,
+        default=50_000,
+    )
     cycleNumber = pexConfig.Field(
         doc=("FGCM fit cycle number.  This is automatically incremented after each run "
              "and stage of outlier rejection.  See cookbook for details."),
@@ -837,6 +863,11 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
              "sufficient star observations (minStarPerCcd) on that CCD."),
         dtype=float,
         default=0.05,
+    )
+    aperCorrPerCcd = pexConfig.Field(
+        doc="Use aperture corrections per-ccd (detector) instead of per-visit?",
+        dtype=bool,
+        default=False,
     )
     aperCorrFitNBins = pexConfig.Field(
         doc=("Number of aperture bins used in aperture correction fit.  When set to 0"
@@ -1228,22 +1259,30 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                     handleDict['fgcmFitParameters'] = fgcmDatasetDict['fgcmFitParameters']
 
                 # Set up plot outputs.
-                # Note that nothing will go in the dict if doPlots is False.
+                # Note that because the plot outputConnections are skipped in
+                # the connections class if config.doPlot is False, this will be
+                # a no-op in that case.
                 plotHandleDict = {}
                 for outputRefName in outputRefs.keys():
                     if outputRefName.endswith("Plot") and f"Cycle{cycle}" in outputRefName:
-                        ref = getattr(outputRefs, outputRefName)
-                        if isinstance(ref, (tuple, list)):
-                            if "physical_filter" in ref[0].dimensions:
-                                for filterRef in ref:
-                                    handleDictKey = f"{outputRefName}_{filterRef.dataId['physical_filter']}"
-                                    plotHandleDict[handleDictKey] = filterRef
-                            if "band" in ref[0].dimensions:
-                                for bandRef in ref:
-                                    handleDictKey = f"{outputRefName}_{bandRef.dataId['band']}"
-                                    plotHandleDict[handleDictKey] = bandRef
+                        refs = getattr(outputRefs, outputRefName)
+                        if isinstance(refs, (tuple, list)):
+                            if "physical_filter" in refs[0].dimensions and "detector" in refs[0].dimensions:
+                                for ref in refs:
+                                    physical_filter = ref.dataId["physical_filter"]
+                                    detector = ref.dataId["detector"]
+                                    handleDictKey = f"{outputRefName}_{physical_filter}_{detector}"
+                                    plotHandleDict[handleDictKey] = ref
+                            elif "physical_filter" in refs[0].dimensions:
+                                for ref in refs:
+                                    handleDictKey = f"{outputRefName}_{ref.dataId['physical_filter']}"
+                                    plotHandleDict[handleDictKey] = ref
+                            elif "band" in refs[0].dimensions:
+                                for ref in refs:
+                                    handleDictKey = f"{outputRefName}_{ref.dataId['band']}"
+                                    plotHandleDict[handleDictKey] = ref
                         else:
-                            plotHandleDict[outputRefName] = ref
+                            plotHandleDict[outputRefName] = refs
 
                 fgcmDatasetDict, config = self._fgcmFitCycle(
                     camera,
@@ -1275,18 +1314,24 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             plotHandleDict = {}
             for outputRefName in outputRefs.keys():
                 if outputRefName.endswith("Plot") and f"Cycle{self.config.cycleNumber}" in outputRefName:
-                    ref = getattr(outputRefs, outputRefName)
-                    if isinstance(ref, (tuple, list)):
-                        if "physical_filter" in ref[0].dimensions:
-                            for filterRef in ref:
-                                handleDictKey = f"{outputRefName}_{filterRef.dataId['physical_filter']}"
-                                plotHandleDict[handleDictKey] = filterRef
-                        if "band" in ref[0].dimensions:
-                            for bandRef in ref:
-                                handleDictKey = f"{outputRefName}_{bandRef.dataId['band']}"
-                                plotHandleDict[handleDictKey] = bandRef
+                    refs = getattr(outputRefs, outputRefName)
+                    if isinstance(refs, (tuple, list)):
+                        if "physical_filter" in refs[0].dimensions and "detector" in refs[0].dimensions:
+                            for ref in refs:
+                                physical_filter = ref.dataId["physical_filter"]
+                                detector = ref.dataId["detector"]
+                                handleDictKey = f"{outputRefName}_{physical_filter}_{detector}"
+                                plotHandleDict[handleDictKey] = ref
+                        elif "physical_filter" in refs[0].dimensions:
+                            for ref in refs:
+                                handleDictKey = f"{outputRefName}_{ref.dataId['physical_filter']}"
+                                plotHandleDict[handleDictKey] = ref
+                        elif "band" in refs[0].dimensions:
+                            for ref in refs:
+                                handleDictKey = f"{outputRefName}_{ref.dataId['band']}"
+                                plotHandleDict[handleDictKey] = ref
                     else:
-                        plotHandleDict[outputRefName] = ref
+                        plotHandleDict[outputRefName] = refs
 
             fgcmDatasetDict, _ = self._fgcmFitCycle(
                 camera,
@@ -1401,8 +1446,19 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         fgcmExpInfo = translateVisitCatalog(visitCat)
         del visitCat
 
-        focalPlaneProjector = FocalPlaneProjector(camera,
-                                                  self.config.defaultCameraOrientation)
+        if len(camera) == fgcmLut.nCCD:
+            useScienceDetectors = False
+        else:
+            # If the LUT has a different number of detectors than
+            # the camera, then we only want to use science detectors
+            # in the focal plane projector.
+            useScienceDetectors = True
+
+        focalPlaneProjector = FocalPlaneProjector(
+            camera,
+            self.config.defaultCameraOrientation,
+            useScienceDetectors=useScienceDetectors,
+        )
 
         noFitsDict = {'lutIndex': lutIndexVals,
                       'lutStd': lutStd,

@@ -33,7 +33,7 @@ from lsst.daf.base.dateTime import DateTime
 from lsst.meas.algorithms.sourceSelector import sourceSelectorRegistry
 
 from .fgcmLoadReferenceCatalog import FgcmLoadReferenceCatalogTask
-from .utilities import computeReferencePixelScale
+from .utilities import computeReferencePixelScale, countDetectors
 
 import fgcm
 
@@ -230,16 +230,18 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         """
         raise NotImplementedError("fgcmMakeAllStarObservations not implemented.")
 
-    def fgcmMakeVisitCatalog(self, camera, groupedHandles):
+    def fgcmMakeVisitCatalog(self, camera, groupedHandles, useScienceDetectors=False):
         """
         Make a visit catalog with all the keys from each visit
 
         Parameters
         ----------
-        camera: `lsst.afw.cameraGeom.Camera`
-           Camera from the butler
-        groupedHandles: `dict` [`list` [`lsst.daf.butler.DeferredDatasetHandle`]]
+        camera : `lsst.afw.cameraGeom.Camera`
+            Camera from the butler
+        groupedHandles : `dict` [`list` [`lsst.daf.butler.DeferredDatasetHandle`]]
             Dataset handles, grouped by visit.
+        useScienceDetectors : `bool`, optional
+            Limit to science detectors?
 
         Returns
         -------
@@ -248,7 +250,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
 
         self.log.info("Assembling visitCatalog from %d visits", len(groupedHandles))
 
-        nCcd = len(camera)
+        nCcd = countDetectors(camera, useScienceDetectors)
 
         schema = self._makeFgcmVisitSchema(nCcd)
 
@@ -260,7 +262,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         visitCat['used'] = 0
         visitCat['sources_read'] = False
 
-        defaultPixelScale = computeReferencePixelScale(camera)
+        defaultPixelScale = computeReferencePixelScale(camera, useScienceDetectors=useScienceDetectors)
 
         # No matter what, fill the catalog. This will check if it was
         # already read.
@@ -344,7 +346,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             # Relative flat scaling (1.0 means no relative scaling)
             rec['scaling'][:] = 1.0
             # Median delta aperture, to be measured from stars
-            rec['deltaAper'] = 0.0
+            rec['deltaAper'] = -9999.0
+            rec['deltaAperDetector'][:] = -9999.0
             rec['psfSigma'] = psfSigma
             rec['psfFwhm'] = psfFwhm
             rec['skyBackground'] = skyBackground
@@ -577,6 +580,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         schema.addField('psfSigma', type=np.float32, doc="PSF sigma (median); pixels")
         schema.addField('psfFwhm', type=np.float32, doc="PSF FWHM (median); arcseconds")
         schema.addField('deltaAper', type=np.float32, doc="Delta-aperture")
+        schema.addField('deltaAperDetector', type='ArrayF', doc='Delta-aperture per detector', size=nCcd)
         schema.addField('skyBackground', type=np.float32, doc="Sky background (ADU) (reference CCD)")
         # the following field is not used yet
         schema.addField('deepFlag', type=np.int32, doc="Deep observation")
