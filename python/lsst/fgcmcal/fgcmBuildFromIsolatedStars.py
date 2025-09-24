@@ -37,12 +37,12 @@ from astropy.table import Table, vstack
 
 from fgcm.fgcmUtilities import objFlagDict, histogram_rev_sorted
 
+import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.pex.config as pexConfig
 import lsst.pipe.base as pipeBase
 from lsst.pipe.base import connectionTypes
 from lsst.meas.algorithms import ReferenceObjectLoader, LoadReferenceObjectsConfig
 from lsst.pipe.tasks.reserveIsolatedStars import ReserveIsolatedStarsTask
-import lsst.afw.cameraGeom as afwCameraGeom
 
 from .fgcmBuildStarsBase import FgcmBuildStarsConfigBase, FgcmBuildStarsBaseTask
 from .utilities import computeApproxPixelAreaFields, computeApertureRadiusFromName
@@ -214,7 +214,6 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             if tract not in isolated_star_source_handle_dict:
                 raise RuntimeError(f"tract {tract} in isolated_star_cats but not isolated_star_sources")
 
-        lookup_table_handle = input_ref_dict["fgcm_lookup_table"]
         if self.config.doReferenceMatches:
 
             # Prepare the reference catalog loader
@@ -238,6 +237,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                                      handle in input_ref_dict['visit_summaries']}
 
         camera = input_ref_dict["camera"]
+
+        lookup_table_handle = input_ref_dict["fgcm_lookup_table"]
 
         struct = self.run(
             camera=camera,
@@ -307,6 +308,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             # If the LUT has a different number of detectors than
             # the camera, then we only want to use science detectors
             # in the focal plane projector.
+            # Note that in the LUT building code we either have
+            # all detectors or only science detectors.
             use_science_detectors = True
         del lut_cat
 
@@ -466,16 +469,38 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 local_background = local_background_area*sources[self.config.localBackgroundFluxField]
                 good_sources &= ((sources[self.config.instFluxField] - local_background) > 0)
 
+            # We need to do this check as early as possible to
+            # ensure we can do the match test below.
             if good_sources.sum() == 0:
                 self.log.info("No good sources found in tract %d", tract)
                 continue
 
             # We also need to make sure that all sources are in the
-            # input list of visits.
-            visit_match, sources_match = esutil.numpy_util.match(visit_cat_table["visit"], sources["visit"])
-            missing_sources = np.ones(len(sources), dtype=np.bool_)
-            missing_sources[sources_match] = False
-            good_sources &= (~missing_sources)
+            # input list of visits and detectors.
+
+            detector_ids = []
+            for detector in camera:
+                if use_science_detectors:
+                    if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                        continue
+                detector_ids.append(detector.getId())
+
+            missing_sources1 = np.ones(len(sources), dtype=np.bool_)
+            _, sources_match = esutil.numpy_util.match(visit_cat_table["visit"], sources["visit"])
+            missing_sources1[sources_match] = False
+            good_sources &= (~missing_sources1)
+
+            missing_sources2 = np.ones(len(sources), dtype=np.bool_)
+            _, sources_match = esutil.numpy_util.match(detector_ids, sources["detector"])
+            missing_sources2[sources_match] = False
+            good_sources &= (~missing_sources2)
+
+            # Check again after further tests.
+            if good_sources.sum() == 0:
+                self.log.info("No good sources found in tract %d", tract)
+                continue
+
+            self.log.info("Tract %d contains %d good sources.", tract, good_sources.sum())
 
             # Need to count the observations of each star after cuts, per band.
             # If we have requiredBands specified, we must make sure that each star
@@ -616,7 +641,9 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 star_obs["inst_mag"][obs_match[use]] = (-2.5 * np.log10(scaled_inst_flux
                                                                         / exp_time[use]))
 
-            # Compute instMagErr from inst_flux_err/inst_flux; scaling will cancel out.
+            # Compute instMagErr from inst_flux_err/inst_flux.
+            # This does not need to be computed per-detector because there
+            # is no need for the per-detector scaling which cancels out.
             star_obs["inst_mag_err"] = k*(sources[self.config.instFluxField + "Err"]
                                           / sources[self.config.instFluxField])
 
@@ -853,6 +880,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
 
         n_detector = visit_cat.schema["deltaAperDetector"].asKey().getSize()
 
+        # This is a fast and clever way of doing a multi-dimensional grouping
+        # between visit + detector (hashed together).
         visit_detector_hash = visit_index * (n_detector + 1) + star_obs["detector"][ok]
 
         h, rev = histogram_rev_sorted(visit_detector_hash)
