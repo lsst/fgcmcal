@@ -346,8 +346,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             # Relative flat scaling (1.0 means no relative scaling)
             rec['scaling'][:] = 1.0
             # Median delta aperture, to be measured from stars
-            rec['deltaAper'] = 0.0
-            rec['deltaAperDetector'][:] = 0.0
+            rec['deltaAper'] = -9999.0
+            rec['deltaAperDetector'][:] = -9999.0
             rec['psfSigma'] = psfSigma
             rec['psfFwhm'] = psfFwhm
             rec['skyBackground'] = skyBackground
