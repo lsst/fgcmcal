@@ -758,7 +758,8 @@ class FgcmOutputProductsTask(pipeBase.PipelineTask):
         cannot_compute = fgcm.fgcmUtilities.zpFlagDict['CANNOT_COMPUTE_ZEROPOINT']
         selected = (((zptCat['fgcmFlag'] & cannot_compute) == 0)
                     & (zptCat['fgcmZptVar'] > 0.0)
-                    & (zptCat['fgcmZpt'] > FGCM_ILLEGAL_VALUE))
+                    & (zptCat['fgcmZpt'] > FGCM_ILLEGAL_VALUE)
+                    & (zptCat['fgcmfZptCheb'][:, 0] > 0.0))
 
         # Log warnings for any visit which has no valid zeropoints
         badVisits = np.unique(zptCat['visit'][~selected])
