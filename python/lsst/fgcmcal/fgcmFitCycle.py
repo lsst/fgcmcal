@@ -295,6 +295,10 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                  "Plot",
                  "Histograms for intrinsic scatter for reserved bright stars (after gray correction).",
                  bandDims),
+                ("SigmaFgcmReservedStarsCrunchedNonPhotom_Plot",
+                 "Plot",
+                 "Histograms for intrinsic scatter for reserved bright stars (including non-photometric).",
+                 bandDims),
                 ("SigmaFgcmPullsAllStars_Plot",
                  "Plot",
                  "Histograms for pulls for all bright stars.",
@@ -306,6 +310,10 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                 ("SigmaFgcmPullsReservedStarsCrunched_Plot",
                  "Plot",
                  "Histograms for pulls for reserved bright stars (after gray correction).",
+                 bandDims),
+                ("SigmaFgcmPullsReservedStarsCrunchedNonPhotom_Plot",
+                 "Plot",
+                 "Histograms for pulls for reserved bright stars (including non-photometric).",
                  bandDims),
                 ("SigmaCal_Plot",
                  "Plot",
@@ -658,7 +666,8 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
     )
     ccdGraySubCcdDict = pexConfig.DictField(
         doc=("Per-band specification on whether to compute achromatic per-ccd residual "
-             "('ccd gray') on a sub-ccd scale."),
+             "('ccd gray') on a sub-ccd scale. This will only be used as a fallback "
+             "if ``ccdGrayFocalPlaneDict[band]`` is set to True."),
         keytype=str,
         itemtype=bool,
         default={},
@@ -676,7 +685,11 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
     )
     ccdGrayFocalPlaneDict = pexConfig.DictField(
         doc=("Per-band specification on whether to compute focal-plane residual "
-             "('ccd gray') corrections."),
+             "('ccd gray') corrections. The focal-plane residuals will be used "
+             "instead of per-CCD residuals except when there are insufficient "
+             "good CCDs (see ``ccdGrayFocalPlaneFitMinCcd``). Therefore, this "
+             "is not recommended for large focal planes with non-photometric "
+             "exposures."),
         keytype=str,
         itemtype=bool,
         default={},
