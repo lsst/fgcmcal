@@ -588,13 +588,6 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=False,
     )
-    nCore = pexConfig.Field(
-        doc="Number of cores to use",
-        dtype=int,
-        default=4,
-        deprecated="Number of cores is deprecated as a config, and will be removed after v27. "
-                   "Please use ``pipetask run --cores-per-quantum`` instead.",
-    )
     nStarPerRun = pexConfig.Field(
         doc="Number of stars to run in each chunk",
         dtype=int,
