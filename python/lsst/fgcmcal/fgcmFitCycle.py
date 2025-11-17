@@ -600,6 +600,11 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=int,
         default=200000,
     )
+    nStarPerGrayRun = pexConfig.Field(
+        doc="Number of stars to run in each chunk (including gray correction).",
+        dtype=int,
+        default=50000,
+    )
     nExpPerRun = pexConfig.Field(
         doc="Number of exposures to run in each chunk",
         dtype=int,

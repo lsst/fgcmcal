@@ -62,6 +62,7 @@ config.minExpPerNight = 1
 config.minStarPerExp = 50
 # Allow calibration to work with small number of stars in processing batches.
 config.nStarPerRun = 50
+config.nStarPerGrayRun = 50
 config.nExpPerRun = 2
 # Define r-i color as the primary way to split by color.
 config.colorSplitBands = ['r', 'i']
