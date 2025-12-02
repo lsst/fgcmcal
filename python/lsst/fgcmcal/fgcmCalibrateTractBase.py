@@ -290,10 +290,13 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
         # Clear out some memory
         del fgcmStarIdCat
         del fgcmStarIndicesCat
+        del fgcmStarObservationCat
         del fgcmRefCat
 
         fgcmFitCycle.setLUT(fgcmLut)
         fgcmFitCycle.setStars(fgcmStars, fgcmPars)
+        fgcmFitCycle.setPars(fgcmPars)
+        fgcmFitCycle.finishSetup()
 
         converged = False
         cycleNumber = 0
@@ -314,14 +317,28 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
                                                                   previousParInfo,
                                                                   previousParams,
                                                                   previousSuperStar)
-                # We need to reset the star magnitudes and errors for the next
-                # cycle
-                fgcmFitCycle.fgcmStars.reloadStarMagnitudes(fgcmStarObservationCat['instMag'][obsIndex],
-                                                            fgcmStarObservationCat['instMagErr'][obsIndex])
-                fgcmFitCycle.initialCycle = False
 
-            fgcmFitCycle.setPars(fgcmPars)
-            fgcmFitCycle.finishSetup()
+                expGrayPhotometricCutDict = fgcmFitCycle.fgcmConfig.expGrayPhotometricCutDict
+                expGrayHighCutDict = fgcmFitCycle.fgcmConfig.expGrayHighCutDict
+                for i, key in enumerate(expGrayPhotometricCutDict.keys()):
+                    expGrayPhotometricCutDict[key] = float(fgcmFitCycle.updatedPhotometricCut[i])
+                    expGrayHighCutDict[key] = float(fgcmFitCycle.updatedHighCut[i])
+
+                fgcmFitCycle.updateConfigNextCycle(
+                    cycleNumber,
+                    resetParameters=True,
+                    outputStandards=False,
+                    outputZeropoints=False,
+                    freezeStdAtmosphere=False,
+                    expGrayPhotometricCutDict=expGrayPhotometricCutDict,
+                    expGrayHighCutDict=expGrayHighCutDict,
+                )
+
+                fgcmFitCycle.fgcmStars.reloadStarMagnitudes()
+                fgcmFitCycle.fgcmStars.computeAllNobs(fgcmPars)
+
+                fgcmFitCycle.setPars(fgcmPars)
+                fgcmFitCycle.finishReset()
 
             fgcmFitCycle.run()
 
@@ -343,10 +360,6 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
                 self.log.info("Raw repeatability has converged after cycle number %d." % (cycleNumber))
                 converged = True
             else:
-                fgcmFitCycle.fgcmConfig.expGrayPhotometricCut[:] = fgcmFitCycle.updatedPhotometricCut
-                fgcmFitCycle.fgcmConfig.expGrayHighCut[:] = fgcmFitCycle.updatedHighCut
-                fgcmFitCycle.fgcmConfig.precomputeSuperStarInitialCycle = False
-                fgcmFitCycle.fgcmConfig.freezeStdAtmosphere = False
                 previousReservedRawRepeatability[:] = fgcmFitCycle.fgcmPars.compReservedRawRepeatability
                 self.log.info("Setting exposure gray photometricity cuts to:")
                 for i, band in enumerate(fgcmFitCycle.fgcmPars.bands):
@@ -362,24 +375,34 @@ class FgcmCalibrateTractBaseTask(pipeBase.PipelineTask, abc.ABC):
             self.log.warning("Maximum number of fit cycles exceeded (%d) without convergence.", cycleNumber)
 
         # Do final clean-up iteration
-        fgcmFitCycle.fgcmConfig.freezeStdAtmosphere = False
-        fgcmFitCycle.fgcmConfig.resetParameters = False
-        fgcmFitCycle.fgcmConfig.maxIter = 0
-        fgcmFitCycle.fgcmConfig.outputZeropoints = True
-        fgcmFitCycle.fgcmConfig.outputStandards = True
-        fgcmFitCycle.fgcmConfig.doPlots = self.config.doDebuggingPlots
-        fgcmFitCycle.fgcmConfig.updateCycleNumber(cycleNumber)
-        fgcmFitCycle.initialCycle = False
+        expGrayPhotometricCutDict = fgcmFitCycle.fgcmConfig.expGrayPhotometricCutDict
+        expGrayHighCutDict = fgcmFitCycle.fgcmConfig.expGrayHighCutDict
+        for i, key in enumerate(expGrayPhotometricCutDict.keys()):
+            expGrayPhotometricCutDict[key] = float(fgcmFitCycle.updatedPhotometricCut[i])
+            expGrayHighCutDict[key] = float(fgcmFitCycle.updatedHighCut[i])
+
+        fgcmFitCycle.updateConfigNextCycle(
+            cycleNumber,
+            maxIter=0,
+            resetParameters=False,
+            outputStandards=True,
+            outputZeropoints=True,
+            freezeStdAtmosphere=False,
+            expGrayPhotometricCutDict=expGrayPhotometricCutDict,
+            expGrayHighCutDict=expGrayHighCutDict,
+        )
 
         fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
                                                           fgcmExpInfo,
                                                           previousParInfo,
                                                           previousParams,
                                                           previousSuperStar)
-        fgcmFitCycle.fgcmStars.reloadStarMagnitudes(fgcmStarObservationCat['instMag'][obsIndex],
-                                                    fgcmStarObservationCat['instMagErr'][obsIndex])
+
+        fgcmFitCycle.fgcmStars.reloadStarMagnitudes()
+        fgcmFitCycle.fgcmStars.computeAllNobs(fgcmPars)
+
         fgcmFitCycle.setPars(fgcmPars)
-        fgcmFitCycle.finishSetup()
+        fgcmFitCycle.finishReset()
 
         self.log.info("Running final clean-up fit cycle...")
         fgcmFitCycle.run()
