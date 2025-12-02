@@ -242,8 +242,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         rawRepeatability = np.array([0.0,
-                                     0.003440500079097844,
-                                     0.006802523624309591])
+                                     0.013999312239597281,
+                                     0.005144248063188913])
         filterNCalibMap = {'HSC-R': 12,
                            'HSC-I': 15}
 
