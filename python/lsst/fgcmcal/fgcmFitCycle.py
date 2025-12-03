@@ -589,12 +589,14 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         default=False,
     )
     nStarPerRun = pexConfig.Field(
-        doc="Number of stars to run in each chunk",
+        doc="Number of stars to run in each chunk. Larger values tend to be faster for large "
+            "datasets, at the expense of some memory overhead.",
         dtype=int,
         default=200000,
     )
     nStarPerGrayRun = pexConfig.Field(
-        doc="Number of stars to run in each chunk (including gray correction).",
+        doc="Number of stars to run in each chunk (including gray correction). Increasing this "
+            "value may increase the peak memory use significantly.",
         dtype=int,
         default=50000,
     )
@@ -1414,6 +1416,10 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             Is this part of a multicycle run?
         fgcmMultiCycleObjects : `dict`, optional
             Dictionary of multi cycle objects from previous cycle.
+            This should be blank on first call; subsequent calls will use
+            the dictionary returned from the previous call. The keys include
+            ``fgcmFitCycle`` (the primary fgcm fit object) and ``fgcmExpInfo``
+            (information about each exposure/visit).
 
         Returns
         -------
@@ -1423,6 +1429,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             Configuration object for next cycle.
         fgcmMultiCycleObjects : `dict`, optional
             Dictionary of multi cycle objects; returned if multicycle is True.
+            To be passed to next call of this method (see Parameters above).
         """
         if config is not None:
             _config = config
@@ -1430,7 +1437,6 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             _config = self.config
 
         if multiCycle and not self.multiCycleLoaded:
-            self.log.info("Resetting multicycle objects")
             fgcmMultiCycleObjects = {}
 
         # Set defaults on whether to output standards and zeropoints
