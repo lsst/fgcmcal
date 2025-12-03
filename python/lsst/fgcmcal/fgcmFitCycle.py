@@ -588,17 +588,17 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=False,
     )
-    nCore = pexConfig.Field(
-        doc="Number of cores to use",
-        dtype=int,
-        default=4,
-        deprecated="Number of cores is deprecated as a config, and will be removed after v27. "
-                   "Please use ``pipetask run --cores-per-quantum`` instead.",
-    )
     nStarPerRun = pexConfig.Field(
-        doc="Number of stars to run in each chunk",
+        doc="Number of stars to run in each chunk. Larger values tend to be faster for large "
+            "datasets, at the expense of some memory overhead.",
         dtype=int,
         default=200000,
+    )
+    nStarPerGrayRun = pexConfig.Field(
+        doc="Number of stars to run in each chunk (including gray correction). Increasing this "
+            "value may increase the peak memory use significantly.",
+        dtype=int,
+        default=50000,
     )
     nExpPerRun = pexConfig.Field(
         doc="Number of exposures to run in each chunk",
@@ -1233,6 +1233,8 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
     def __init__(self, initInputs=None, **kwargs):
         super().__init__(**kwargs)
 
+        self.multiCycleLoaded = False
+
     def runQuantum(self, butlerQC, inputRefs, outputRefs):
         camera = butlerQC.get(inputRefs.camera)
 
@@ -1259,6 +1261,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             handleDict['fgcmFitParameters'] = butlerQC.get(inputRefs.fgcmFitParametersInput)
 
         fgcmDatasetDict = None
+        fgcmMultiCycleObjects = None
         if self.config.doMultipleCycles:
             # Run multiple cycles at once.
             config = copy.copy(self.config)
@@ -1297,13 +1300,14 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                         else:
                             plotHandleDict[outputRefName] = refs
 
-                fgcmDatasetDict, config = self._fgcmFitCycle(
+                fgcmDatasetDict, config, fgcmMultiCycleObjects = self._fgcmFitCycle(
                     camera,
                     handleDict,
                     butlerQC=butlerQC,
                     plotHandleDict=plotHandleDict,
                     config=config,
                     nCore=nCore,
+                    fgcmMultiCycleObjects=fgcmMultiCycleObjects,
                 )
                 butlerQC.put(fgcmDatasetDict['fgcmFitParameters'],
                              getattr(outputRefs, f'fgcm_Cycle{cycle}_FitParameters'))
@@ -1372,6 +1376,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         config=None,
         nCore=1,
         multiCycle=True,
+        fgcmMultiCycleObjects=None,
     ):
         """
         Run the fit cycle
@@ -1409,16 +1414,30 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             Number of cores to use during fitting.
         multiCycle : `bool`, optional
             Is this part of a multicycle run?
+        fgcmMultiCycleObjects : `dict`, optional
+            Dictionary of multi cycle objects from previous cycle.
+            This should be blank on first call; subsequent calls will use
+            the dictionary returned from the previous call. The keys include
+            ``fgcmFitCycle`` (the primary fgcm fit object) and ``fgcmExpInfo``
+            (information about each exposure/visit).
 
         Returns
         -------
         fgcmDatasetDict : `dict`
             Dictionary of datasets to persist.
+        config : `lsst.pex.config.Config`
+            Configuration object for next cycle.
+        fgcmMultiCycleObjects : `dict`, optional
+            Dictionary of multi cycle objects; returned if multicycle is True.
+            To be passed to next call of this method (see Parameters above).
         """
         if config is not None:
             _config = config
         else:
             _config = self.config
+
+        if multiCycle and not self.multiCycleLoaded:
+            fgcmMultiCycleObjects = {}
 
         # Set defaults on whether to output standards and zeropoints
         self.maxIter = _config.maxIterBeforeFinalCycle
@@ -1435,11 +1454,6 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
             self.outputZeropoints = True
             self.resetFitParameters = False
 
-        lutCat = handleDict['fgcmLookUpTable'].get()
-        fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat,
-                                                         dict(_config.physicalFilterMap))
-        del lutCat
-
         # Check if we want to do plots.
         doPlots = _config.doPlots
         if doPlots and multiCycle:
@@ -1447,210 +1461,286 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                and not _config.doPlotsBeforeFinalCycles:
                 doPlots = False
 
-        configDict = makeConfigDict(_config, self.log, camera,
-                                    self.maxIter, self.resetFitParameters,
-                                    self.outputZeropoints,
-                                    lutIndexVals[0]['FILTERNAMES'],
-                                    nCore=nCore,
-                                    doPlots=doPlots)
+        if not self.multiCycleLoaded:
+            lutCat = handleDict['fgcmLookUpTable'].get()
+            fgcmLut, lutIndexVals, lutStd = translateFgcmLut(lutCat,
+                                                             dict(_config.physicalFilterMap))
+            del lutCat
 
-        # next we need the exposure/visit information
-        visitCat = handleDict['fgcmVisitCatalog'].get()
-        fgcmExpInfo = translateVisitCatalog(visitCat)
-        del visitCat
+            filterNames = lutIndexVals[0]['FILTERNAMES']
 
-        if len(camera) == fgcmLut.nCCD:
-            useScienceDetectors = False
+            configDict = makeConfigDict(
+                _config,
+                self.log,
+                camera,
+                self.maxIter,
+                self.resetFitParameters,
+                self.outputZeropoints,
+                filterNames,
+                nCore=nCore,
+                doPlots=doPlots,
+            )
+
+            visitCat = handleDict['fgcmVisitCatalog'].get()
+            fgcmExpInfo = translateVisitCatalog(visitCat)
+            del visitCat
+
+            if len(camera) == fgcmLut.nCCD:
+                useScienceDetectors = False
+            else:
+                # If the LUT has a different number of detectors than
+                # the camera, then we only want to use science detectors
+                # in the focal plane projector.
+                useScienceDetectors = True
+
+            self.log.info("Loading focal plane projector")
+            focalPlaneProjector = FocalPlaneProjector(
+                camera,
+                self.config.defaultCameraOrientation,
+                useScienceDetectors=useScienceDetectors,
+            )
+
+            noFitsDict = {
+                'lutIndex': lutIndexVals,
+                'lutStd': lutStd,
+                'expInfo': fgcmExpInfo,
+                'focalPlaneProjector': focalPlaneProjector,
+            }
+
+            fgcmFitCycle = fgcm.FgcmFitCycle(
+                configDict,
+                useFits=False,
+                noFitsDict=noFitsDict,
+                noOutput=True,
+                butlerQC=butlerQC,
+                plotHandleDict=plotHandleDict,
+            )
+
+            if fgcmFitCycle.initialCycle:
+                # cycle = 0, initial cycle
+                fgcmPars = fgcm.FgcmParameters.newParsWithArrays(
+                    fgcmFitCycle.fgcmConfig,
+                    fgcmLut,
+                    fgcmExpInfo,
+                    butlerQC=butlerQC,
+                    plotHandleDict=plotHandleDict,
+                )
+            else:
+                if isinstance(handleDict['fgcmFitParameters'], afwTable.BaseCatalog):
+                    parCat = handleDict['fgcmFitParameters']
+                else:
+                    parCat = handleDict['fgcmFitParameters'].get()
+                inParInfo, inParams, inSuperStar = self._loadParameters(parCat)
+                del parCat
+
+                fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(
+                    fgcmFitCycle.fgcmConfig,
+                    fgcmExpInfo,
+                    inParInfo,
+                    inParams,
+                    inSuperStar,
+                    butlerQC=butlerQC,
+                    plotHandleDict=plotHandleDict,
+                )
+
+            fgcmStars = fgcm.FgcmStars(
+                fgcmFitCycle.fgcmConfig,
+                butlerQC=butlerQC,
+                plotHandleDict=plotHandleDict,
+            )
+
+            starObs = handleDict['fgcmStarObservations'].get()
+            starIds = handleDict['fgcmStarIds'].get()
+            if not self.config.useParquetCatalogFormat:
+                starIndices = handleDict['fgcmStarIndices'].get()
+            else:
+                starIndices = None
+
+            # grab the flagged stars if available
+            if 'fgcmFlaggedStars' in handleDict:
+                if isinstance(handleDict['fgcmFlaggedStars'], afwTable.BaseCatalog):
+                    flaggedStars = handleDict['fgcmFlaggedStars']
+                else:
+                    flaggedStars = handleDict['fgcmFlaggedStars'].get()
+                flagId = flaggedStars['objId'][:]
+                flagFlag = flaggedStars['objFlag'][:]
+
+                del flaggedStars
+            elif self.config.useParquetCatalogFormat:
+                # If we are using the parquet catalog format, then that means that
+                # reserved stars have already been flagged.  We extract the flags here
+                # to input to fgcm, which will then be persisted (with additional
+                # quality flags) as the fgcmFlaggedStars datatype in subsequent
+                # fit cycles.
+                flagged = (starIds['obj_flag'] > 0)
+                flagId = starIds['fgcm_id'][flagged]
+                flagFlag = starIds['obj_flag'][flagged]
+            else:
+                flagId = None
+                flagFlag = None
+
+            if _config.doReferenceCalibration:
+                refStars = handleDict['fgcmReferenceStars'].get()
+
+                refMag, refMagErr = extractReferenceMags(
+                    refStars,
+                    _config.bands,
+                    _config.physicalFilterMap,
+                )
+
+                refId = refStars['fgcm_id'][:]
+            else:
+                refStars = None
+                refId = None
+                refMag = None
+                refMagErr = None
+
+            # match star observations to visits
+            # Only those star observations that match visits from fgcmExpInfo['VISIT'] will
+            # actually be transferred into fgcm using the indexing below.
+            if self.config.useParquetCatalogFormat:
+                visitIndex = np.searchsorted(fgcmExpInfo['VISIT'], starObs['visit'])
+            else:
+                visitIndex = np.searchsorted(fgcmExpInfo['VISIT'], starObs['visit'][starIndices['obsIndex']])
+
+                # The fgcmStars.loadStars method will copy all the star
+                # information into special shared memory objects that will
+                # not blow up the memory usage when used with python
+                # multiprocessing.  Once all the numbers are copied, it is
+                # necessary to release all references to the objects that
+                # previously stored the data to ensure that the garbage
+                # collector can clear the memory, and ensure that this
+                # memory is not copied when multiprocessing kicks in.
+
+            if self.config.useParquetCatalogFormat:
+                # Note that the ra/dec coordinates for the parquet format are in
+                # degrees, which is what fgcm expects.
+                self.log.info("Loading stars and such")
+                fgcmStars.loadStars(
+                    fgcmPars,
+                    starObs['visit'][:],
+                    starObs['detector'][:],
+                    starObs['ra'][:],
+                    starObs['dec'][:],
+                    starObs['inst_mag'][:],
+                    starObs['inst_mag_err'][:],
+                    fgcmExpInfo['FILTERNAME'][visitIndex],
+                    starIds['fgcm_id'][:],
+                    starIds['ra'][:],
+                    starIds['dec'][:],
+                    starIds['obs_arr_index'][:],
+                    starIds['n_obs'][:],
+                    obsX=starObs['x'][:],
+                    obsY=starObs['y'][:],
+                    obsDeltaMagBkg=starObs['delta_mag_bkg'][:],
+                    obsDeltaAper=starObs['delta_mag_aper'][:],
+                    refID=refId,
+                    refMag=refMag,
+                    refMagErr=refMagErr,
+                    flagID=flagId,
+                    flagFlag=flagFlag,
+                    computeNobs=True,
+                    objIDAlternate=starIds['isolated_star_id'],
+                )
+            else:
+                # We determine the conversion from the native units
+                # (typically radians) to degrees for the first star.
+                # This allows us to treat coord_ra/coord_dec as
+                # numpy arrays rather than Angles, which would we
+                # approximately 600x slower.
+                conv = starObs[0]['ra'].asDegrees() / float(starObs[0]['ra'])
+
+                fgcmStars.loadStars(
+                    fgcmPars,
+                    starObs['visit'][starIndices['obsIndex']],
+                    starObs['ccd'][starIndices['obsIndex']],
+                    starObs['ra'][starIndices['obsIndex']] * conv,
+                    starObs['dec'][starIndices['obsIndex']] * conv,
+                    starObs['instMag'][starIndices['obsIndex']],
+                    starObs['instMagErr'][starIndices['obsIndex']],
+                    fgcmExpInfo['FILTERNAME'][visitIndex],
+                    starIds['fgcm_id'][:],
+                    starIds['ra'][:],
+                    starIds['dec'][:],
+                    starIds['obsArrIndex'][:],
+                    starIds['nObs'][:],
+                    obsX=starObs['x'][starIndices['obsIndex']],
+                    obsY=starObs['y'][starIndices['obsIndex']],
+                    obsDeltaMagBkg=starObs['deltaMagBkg'][starIndices['obsIndex']],
+                    obsDeltaAper=starObs['deltaMagAper'][starIndices['obsIndex']],
+                    psfCandidate=starObs['psf_candidate'][starIndices['obsIndex']],
+                    refID=refId,
+                    refMag=refMag,
+                    refMagErr=refMagErr,
+                    flagID=flagId,
+                    flagFlag=flagFlag,
+                    computeNobs=True,
+                )
+
+            # Release all references to temporary objects holding star data
+            # (see above)
+            del starObs
+            del starIds
+            del starIndices
+            del flagId
+            del flagFlag
+            del refStars
+            del refId
+            del refMag
+            del refMagErr
+
+            fgcmFitCycle.setLUT(fgcmLut)
+            fgcmFitCycle.setStars(fgcmStars, fgcmPars)
+
+            if multiCycle:
+                fgcmMultiCycleObjects["fgcmFitCycle"] = fgcmFitCycle
+                fgcmMultiCycleObjects["fgcmExpInfo"] = fgcmExpInfo
+
+            fgcmFitCycle.setPars(fgcmPars)
+            fgcmFitCycle.finishSetup()
         else:
-            # If the LUT has a different number of detectors than
-            # the camera, then we only want to use science detectors
-            # in the focal plane projector.
-            useScienceDetectors = True
+            # We already have an fgcmFitCycle object loaded.
+            fgcmFitCycle = fgcmMultiCycleObjects["fgcmFitCycle"]
+            fgcmExpInfo = fgcmMultiCycleObjects["fgcmExpInfo"]
 
-        focalPlaneProjector = FocalPlaneProjector(
-            camera,
-            self.config.defaultCameraOrientation,
-            useScienceDetectors=useScienceDetectors,
-        )
+            # Update configs.
+            self.log.info("Updating fgcm configuration for cycle %d", _config.cycleNumber)
+            fgcmFitCycle.updateConfigNextCycle(
+                _config.cycleNumber,
+                maxIter=self.maxIter,
+                resetParameters=self.resetFitParameters,
+                outputStandards=self.outputStandards,
+                outputZeropoints=self.outputZeropoints,
+                freezeStdAtmosphere=_config.freezeStdAtmosphere,
+                expGrayPhotometricCutDict=dict(_config.expGrayPhotometricCutDict),
+                expGrayHighCutDict=dict(_config.expGrayHighCutDict),
+            )
 
-        noFitsDict = {'lutIndex': lutIndexVals,
-                      'lutStd': lutStd,
-                      'expInfo': fgcmExpInfo,
-                      'focalPlaneProjector': focalPlaneProjector}
-
-        # set up the fitter object
-        fgcmFitCycle = fgcm.FgcmFitCycle(
-            configDict,
-            useFits=False,
-            noFitsDict=noFitsDict,
-            noOutput=True,
-            butlerQC=butlerQC,
-            plotHandleDict=plotHandleDict,
-        )
-
-        # create the parameter object
-        if (fgcmFitCycle.initialCycle):
-            # cycle = 0, initial cycle
-            fgcmPars = fgcm.FgcmParameters.newParsWithArrays(fgcmFitCycle.fgcmConfig,
-                                                             fgcmLut,
-                                                             fgcmExpInfo,
-                                                             butlerQC=butlerQC,
-                                                             plotHandleDict=plotHandleDict)
-        else:
+            # Reload parameters.
             if isinstance(handleDict['fgcmFitParameters'], afwTable.BaseCatalog):
                 parCat = handleDict['fgcmFitParameters']
             else:
                 parCat = handleDict['fgcmFitParameters'].get()
             inParInfo, inParams, inSuperStar = self._loadParameters(parCat)
             del parCat
-            fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(fgcmFitCycle.fgcmConfig,
-                                                              fgcmExpInfo,
-                                                              inParInfo,
-                                                              inParams,
-                                                              inSuperStar,
-                                                              butlerQC=butlerQC,
-                                                              plotHandleDict=plotHandleDict)
 
-        # set up the stars...
-        fgcmStars = fgcm.FgcmStars(fgcmFitCycle.fgcmConfig, butlerQC=butlerQC, plotHandleDict=plotHandleDict)
+            fgcmPars = fgcm.FgcmParameters.loadParsWithArrays(
+                fgcmFitCycle.fgcmConfig,
+                fgcmExpInfo,
+                inParInfo,
+                inParams,
+                inSuperStar,
+                butlerQC=butlerQC,
+                plotHandleDict=plotHandleDict,
+            )
 
-        starObs = handleDict['fgcmStarObservations'].get()
-        starIds = handleDict['fgcmStarIds'].get()
-        if not self.config.useParquetCatalogFormat:
-            starIndices = handleDict['fgcmStarIndices'].get()
-        else:
-            starIndices = None
+            # Reset star magnitudes.
+            fgcmFitCycle.fgcmStars.reloadStarMagnitudes()
+            fgcmFitCycle.fgcmStars.computeAllNobs(fgcmPars)
 
-        # grab the flagged stars if available
-        if 'fgcmFlaggedStars' in handleDict:
-            if isinstance(handleDict['fgcmFlaggedStars'], afwTable.BaseCatalog):
-                flaggedStars = handleDict['fgcmFlaggedStars']
-            else:
-                flaggedStars = handleDict['fgcmFlaggedStars'].get()
-            flagId = flaggedStars['objId'][:]
-            flagFlag = flaggedStars['objFlag'][:]
+            fgcmFitCycle.setPars(fgcmPars)
+            fgcmFitCycle.finishReset(butlerQC=butlerQC, plotHandleDict=plotHandleDict)
 
-            del flaggedStars
-        elif self.config.useParquetCatalogFormat:
-            # If we are using the parquet catalog format, then that means that
-            # reserved stars have already been flagged.  We extract the flags here
-            # to input to fgcm, which will then be persisted (with additional
-            # quality flags) as the fgcmFlaggedStars datatype in subsequent
-            # fit cycles.
-            (flagged,) = (starIds['obj_flag'] > 0).nonzero()
-            flagId = starIds['fgcm_id'][flagged]
-            flagFlag = starIds['obj_flag'][flagged]
-        else:
-            flagId = None
-            flagFlag = None
-
-        if _config.doReferenceCalibration:
-            refStars = handleDict['fgcmReferenceStars'].get()
-
-            refMag, refMagErr = extractReferenceMags(refStars,
-                                                     _config.bands,
-                                                     _config.physicalFilterMap)
-
-            refId = refStars['fgcm_id'][:]
-        else:
-            refStars = None
-            refId = None
-            refMag = None
-            refMagErr = None
-
-        # match star observations to visits
-        # Only those star observations that match visits from fgcmExpInfo['VISIT'] will
-        # actually be transferred into fgcm using the indexing below.
-        if self.config.useParquetCatalogFormat:
-            visitIndex = np.searchsorted(fgcmExpInfo['VISIT'], starObs['visit'])
-        else:
-            visitIndex = np.searchsorted(fgcmExpInfo['VISIT'], starObs['visit'][starIndices['obsIndex']])
-
-        # The fgcmStars.loadStars method will copy all the star information into
-        # special shared memory objects that will not blow up the memory usage when
-        # used with python multiprocessing.  Once all the numbers are copied,
-        # it is necessary to release all references to the objects that previously
-        # stored the data to ensure that the garbage collector can clear the memory,
-        # and ensure that this memory is not copied when multiprocessing kicks in.
-
-        if self.config.useParquetCatalogFormat:
-            # Note that the ra/dec coordinates for the parquet format are in
-            # degrees, which is what fgcm expects.
-            fgcmStars.loadStars(fgcmPars,
-                                starObs['visit'][:],
-                                starObs['detector'][:],
-                                starObs['ra'][:],
-                                starObs['dec'][:],
-                                starObs['inst_mag'][:],
-                                starObs['inst_mag_err'][:],
-                                fgcmExpInfo['FILTERNAME'][visitIndex],
-                                starIds['fgcm_id'][:],
-                                starIds['ra'][:],
-                                starIds['dec'][:],
-                                starIds['obs_arr_index'][:],
-                                starIds['n_obs'][:],
-                                obsX=starObs['x'][:],
-                                obsY=starObs['y'][:],
-                                obsDeltaMagBkg=starObs['delta_mag_bkg'][:],
-                                obsDeltaAper=starObs['delta_mag_aper'][:],
-                                refID=refId,
-                                refMag=refMag,
-                                refMagErr=refMagErr,
-                                flagID=flagId,
-                                flagFlag=flagFlag,
-                                computeNobs=True,
-                                objIDAlternate=starIds['isolated_star_id'])
-        else:
-            # We determine the conversion from the native units (typically radians) to
-            # degrees for the first star.  This allows us to treat coord_ra/coord_dec as
-            # numpy arrays rather than Angles, which would we approximately 600x slower.
-            conv = starObs[0]['ra'].asDegrees() / float(starObs[0]['ra'])
-
-            fgcmStars.loadStars(fgcmPars,
-                                starObs['visit'][starIndices['obsIndex']],
-                                starObs['ccd'][starIndices['obsIndex']],
-                                starObs['ra'][starIndices['obsIndex']] * conv,
-                                starObs['dec'][starIndices['obsIndex']] * conv,
-                                starObs['instMag'][starIndices['obsIndex']],
-                                starObs['instMagErr'][starIndices['obsIndex']],
-                                fgcmExpInfo['FILTERNAME'][visitIndex],
-                                starIds['fgcm_id'][:],
-                                starIds['ra'][:],
-                                starIds['dec'][:],
-                                starIds['obsArrIndex'][:],
-                                starIds['nObs'][:],
-                                obsX=starObs['x'][starIndices['obsIndex']],
-                                obsY=starObs['y'][starIndices['obsIndex']],
-                                obsDeltaMagBkg=starObs['deltaMagBkg'][starIndices['obsIndex']],
-                                obsDeltaAper=starObs['deltaMagAper'][starIndices['obsIndex']],
-                                psfCandidate=starObs['psf_candidate'][starIndices['obsIndex']],
-                                refID=refId,
-                                refMag=refMag,
-                                refMagErr=refMagErr,
-                                flagID=flagId,
-                                flagFlag=flagFlag,
-                                computeNobs=True)
-
-        # Release all references to temporary objects holding star data (see above)
-        del starObs
-        del starIds
-        del starIndices
-        del flagId
-        del flagFlag
-        del refStars
-        del refId
-        del refMag
-        del refMagErr
-
-        # and set the bits in the cycle object
-        fgcmFitCycle.setLUT(fgcmLut)
-        fgcmFitCycle.setStars(fgcmStars, fgcmPars)
-        fgcmFitCycle.setPars(fgcmPars)
-
-        # finish the setup
-        fgcmFitCycle.finishSetup()
-
-        # and run
         fgcmFitCycle.run()
 
         ##################
@@ -1693,9 +1783,15 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                 self.log.info("If you are satisfied with the fit, please set:")
                 self.log.info("   config.isFinalCycle = True")
 
-        fgcmFitCycle.freeSharedMemory()
+        if not multiCycle or config.isFinalCycle:
+            fgcmFitCycle.freeSharedMemory()
 
-        return fgcmDatasetDict, outConfig
+        if multiCycle:
+            self.multiCycleLoaded = True
+
+            return fgcmDatasetDict, outConfig, fgcmMultiCycleObjects
+        else:
+            return fgcmDatasetDict, outConfig
 
     def _loadParameters(self, parCat):
         """

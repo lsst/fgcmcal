@@ -66,14 +66,14 @@ class FgcmcalTestBase(object):
 
         # Make the repo and retrieve a writeable Butler
         _ = dafButler.Butler.makeRepo(cls.repo)
-        butler = dafButler.Butler(cls.repo, writeable=True)
-        # Register the instrument
-        instrInstance = pipeBase.Instrument.from_string(instrument)
-        instrInstance.register(butler.registry)
-        # Import the exportFile
-        butler.import_(directory=exportPath, filename=exportFile,
-                       transfer='symlink',
-                       skip_dimensions={'instrument', 'detector', 'physical_filter'})
+        with dafButler.Butler.from_config(cls.repo, writeable=True) as butler:
+            # Register the instrument
+            instrInstance = pipeBase.Instrument.from_string(instrument)
+            instrInstance.register(butler.registry)
+            # Import the exportFile
+            butler.import_(directory=exportPath, filename=exportFile,
+                           transfer='symlink',
+                           skip_dimensions={'instrument', 'detector', 'physical_filter'})
 
     def _runPipeline(self, repo, pipelineFile, queryString='',
                      inputCollections=None, outputCollection=None,
@@ -120,6 +120,7 @@ class FgcmcalTestBase(object):
         butler = SimplePipelineExecutor.prep_butler(repo,
                                                     inputs=inputCollections,
                                                     output=outputCollection)
+        self.enterContext(butler)
         pipeline = Pipeline.fromFile(pipelineFile)
         for taskName, fileList in configFiles.items():
             for fileName in fileList:
@@ -176,6 +177,7 @@ class FgcmcalTestBase(object):
 
         # Check output values
         butler = dafButler.Butler(self.repo)
+        self.enterContext(butler)
         lutCat = butler.get('fgcmLookUpTable',
                             collections=[outputCollection],
                             instrument=instName)
@@ -282,6 +284,7 @@ class FgcmcalTestBase(object):
                           registerDatasetTypes=True)
 
         butler = dafButler.Butler(self.repo)
+        self.enterContext(butler)
 
         visitCat = butler.get('fgcmVisitCatalog', collections=[outputCollection],
                               instrument=instName)
@@ -337,6 +340,7 @@ class FgcmcalTestBase(object):
                           registerDatasetTypes=True)
 
         butler = dafButler.Butler(self.repo)
+        self.enterContext(butler)
 
         visitCat = butler.get('fgcmVisitCatalog', collections=[outputCollection],
                               instrument=instName)
@@ -402,6 +406,7 @@ class FgcmcalTestBase(object):
             # pipetask command-line interface, but not by the python
             # API.
             butler = dafButler.Butler(self.repo)
+            self.enterContext(butler)
             inputCollections = list(butler.registry.getCollectionChain(outputCollection))
 
         cwd = os.getcwd()
@@ -429,6 +434,7 @@ class FgcmcalTestBase(object):
             return
 
         butler = dafButler.Butler(self.repo)
+        self.enterContext(butler)
 
         # Check that the expected number of plots are there.
         plotDatasets = list(butler.registry.queryDatasets(
@@ -510,6 +516,7 @@ class FgcmcalTestBase(object):
                           registerDatasetTypes=True)
 
         butler = dafButler.Butler(self.repo, collections=[outputCollection], instrument=instName)
+        self.enterContext(butler)
         offsetCat = butler.get('fgcmReferenceCalibrationOffsets')
         offsets = offsetCat['offset'][:]
         self.assertFloatsAlmostEqual(offsets, zpOffsets, atol=1e-6)
@@ -733,6 +740,7 @@ class FgcmcalTestBase(object):
         )
 
         butler = dafButler.Butler(self.repo)
+        self.enterContext(butler)
 
         # Check for illumination correction files.
         illumCorrRefs = butler.query_datasets(
@@ -822,6 +830,7 @@ class FgcmcalTestBase(object):
         os.chdir(cwd)
 
         butler = dafButler.Butler(self.repo)
+        self.enterContext(butler)
 
         offsetCat = butler.get('fgcmReferenceCalibrationOffsets',
                                collections=[outputCollection], instrument=instName)
@@ -928,6 +937,7 @@ class FgcmcalTestBase(object):
                           registerDatasetTypes=True)
 
         butler = dafButler.Butler(self.repo)
+        self.enterContext(butler)
 
         whereClause = f"instrument='{instName:s}' and tract={tract:d} and skymap='{skymapName:s}'"
 
