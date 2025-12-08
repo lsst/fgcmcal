@@ -211,6 +211,8 @@ class FgcmcalTestLatiss(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCa
             "band IN ('g', 'r', 'i')",
             visits,
             zpOffsets,
+            54,
+            46,
             refcatCollection="refcats/DM-33444",
         )
 
