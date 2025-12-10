@@ -765,6 +765,7 @@ class FgcmcalTestBase(object):
         self.assertEqual(testCorr.getDetector().getId(), illumCorrRefs[0].dataId["detector"])
 
     def _testFgcmMultiFit(self, instName, testName, queryString, visits, zpOffsets,
+                          nPlotsPenultimateCycle, nPlotsFinalCycle,
                           refcatCollection="refcats/gen2"):
         """Test running the full pipeline with multiple fit cycles.
 
@@ -780,6 +781,10 @@ class FgcmcalTestBase(object):
             List of visits to calibrate.
         zpOffsets : `np.ndarray`
             Zeropoint offsets expected.
+        nPlotsPenultimateCycle : `int`
+            Number of plots expected in penultimate cycle.
+        nPlotsFinalCycle : `int`
+            Number of plots expected in final cycle.
         refcatCollection : `str`, optional
             Name of reference catalog collection.
         """
@@ -831,6 +836,23 @@ class FgcmcalTestBase(object):
 
         butler = dafButler.Butler(self.repo)
         self.enterContext(butler)
+
+        # Check that the expected number of plots are there.
+        config = butler.get("fgcmFitCycle_config", collections=[outputCollection])
+
+        cycleNumber = config.multipleCyclesFinalCycleNumber - 1
+        plotDatasets = list(butler.registry.queryDatasets(
+            f"fgcm_Cycle{cycleNumber}_*Plot",
+            collections=[outputCollection],
+        ))
+        self.assertEqual(len(plotDatasets), nPlotsPenultimateCycle)
+
+        cycleNumber = config.multipleCyclesFinalCycleNumber
+        plotDatasets = list(butler.registry.queryDatasets(
+            f"fgcm_Cycle{cycleNumber}_*Plot",
+            collections=[outputCollection],
+        ))
+        self.assertEqual(len(plotDatasets), nPlotsFinalCycle)
 
         offsetCat = butler.get('fgcmReferenceCalibrationOffsets',
                                collections=[outputCollection], instrument=instName)

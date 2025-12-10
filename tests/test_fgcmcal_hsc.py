@@ -223,7 +223,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I') and skymap='hsc_rings_v1'",
-                               visits, zpOffsets)
+                               visits, zpOffsets, 118, 57)
 
     def test_fgcmcalTractPipeline(self):
         # Set numpy seed for stability
