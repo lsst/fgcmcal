@@ -1714,6 +1714,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                 freezeStdAtmosphere=_config.freezeStdAtmosphere,
                 expGrayPhotometricCutDict=dict(_config.expGrayPhotometricCutDict),
                 expGrayHighCutDict=dict(_config.expGrayHighCutDict),
+                doPlots=_config.doPlots,
             )
 
             # Reload parameters.
