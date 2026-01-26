@@ -445,7 +445,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             ("isolated_star_id", "i8"),
             ("ra", "f8"),
             ("dec", "f8"),
-            ("obs_arr_index", "i4"),
+            ("obs_arr_index", "i8"),
             ("n_obs", "i4"),
             ("obj_flag", "i4"),
         ]
