@@ -653,14 +653,14 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
 
             # We now reformat the stars and compute the ''objects'' that fgcm expects.
             fgcm_obj = Table(data=np.zeros(len(stars), dtype=fgcm_obj_dtype))
-            fgcm_obj["isolated_star_id"] = stars["isolated_star_id"]
-            fgcm_obj["ra"] = stars["ra"]
-            fgcm_obj["dec"] = stars["dec"]
-            fgcm_obj["obs_arr_index"] = stars["source_cat_index"]
-            fgcm_obj["n_obs"] = stars["nsource"]
+            fgcm_obj["isolated_star_id"][:] = stars["isolated_star_id"]
+            fgcm_obj["ra"][:] = stars["ra"]
+            fgcm_obj["dec"][:] = stars["dec"]
+            fgcm_obj["obs_arr_index"][:] = stars["source_cat_index"]
+            fgcm_obj["n_obs"][:] = stars["nsource"]
 
             # Offset indexes to account for tract merging
-            fgcm_obj["obs_arr_index"] += merge_source_counter
+            fgcm_obj["obs_arr_index"][:] += merge_source_counter
 
             fgcm_objs.append(fgcm_obj)
             star_obs_cats.append(star_obs)
