@@ -319,6 +319,17 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             useScienceDetectors=use_science_detectors,
         )
 
+        obj1 = self._make_all_star_obj_from_isolated_stars_first_pass(
+            isolated_star_cat_handle_dict,
+            isolated_star_source_handle_dict,
+            visit_cat,
+            camera,
+            calib_flux_aperture_radius=calib_flux_aperture_radius,
+            use_science_detectors=use_science_detectors,
+        )
+
+        self._density_downsample_first_pass(obj1)
+
         # Select and concatenate the isolated stars and sources.
         fgcm_obj, star_obs = self._make_all_star_obs_from_isolated_stars(
             isolated_star_cat_handle_dict,
@@ -352,6 +363,180 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             fgcm_star_ids=fgcm_obj,
             fgcm_reference_stars=fgcm_ref,
         )
+
+    def _make_all_star_obj_from_isolated_stars_first_pass(
+        self,
+        isolated_star_cat_handle_dict,
+        isolated_star_source_handle_dict,
+        visit_cat,
+        camera,
+        calib_flux_aperture_radius=None,
+        use_science_detectors=False,
+    ):
+        """
+        """
+        source_columns = [
+            "sourceId",
+            "visit",
+            "detector",
+            # "ra",
+            # "dec",
+            # "x",
+            # "y",
+            "physical_filter",
+            "band",
+            "obj_index",
+            self.config.instFluxField,
+            self.config.instFluxField + "Err",
+            # self.config.apertureInnerInstFluxField,
+            # self.config.apertureInnerInstFluxField + "Err",
+            # self.config.apertureOuterInstFluxField,
+            # self.config.apertureOuterInstFluxField + "Err",
+        ]
+
+        if self.config.doSubtractLocalBackground:
+            source_columns.append(self.config.localBackgroundFluxField)
+            local_background_flag_name = self.config.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
+            source_columns.append(local_background_flag_name)
+
+        if self.sourceSelector.config.doFlags:
+            source_columns.extend(self.sourceSelector.config.flags.bad)
+
+        if self.config.doSubtractLocalBackground:
+            local_background_area = np.pi*calib_flux_aperture_radius**2.
+
+        # Construct mapping from detector number to index.
+        detector_mapping = {}
+        for detector_index, detector in enumerate(camera):
+            detector_mapping[detector.getId()] = detector_index
+
+        fgcm_objs = []
+
+        visit_cat_table = visit_cat.asAstropy()
+
+        for tract in sorted(isolated_star_cat_handle_dict):
+            stars = isolated_star_cat_handle_dict[tract].get()
+            sources = isolated_star_source_handle_dict[tract].get(parameters={"columns": source_columns})
+
+            # Down-select sources.
+            good_sources = self.sourceSelector.selectSources(sources).selected
+            if self.config.doSubtractLocalBackground:
+                good_sources &= (~sources[local_background_flag_name])
+                local_background = local_background_area*sources[self.config.localBackgroundFluxField]
+                good_sources &= ((sources[self.config.instFluxField] - local_background) > 0)
+
+            # We need to do this check as early as possible to
+            # ensure we can do the match test below.
+            if good_sources.sum() == 0:
+                self.log.info("No good sources found in tract %d", tract)
+                continue
+
+            # We also need to make sure that all sources are in the
+            # input list of visits and detectors.
+
+            detector_ids = []
+            for detector in camera:
+                if use_science_detectors:
+                    if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
+                        continue
+                detector_ids.append(detector.getId())
+
+            missing_sources1 = np.ones(len(sources), dtype=np.bool_)
+            _, sources_match = esutil.numpy_util.match(visit_cat_table["visit"], sources["visit"])
+            missing_sources1[sources_match] = False
+            good_sources &= (~missing_sources1)
+
+            missing_sources2 = np.ones(len(sources), dtype=np.bool_)
+            _, sources_match = esutil.numpy_util.match(detector_ids, sources["detector"])
+            missing_sources2[sources_match] = False
+            good_sources &= (~missing_sources2)
+
+            # Check again after further tests.
+            if good_sources.sum() == 0:
+                self.log.info("No good sources found in tract %d", tract)
+                continue
+
+            self.log.info("Tract %d contains %d good sources.", tract, good_sources.sum())
+
+            # Need to count the observations of each star after cuts, per band.
+            # If we have requiredBands specified, we must make sure that each star
+            # has the minumum number of observations in each of thos bands.
+            # Otherwise, we must make sure that each star has at least the minimum
+            # number of observations in _any_ band.
+            if len(self.config.requiredBands) > 0:
+                loop_bands = self.config.requiredBands
+            else:
+                loop_bands = np.unique(sources["band"])
+
+            n_req = np.zeros((len(loop_bands), len(stars)), dtype=np.int32)
+            for i, band in enumerate(loop_bands):
+                (band_use,) = (sources[good_sources]["band"] == band).nonzero()
+                np.add.at(
+                    n_req,
+                    (i, sources[good_sources]["obj_index"][band_use]),
+                    1,
+                )
+
+            if len(self.config.requiredBands) > 0:
+                # The min gives us the band with the fewest observations, which must be
+                # above the limit.
+                (good_stars,) = (n_req.min(axis=0) >= self.config.minPerBand).nonzero()
+            else:
+                # The max gives us the band with the most observations, which must be
+                # above the limit.
+                (good_stars,) = (n_req.max(axis=0) >= self.config.minPerBand).nonzero()
+
+            if len(good_stars) == 0:
+                self.log.info("No good stars found in tract %d", tract)
+                continue
+
+            stars = stars[good_stars]
+
+            # fgcm_obj = Table(data=np.zeros(len(stars)), dtype=
+            fgcm_obj = Table()
+            fgcm_obj["isolated_star_id"] = stars["isolated_star_id"]
+            fgcm_obj["ra"] = stars["ra"]
+            fgcm_obj["dec"] = stars["dec"]
+
+            fgcm_objs.append(fgcm_obj)
+
+        fgcm_obj = vstack(fgcm_objs)
+        fgcm_obj["fgcm_id"] = np.arange(len(fgcm_obj)) + 1
+
+        return fgcm_obj
+
+    def _density_downsample_first_pass(self, fgcm_obj):
+        """
+        """
+        if self.config.randomSeed is not None:
+            rng = np.random.Generator(np.random.MT19937(self.config.randomSeed))
+        else:
+            rng = np.random.Generator(np.random.MT19937())
+
+        ipnest = hpg.angle_to_pixel(self.config.densityCutNside, fgcm_obj["ra"], fgcm_obj["dec"])
+        # Use the esutil.stat.histogram function to pull out the histogram of
+        # grouped pixels, and the rev_indices which describes which inputs
+        # are grouped together.  The fgcm histogram_rev_sorted shim
+        # ensures that the indices are properly sorted.
+        hist, rev_indices = histogram_rev_sorted(ipnest)
+
+        obj_use = np.ones(len(fgcm_obj), dtype=bool)
+
+        (high,) = (hist > self.config.densityCutMaxPerPixel).nonzero()
+        (ok,) = (hist > 0).nonzero()
+        self.log.info("There are %d/%d pixels with high stellar density.", high.size, ok.size)
+        for i in range(high.size):
+            # The pix_indices are the indices of every star in the pixel.
+            pix_indices = rev_indices[rev_indices[high[i]]: rev_indices[high[i] + 1]]
+            # Cut down to the maximum number of stars in the pixel.
+            cut = rng.choice(
+                pix_indices,
+                size=pix_indices.size - self.config.densityCutMaxPerPixel,
+                replace=False,
+            )
+            obj_use[cut] = False
+
+        fgcm_obj = fgcm_obj[obj_use]
 
     def _make_all_star_obs_from_isolated_stars(
             self,
