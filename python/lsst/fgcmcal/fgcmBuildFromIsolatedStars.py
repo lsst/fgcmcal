@@ -563,12 +563,13 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 continue
             elif input_star_ids is not None:
                 # Down-select good_stars indices to those in the inputs.
-                a, b = esutil.numpy_util.match(
-                    input_star_ids,
-                    stars["isolated_star_id"][good_stars],
-                    presorted=True,
+                sub1 = np.clip(
+                    np.searchsorted(input_star_ids, stars["isolated_star_id"][good_stars]),
+                    0,
+                    len(input_star_ids),
                 )
-                good_stars = good_stars[b]
+                matched = (input_star_ids[sub1] == stars["isolated_star_id"][good_stars])
+                good_stars = good_stars[matched]
 
                 if len(good_stars) == 0:
                     self.log.info("No good stars found after down-selection in tract %d", tract)
