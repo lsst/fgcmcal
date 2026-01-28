@@ -79,7 +79,7 @@ class FgcmBuildStarsConfigBase(pexConfig.Config):
     randomSeed = pexConfig.Field(
         doc="Random seed for high density down-sampling.",
         dtype=int,
-        default=None,
+        default=123456,
         optional=True,
     )
     matchNside = pexConfig.Field(
