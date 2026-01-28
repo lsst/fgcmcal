@@ -570,6 +570,10 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 )
                 good_stars = good_stars[b]
 
+                if len(good_stars) == 0:
+                    self.log.info("No good stars found after down-selection in tract %d", tract)
+                    continue
+
             # The following is only used if we are assembling the observations.
 
             # With the following matching:
