@@ -35,7 +35,7 @@ import hpgeom as hpg
 from smatch.matcher import Matcher
 from astropy.table import Table, vstack
 
-from fgcm.fgcmUtilities import objFlagDict, histogram_rev_sorted
+from fgcm.fgcmUtilities import objFlagDict, histogram_rev_sorted, getMemoryString
 
 import lsst.afw.cameraGeom as afwCameraGeom
 import lsst.pex.config as pexConfig
@@ -319,7 +319,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             useScienceDetectors=use_science_detectors,
         )
 
-        obj1 = self._make_all_star_obj_from_isolated_stars_first_pass(
+        fgcm_obj = self._make_all_star_obs_from_isolated_stars(
             isolated_star_cat_handle_dict,
             isolated_star_source_handle_dict,
             visit_cat,
@@ -328,7 +328,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             use_science_detectors=use_science_detectors,
         )
 
-        self._density_downsample_first_pass(obj1)
+        star_ids = self._density_downsample(fgcm_obj)
 
         # Select and concatenate the isolated stars and sources.
         fgcm_obj, star_obs = self._make_all_star_obs_from_isolated_stars(
@@ -338,15 +338,14 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             camera,
             calib_flux_aperture_radius=calib_flux_aperture_radius,
             use_science_detectors=use_science_detectors,
+            input_star_ids=star_ids,
+            return_observations=True,
         )
 
         self._compute_delta_aper_summary_statistics(
             visit_cat,
             star_obs,
         )
-
-        # Do density down-sampling.
-        self._density_downsample(fgcm_obj, star_obs)
 
         # Mark reserve stars
         self._mark_reserve_stars(fgcm_obj)
@@ -364,7 +363,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             fgcm_reference_stars=fgcm_ref,
         )
 
-    def _make_all_star_obj_from_isolated_stars_first_pass(
+    def _make_all_star_obs_from_isolated_stars(
         self,
         isolated_star_cat_handle_dict,
         isolated_star_source_handle_dict,
@@ -372,182 +371,11 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         camera,
         calib_flux_aperture_radius=None,
         use_science_detectors=False,
+        input_star_ids=None,
+        return_observations=False,
     ):
         """
-        """
-        source_columns = [
-            "sourceId",
-            "visit",
-            "detector",
-            # "ra",
-            # "dec",
-            # "x",
-            # "y",
-            "physical_filter",
-            "band",
-            "obj_index",
-            self.config.instFluxField,
-            self.config.instFluxField + "Err",
-            # self.config.apertureInnerInstFluxField,
-            # self.config.apertureInnerInstFluxField + "Err",
-            # self.config.apertureOuterInstFluxField,
-            # self.config.apertureOuterInstFluxField + "Err",
-        ]
-
-        if self.config.doSubtractLocalBackground:
-            source_columns.append(self.config.localBackgroundFluxField)
-            local_background_flag_name = self.config.localBackgroundFluxField[0: -len('instFlux')] + 'flag'
-            source_columns.append(local_background_flag_name)
-
-        if self.sourceSelector.config.doFlags:
-            source_columns.extend(self.sourceSelector.config.flags.bad)
-
-        if self.config.doSubtractLocalBackground:
-            local_background_area = np.pi*calib_flux_aperture_radius**2.
-
-        # Construct mapping from detector number to index.
-        detector_mapping = {}
-        for detector_index, detector in enumerate(camera):
-            detector_mapping[detector.getId()] = detector_index
-
-        fgcm_objs = []
-
-        visit_cat_table = visit_cat.asAstropy()
-
-        for tract in sorted(isolated_star_cat_handle_dict):
-            stars = isolated_star_cat_handle_dict[tract].get()
-            sources = isolated_star_source_handle_dict[tract].get(parameters={"columns": source_columns})
-
-            # Down-select sources.
-            good_sources = self.sourceSelector.selectSources(sources).selected
-            if self.config.doSubtractLocalBackground:
-                good_sources &= (~sources[local_background_flag_name])
-                local_background = local_background_area*sources[self.config.localBackgroundFluxField]
-                good_sources &= ((sources[self.config.instFluxField] - local_background) > 0)
-
-            # We need to do this check as early as possible to
-            # ensure we can do the match test below.
-            if good_sources.sum() == 0:
-                self.log.info("No good sources found in tract %d", tract)
-                continue
-
-            # We also need to make sure that all sources are in the
-            # input list of visits and detectors.
-
-            detector_ids = []
-            for detector in camera:
-                if use_science_detectors:
-                    if not detector.getType() == afwCameraGeom.DetectorType.SCIENCE:
-                        continue
-                detector_ids.append(detector.getId())
-
-            missing_sources1 = np.ones(len(sources), dtype=np.bool_)
-            _, sources_match = esutil.numpy_util.match(visit_cat_table["visit"], sources["visit"])
-            missing_sources1[sources_match] = False
-            good_sources &= (~missing_sources1)
-
-            missing_sources2 = np.ones(len(sources), dtype=np.bool_)
-            _, sources_match = esutil.numpy_util.match(detector_ids, sources["detector"])
-            missing_sources2[sources_match] = False
-            good_sources &= (~missing_sources2)
-
-            # Check again after further tests.
-            if good_sources.sum() == 0:
-                self.log.info("No good sources found in tract %d", tract)
-                continue
-
-            self.log.info("Tract %d contains %d good sources.", tract, good_sources.sum())
-
-            # Need to count the observations of each star after cuts, per band.
-            # If we have requiredBands specified, we must make sure that each star
-            # has the minumum number of observations in each of thos bands.
-            # Otherwise, we must make sure that each star has at least the minimum
-            # number of observations in _any_ band.
-            if len(self.config.requiredBands) > 0:
-                loop_bands = self.config.requiredBands
-            else:
-                loop_bands = np.unique(sources["band"])
-
-            n_req = np.zeros((len(loop_bands), len(stars)), dtype=np.int32)
-            for i, band in enumerate(loop_bands):
-                (band_use,) = (sources[good_sources]["band"] == band).nonzero()
-                np.add.at(
-                    n_req,
-                    (i, sources[good_sources]["obj_index"][band_use]),
-                    1,
-                )
-
-            if len(self.config.requiredBands) > 0:
-                # The min gives us the band with the fewest observations, which must be
-                # above the limit.
-                (good_stars,) = (n_req.min(axis=0) >= self.config.minPerBand).nonzero()
-            else:
-                # The max gives us the band with the most observations, which must be
-                # above the limit.
-                (good_stars,) = (n_req.max(axis=0) >= self.config.minPerBand).nonzero()
-
-            if len(good_stars) == 0:
-                self.log.info("No good stars found in tract %d", tract)
-                continue
-
-            stars = stars[good_stars]
-
-            # fgcm_obj = Table(data=np.zeros(len(stars)), dtype=
-            fgcm_obj = Table()
-            fgcm_obj["isolated_star_id"] = stars["isolated_star_id"]
-            fgcm_obj["ra"] = stars["ra"]
-            fgcm_obj["dec"] = stars["dec"]
-
-            fgcm_objs.append(fgcm_obj)
-
-        fgcm_obj = vstack(fgcm_objs)
-        fgcm_obj["fgcm_id"] = np.arange(len(fgcm_obj)) + 1
-
-        return fgcm_obj
-
-    def _density_downsample_first_pass(self, fgcm_obj):
-        """
-        """
-        if self.config.randomSeed is not None:
-            rng = np.random.Generator(np.random.MT19937(self.config.randomSeed))
-        else:
-            rng = np.random.Generator(np.random.MT19937())
-
-        ipnest = hpg.angle_to_pixel(self.config.densityCutNside, fgcm_obj["ra"], fgcm_obj["dec"])
-        # Use the esutil.stat.histogram function to pull out the histogram of
-        # grouped pixels, and the rev_indices which describes which inputs
-        # are grouped together.  The fgcm histogram_rev_sorted shim
-        # ensures that the indices are properly sorted.
-        hist, rev_indices = histogram_rev_sorted(ipnest)
-
-        obj_use = np.ones(len(fgcm_obj), dtype=bool)
-
-        (high,) = (hist > self.config.densityCutMaxPerPixel).nonzero()
-        (ok,) = (hist > 0).nonzero()
-        self.log.info("There are %d/%d pixels with high stellar density.", high.size, ok.size)
-        for i in range(high.size):
-            # The pix_indices are the indices of every star in the pixel.
-            pix_indices = rev_indices[rev_indices[high[i]]: rev_indices[high[i] + 1]]
-            # Cut down to the maximum number of stars in the pixel.
-            cut = rng.choice(
-                pix_indices,
-                size=pix_indices.size - self.config.densityCutMaxPerPixel,
-                replace=False,
-            )
-            obj_use[cut] = False
-
-        fgcm_obj = fgcm_obj[obj_use]
-
-    def _make_all_star_obs_from_isolated_stars(
-            self,
-            isolated_star_cat_handle_dict,
-            isolated_star_source_handle_dict,
-            visit_cat,
-            camera,
-            calib_flux_aperture_radius=None,
-            use_science_detectors=False,
-    ):
-        """Make all star observations from isolated star catalogs.
+        Make all the star observations from isolated star catalogs.
 
         Parameters
         ----------
@@ -563,32 +391,50 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             Radius for the calibration flux aperture.
         use_science_detectors : `bool`, optional
             Only use science detectors?
+        input_star_ids : `np.ndarray`, optional
+            Array of star IDs to use. Used for second pass and
+            full load.
+        return_observations : `bool`, optional
+            Return the observations? Should be False for first pass.
 
         Returns
         -------
         fgcm_obj : `astropy.table.Table`
             Catalog of ids and positions for each star.
         star_obs : `astropy.table.Table`
-            Catalog of individual star observations.
+            Catalog of individual star observations if
+            return_observations is True.
         """
+        # Ensure that input stars are sorted.
+        if input_star_ids is not None:
+            input_star_ids = np.sort(input_star_ids)
+
         source_columns = [
             "sourceId",
             "visit",
             "detector",
-            "ra",
-            "dec",
-            "x",
-            "y",
             "physical_filter",
             "band",
             "obj_index",
             self.config.instFluxField,
             self.config.instFluxField + "Err",
-            self.config.apertureInnerInstFluxField,
-            self.config.apertureInnerInstFluxField + "Err",
-            self.config.apertureOuterInstFluxField,
-            self.config.apertureOuterInstFluxField + "Err",
         ]
+
+        if return_observations:
+            # We only need these columns if we are returning all
+            # the observations.
+            source_columns.extend(
+                [
+                    "ra",
+                    "dec",
+                    "x",
+                    "y",
+                    self.config.apertureInnerInstFluxField,
+                    self.config.apertureInnerInstFluxField + "Err",
+                    self.config.apertureOuterInstFluxField,
+                    self.config.apertureOuterInstFluxField + "Err",
+                ],
+            )
 
         if self.config.doSubtractLocalBackground:
             source_columns.append(self.config.localBackgroundFluxField)
@@ -610,31 +456,6 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         for detector_index, detector in enumerate(camera):
             detector_mapping[detector.getId()] = detector_index
 
-        star_obs_dtype = [
-            ("ra", "f8"),
-            ("dec", "f8"),
-            ("x", "f8"),
-            ("y", "f8"),
-            ("visit", "i8"),
-            ("detector", "i4"),
-            ("inst_mag", "f4"),
-            ("inst_mag_err", "f4"),
-            ("jacobian", "f4"),
-            ("delta_mag_bkg", "f4"),
-            ("delta_mag_aper", "f4"),
-            ("delta_mag_err_aper", "f4"),
-        ]
-
-        fgcm_obj_dtype = [
-            ("fgcm_id", "i8"),
-            ("isolated_star_id", "i8"),
-            ("ra", "f8"),
-            ("dec", "f8"),
-            ("obs_arr_index", "i8"),
-            ("n_obs", "i4"),
-            ("obj_flag", "i4"),
-        ]
-
         fgcm_objs = []
         star_obs_cats = []
         merge_source_counter = 0
@@ -643,7 +464,12 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
 
         visit_cat_table = visit_cat.asAstropy()
 
-        for tract in sorted(isolated_star_cat_handle_dict):
+        n_tracts = len(isolated_star_cat_handle_dict)
+
+        for index, tract in enumerate(sorted(isolated_star_cat_handle_dict)):
+            if (index % 50) == 0:
+                self.log.info(getMemoryString(f"Loading tract index {index}"))
+
             stars = isolated_star_cat_handle_dict[tract].get()
             sources = isolated_star_source_handle_dict[tract].get(parameters={"columns": source_columns})
 
@@ -685,7 +511,13 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 self.log.info("No good sources found in tract %d", tract)
                 continue
 
-            self.log.info("Tract %d contains %d good sources.", tract, good_sources.sum())
+            self.log.info(
+                "Tract %d (%d/%d) contains %d good sources.",
+                tract,
+                index,
+                n_tracts,
+                good_sources.sum(),
+            )
 
             # Need to count the observations of each star after cuts, per band.
             # If we have requiredBands specified, we must make sure that each star
@@ -718,6 +550,27 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             if len(good_stars) == 0:
                 self.log.info("No good stars found in tract %d", tract)
                 continue
+
+            if not return_observations:
+                fgcm_obj = Table()
+                fgcm_obj["isolated_star_id"] = stars["isolated_star_id"][good_stars]
+                fgcm_obj["ra"] = stars["ra"][good_stars]
+                fgcm_obj["dec"] = stars["dec"][good_stars]
+                fgcm_obj["fgcm_id"] = np.zeros(len(fgcm_obj), dtype=np.int64)
+
+                fgcm_objs.append(fgcm_obj)
+
+                continue
+            elif input_star_ids is not None:
+                # Down-select good_stars indices to those in the inputs.
+                a, b = esutil.numpy_util.match(
+                    input_star_ids,
+                    stars["isolated_star_id"][good_stars],
+                    presorted=True,
+                )
+                good_stars = good_stars[b]
+
+            # The following is only used if we are assembling the observations.
 
             # With the following matching:
             #   sources[good_sources][b] <-> stars[good_stars[a]]
@@ -750,13 +603,19 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             #   isolated star.
 
             # We now reformat the sources and compute the ``observations`` that fgcm expects.
-            star_obs = Table(data=np.zeros(len(sources), dtype=star_obs_dtype))
-            star_obs["ra"] = sources["ra"]
-            star_obs["dec"] = sources["dec"]
-            star_obs["x"] = sources["x"]
-            star_obs["y"] = sources["y"]
-            star_obs["visit"] = sources["visit"]
-            star_obs["detector"] = sources["detector"]
+            star_obs = Table()
+            star_obs["ra"] = sources["ra"].astype(np.float64)
+            star_obs["dec"] = sources["dec"].astype(np.float64)
+            star_obs["x"] = sources["x"].astype(np.float64)
+            star_obs["y"] = sources["y"].astype(np.float64)
+            star_obs["visit"] = sources["visit"].astype(np.int64)
+            star_obs["detector"] = sources["detector"].astype(np.int32)
+            star_obs["inst_mag"] = np.zeros(len(sources), dtype="f4")
+            star_obs["inst_mag_err"] = np.zeros(len(sources), dtype="f4")
+            star_obs["jacobian"] = np.zeros(len(sources), dtype="f4")
+            star_obs["delta_mag_bkg"] = np.zeros(len(sources), dtype="f4")
+            star_obs["delta_mag_aper"] = np.zeros(len(sources), dtype="f4")
+            star_obs["delta_mag_err_aper"] = np.zeros(len(sources), dtype="f4")
 
             visit_match, obs_match = esutil.numpy_util.match(visit_cat_table["visit"], sources["visit"])
 
@@ -773,8 +632,8 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 inst_mag_outer = -2.5*np.log10(sources[self.config.apertureOuterInstFluxField])
                 inst_mag_err_outer = k*(sources[self.config.apertureOuterInstFluxField + "Err"]
                                         / sources[self.config.apertureOuterInstFluxField])
-                star_obs["delta_mag_aper"] = inst_mag_inner - inst_mag_outer
-                star_obs["delta_mag_err_aper"] = np.sqrt(inst_mag_err_inner**2. + inst_mag_err_outer**2.)
+                star_obs["delta_mag_aper"][:] = inst_mag_inner - inst_mag_outer
+                star_obs["delta_mag_err_aper"][:] = np.sqrt(inst_mag_err_inner**2. + inst_mag_err_outer**2.)
                 # Set bad values to sentinel values for fgcm.
                 bad = ~np.isfinite(star_obs["delta_mag_aper"])
                 star_obs["delta_mag_aper"][bad] = 99.0
@@ -795,9 +654,11 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 # This is the difference between the mag with local background correction
                 # and the mag without local background correction.
                 local_background = local_background_area*sources[self.config.localBackgroundFluxField]
-                star_obs["delta_mag_bkg"] = (-2.5*np.log10(sources[self.config.instFluxField]
-                                                           - local_background) -
-                                             -2.5*np.log10(sources[self.config.instFluxField]))
+                star_obs["delta_mag_bkg"][:] = (
+                    -2.5*np.log10(sources[self.config.instFluxField]
+                                  - local_background) -
+                    -2.5*np.log10(sources[self.config.instFluxField])
+                )
 
             # Need to loop over detectors here.
             for detector in camera:
@@ -829,20 +690,22 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             # Compute instMagErr from inst_flux_err/inst_flux.
             # This does not need to be computed per-detector because there
             # is no need for the per-detector scaling which cancels out.
-            star_obs["inst_mag_err"] = k*(sources[self.config.instFluxField + "Err"]
-                                          / sources[self.config.instFluxField])
+            star_obs["inst_mag_err"][:] = k*(sources[self.config.instFluxField + "Err"]
+                                             / sources[self.config.instFluxField])
 
             # Apply the jacobian if configured to do so.
             if self.config.doApplyWcsJacobian:
-                star_obs["inst_mag"] -= 2.5*np.log10(star_obs["jacobian"])
+                star_obs["inst_mag"][:] -= 2.5*np.log10(star_obs["jacobian"])
 
             # We now reformat the stars and compute the ''objects'' that fgcm expects.
-            fgcm_obj = Table(data=np.zeros(len(stars), dtype=fgcm_obj_dtype))
-            fgcm_obj["isolated_star_id"][:] = stars["isolated_star_id"]
-            fgcm_obj["ra"][:] = stars["ra"]
-            fgcm_obj["dec"][:] = stars["dec"]
-            fgcm_obj["obs_arr_index"][:] = stars["source_cat_index"]
-            fgcm_obj["n_obs"][:] = stars["nsource"]
+            fgcm_obj = Table()
+            fgcm_obj["fgcm_id"] = np.zeros(len(stars), dtype=np.int64)
+            fgcm_obj["isolated_star_id"] = stars["isolated_star_id"].astype(np.int64)
+            fgcm_obj["ra"] = stars["ra"].astype(np.float64)
+            fgcm_obj["dec"] = stars["dec"].astype(np.float64)
+            fgcm_obj["obs_arr_index"] = stars["source_cat_index"].astype(np.int64)
+            fgcm_obj["n_obs"] = stars["nsource"].astype(np.int32)
+            fgcm_obj["obj_flag"] = np.zeros(len(stars), dtype=np.int32)
 
             # Offset indexes to account for tract merging
             fgcm_obj["obs_arr_index"][:] += merge_source_counter
@@ -857,22 +720,28 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         # Set the fgcm_id to a unique 64-bit integer for easier sorting.
         fgcm_obj["fgcm_id"][:] = np.arange(len(fgcm_obj)) + 1
 
-        return fgcm_obj, vstack(star_obs_cats)
+        if return_observations:
+            return fgcm_obj, vstack(star_obs_cats)
+        else:
+            return fgcm_obj
 
-    def _density_downsample(self, fgcm_obj, star_obs):
+    def _density_downsample(self, fgcm_obj):
         """Downsample stars according to density.
-
-        Catalogs are modified in-place.
 
         Parameters
         ----------
         fgcm_obj : `astropy.table.Table`
             Catalog of per-star ids and positions.
-        star_obs : `astropy.table.Table`
-            Catalog of individual star observations.
+
+        Returns
+        -------
+        star_ids : `np.ndarray`
+            Array of downsampled isolated star ids.
         """
         if self.config.randomSeed is not None:
-            np.random.seed(seed=self.config.randomSeed)
+            rng = np.random.Generator(np.random.MT19937(self.config.randomSeed))
+        else:
+            rng = np.random.Generator(np.random.MT19937())
 
         ipnest = hpg.angle_to_pixel(self.config.densityCutNside, fgcm_obj["ra"], fgcm_obj["dec"])
         # Use the esutil.stat.histogram function to pull out the histogram of
@@ -890,26 +759,14 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
             # The pix_indices are the indices of every star in the pixel.
             pix_indices = rev_indices[rev_indices[high[i]]: rev_indices[high[i] + 1]]
             # Cut down to the maximum number of stars in the pixel.
-            cut = np.random.choice(
+            cut = rng.choice(
                 pix_indices,
                 size=pix_indices.size - self.config.densityCutMaxPerPixel,
                 replace=False,
             )
             obj_use[cut] = False
 
-        fgcm_obj = fgcm_obj[obj_use]
-
-        obs_index = np.zeros(np.sum(fgcm_obj["n_obs"]), dtype=np.int32)
-        ctr = 0
-        for i in range(len(fgcm_obj)):
-            n_obs = fgcm_obj["n_obs"][i]
-            obs_index[ctr: ctr + n_obs] = (
-                np.arange(fgcm_obj["obs_arr_index"][i], fgcm_obj["obs_arr_index"][i] + n_obs)
-            )
-            fgcm_obj["obs_arr_index"][i] = ctr
-            ctr += n_obs
-
-        star_obs = star_obs[obs_index]
+        return np.asarray(fgcm_obj["isolated_star_id"][obj_use])
 
     def _mark_reserve_stars(self, fgcm_obj):
         """Run the star reservation task to flag reserved stars.
@@ -967,7 +824,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         pixel_cats = []
 
         # Compute the dtype from the filter names.
-        dtype = [("fgcm_id", "i4"),
+        dtype = [("fgcm_id", "i8"),
                  ("refMag", "f4", (len(reference_filter_names), )),
                  ("refMagErr", "f4", (len(reference_filter_names), ))]
 
@@ -1019,7 +876,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 continue
 
             pixel_cat = Table(data=np.zeros(i1.size, dtype=dtype))
-            pixel_cat["fgcm_id"] = fgcm_obj["fgcm_id"][p1a[i1]]
+            pixel_cat["fgcm_id"][:] = fgcm_obj["fgcm_id"][p1a[i1]]
             pixel_cat["refMag"][:, :] = ref_cat["refMag"][i2, :]
             pixel_cat["refMagErr"][:, :] = ref_cat["refMagErr"][i2, :]
 
