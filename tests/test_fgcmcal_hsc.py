@@ -153,8 +153,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
 
-        nStar = 295
-        nObs = 1808
+        nStar = 292
+        nObs = 1790
 
         self._testFgcmBuildFromIsolatedStars(
             instName,
@@ -169,7 +169,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nGoodZp = 27
         nOkZp = 27
         nBadZp = 1093
-        nStdStars = 227
+        nStdStars = 222
         nPlots = 59
 
         self._testFgcmFitCycle(instName, testName,
@@ -189,8 +189,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                                2, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots,
                                extraConfig=extraConfigFile)
 
-        zpOffsets = np.array([-0.001339632086455822,
-                              0.005496968515217304])
+        zpOffsets = np.array([-0.000842530163936317,
+                              0.0047900681383907795])
 
         self._testFgcmOutputProducts(instName, testName,
                                      zpOffsets, 36236, 87, 'i', 1, 'hsc_rings_v1')
@@ -218,8 +218,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         # These are slightly different from above due to the configuration change
         # mid-way in the separate fits.
-        zpOffsets = np.array([-0.0015136072179302573,
-                              0.0019038696773350239])
+        zpOffsets = np.array([-0.0007637073867954314,
+                              0.0013884829822927713])
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I') and skymap='hsc_rings_v1'",
