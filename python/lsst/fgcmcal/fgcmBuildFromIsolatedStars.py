@@ -566,7 +566,7 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 sub1 = np.clip(
                     np.searchsorted(input_star_ids, stars["isolated_star_id"][good_stars]),
                     0,
-                    len(input_star_ids),
+                    len(input_star_ids) - 1,
                 )
                 matched = (input_star_ids[sub1] == stars["isolated_star_id"][good_stars])
                 good_stars = good_stars[matched]
