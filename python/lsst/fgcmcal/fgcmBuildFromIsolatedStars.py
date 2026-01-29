@@ -377,6 +377,12 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
         """
         Make all the star observations from isolated star catalogs.
 
+        This is intended to be run in two passes. In the first pass, a limited
+        set of columns is read in (only what is required to select potential
+        "good stars") and the stars are returned. In the second pass, the full
+        set of columns is read and only stars that are in input_star_ids
+        are put into the aggregated tables.
+
         Parameters
         ----------
         isolated_star_cat_handle_dict : `dict` [`int`, `lsst.daf.butler.DeferredDatasetHandle`]
@@ -703,6 +709,10 @@ class FgcmBuildFromIsolatedStarsTask(FgcmBuildStarsBaseTask):
                 star_obs["inst_mag"][:] -= 2.5*np.log10(star_obs["jacobian"])
 
             # We now reformat the stars and compute the ''objects'' that fgcm expects.
+            # Note that we are very careful here about casting to the correct
+            # data types. In particular, obs_arr_index must be a 64 bit integer
+            # even if each individual isolated_star_sources can use a 32 bit
+            # index counter.
             fgcm_obj = Table()
             fgcm_obj["fgcm_id"] = np.zeros(len(stars), dtype=np.int64)
             fgcm_obj["isolated_star_id"] = stars["isolated_star_id"].astype(np.int64)
