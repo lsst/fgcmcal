@@ -127,10 +127,16 @@ def makeConfigDict(config, log, camera, maxIter,
         outfileBase = '%s-%06d' % (config.outfileBase, tract)
 
     if config.aperCorrPerCcd:
-        seeingField = 'DELTA_APER_DETECTOR'
+        if config.aperCorrUsePsfFwhm:
+            seeingField = 'PSFFWHM_DETECTOR'
+        else:
+            seeingField = 'DELTA_APER_DETECTOR'
         seeingSubExposure = True
     else:
-        seeingField = 'DELTA_APER'
+        if config.aperCorrUsePsfFwhm:
+            seeingField = 'PSFFWHM_DETECTOR'
+        else:
+            seeingField = 'DELTA_APER'
         seeingSubExposure = False
 
     # create a configuration dictionary for fgcmFitCycle
@@ -420,6 +426,7 @@ def translateVisitCatalog(visitCat):
                                                  ('MJD', 'f8'),
                                                  ('EXPTIME', 'f8'),
                                                  ('PSFFWHM', 'f8'),
+                                                 ('PSFFWHM_DETECTOR', ('f8', nDetector)),
                                                  ('DELTA_APER', 'f8'),
                                                  ('DELTA_APER_DETECTOR', ('f8', nDetector)),
                                                  ('SKYBACKGROUND', 'f8'),
@@ -440,6 +447,7 @@ def translateVisitCatalog(visitCat):
     fgcmExpInfo['TELROT'][:] = visitCat['telrot']
     fgcmExpInfo['PMB'][:] = visitCat['pmb']
     fgcmExpInfo['PSFFWHM'][:] = visitCat['psfFwhm']
+    fgcmExpInfo['PSFFWHM_DETECTOR'][:] = visitCat['psfFwhmDetector']
     fgcmExpInfo['DELTA_APER'][:] = visitCat['deltaAper']
     fgcmExpInfo['DELTA_APER_DETECTOR'][:, :] = visitCat['deltaAperDetector']
     fgcmExpInfo['SKYBACKGROUND'][:] = visitCat['skyBackground']
