@@ -128,8 +128,10 @@ def makeConfigDict(config, log, camera, maxIter,
 
     if config.aperCorrPerCcd:
         seeingField = 'DELTA_APER_DETECTOR'
+        seeingSubExposure = True
     else:
         seeingField = 'DELTA_APER'
+        seeingSubExposure = False
 
     # create a configuration dictionary for fgcmFitCycle
     configDict = {'outfileBase': outfileBase,
@@ -208,6 +210,7 @@ def makeConfigDict(config, log, camera, maxIter,
                   'refStarColorCuts': refStarColorCutList,
                   'aperCorrFitNBins': config.aperCorrFitNBins,
                   'aperCorrInputSlopeDict': dict(config.aperCorrInputSlopeDict),
+                  'seeingSubExposure': seeingSubExposure,
                   'sedBoundaryTermDict': config.sedboundaryterms.toDict()['data'],
                   'sedTermDict': config.sedterms.toDict()['data'],
                   'colorSplitBands': list(config.colorSplitBands),
