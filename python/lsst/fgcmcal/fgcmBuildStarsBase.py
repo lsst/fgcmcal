@@ -353,7 +353,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             rec['deltaAperDetector'][:] = -9999.0
             rec['psfSigma'] = psfSigma
             rec['psfFwhm'] = psfFwhm
-            rec['psfFwhmDetector'] = psfFwhms.astype(np.float32)
+            # This is keyed by detector.
+            rec['psfFwhmDetector'][summary["id"]] = psfFwhms
             rec['skyBackground'] = skyBackground
             rec['used'] = 1
 
