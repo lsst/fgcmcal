@@ -134,7 +134,7 @@ def makeConfigDict(config, log, camera, maxIter,
         seeingSubExposure = True
     else:
         if config.aperCorrUsePsfFwhm:
-            seeingField = 'PSFFWHM_DETECTOR'
+            seeingField = 'PSFFWHM'
         else:
             seeingField = 'DELTA_APER'
         seeingSubExposure = False
