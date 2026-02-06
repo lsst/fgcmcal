@@ -306,13 +306,16 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             else:
                 pixelScales = np.full(len(summary['psfSigma']), defaultPixelScale)
             psfSigmas = summary['psfSigma']
-            goodSigma, = np.where((np.nan_to_num(psfSigmas) > 0) & (np.nan_to_num(pixelScales) > 0))
+            psfFwhms = psfSigmas * pixelScales * np.sqrt(8.*np.log(2.))
+            goodSigma = ((np.nan_to_num(psfSigmas) > 0) & (np.nan_to_num(pixelScales) > 0))
+            psfSigmas[~goodSigma] = -9999.0
+            psfFwhms[~goodSigma] = -9999.0
             if goodSigma.size > 2:
                 psfSigma = np.median(psfSigmas[goodSigma])
-                psfFwhm = np.median(psfSigmas[goodSigma] * pixelScales[goodSigma]) * np.sqrt(8.*np.log(2.))
+                psfFwhm = np.median(psfFwhms[goodSigma])
             elif goodSigma.size > 0:
                 psfSigma = psfSigmas[goodSigma[0]]
-                psfFwhm = psfSigmas[goodSigma[0]] * pixelScales[goodSigma[0]] * np.sqrt(8.)*np.log(2.)
+                psfFwhm = psfFwhms[goodSigma[0]]
             else:
                 self.log.warning("Could not find any good summary psfSigma for visit %d", visit)
                 psfSigma = 0.0
@@ -350,6 +353,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             rec['deltaAperDetector'][:] = -9999.0
             rec['psfSigma'] = psfSigma
             rec['psfFwhm'] = psfFwhm
+            # This is keyed by detector.
+            rec['psfFwhmDetector'][summary["id"]] = psfFwhms
             rec['skyBackground'] = skyBackground
             rec['used'] = 1
 
@@ -579,6 +584,7 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
         schema.addField('pmb', type=np.float32, doc="Pressure (millibar)")
         schema.addField('psfSigma', type=np.float32, doc="PSF sigma (median); pixels")
         schema.addField('psfFwhm', type=np.float32, doc="PSF FWHM (median); arcseconds")
+        schema.addField('psfFwhmDetector', type='ArrayF', doc="PSF FWHM per detector; arcseconds", size=nCcd)
         schema.addField('deltaAper', type=np.float32, doc="Delta-aperture")
         schema.addField('deltaAperDetector', type='ArrayF', doc='Delta-aperture per detector', size=nCcd)
         schema.addField('skyBackground', type=np.float32, doc="Sky background (ADU) (reference CCD)")

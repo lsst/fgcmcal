@@ -877,6 +877,11 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=float,
         default=0.05,
     )
+    aperCorrUsePsfFwhm = pexConfig.Field(
+        doc="Use PSF FWHM for aperture corrections?  Otherwise delta_aper statistic is used.",
+        dtype=bool,
+        default=False,
+    )
     aperCorrPerCcd = pexConfig.Field(
         doc="Use aperture corrections per-ccd (detector) instead of per-visit?",
         dtype=bool,
@@ -1714,7 +1719,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                 freezeStdAtmosphere=_config.freezeStdAtmosphere,
                 expGrayPhotometricCutDict=dict(_config.expGrayPhotometricCutDict),
                 expGrayHighCutDict=dict(_config.expGrayHighCutDict),
-                doPlots=_config.doPlots,
+                doPlots=doPlots,
             )
 
             # Reload parameters.
