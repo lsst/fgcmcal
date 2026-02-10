@@ -600,6 +600,18 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=int,
         default=50000,
     )
+    nObsPerRun = pexConfig.Field(
+        doc="Number of observations to run in each chunk. Larger values tend to be faster for large "
+            "datasets, at the expense of some memory overhead.",
+        dtype=int,
+        default=500000,
+    )
+    nObsPerGrayRun = pexConfig.Field(
+        doc="Number of observations to run in each chunk (including gray correction). Increasing this "
+            "value may increase the peak memory use significantly.",
+        dtype=int,
+        default=100000,
+    )
     nExpPerRun = pexConfig.Field(
         doc="Number of exposures to run in each chunk",
         dtype=int,
