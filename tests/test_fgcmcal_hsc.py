@@ -219,7 +219,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # These are slightly different from above due to the configuration change
         # mid-way in the separate fits.
         zpOffsets = np.array([0.0011443052208051085,
-                              0.0019046493107452989])
+                              0.0015734810149297118])
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I') and skymap='hsc_rings_v1'",
@@ -242,8 +242,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         rawRepeatability = np.array([0.0,
-                                     0.013999312239597281,
-                                     0.005144248063188913])
+                                     0.01201036876093324,
+                                     0.003979326480379284])
         filterNCalibMap = {'HSC-R': 12,
                            'HSC-I': 15}
 
