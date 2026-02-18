@@ -99,11 +99,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                                       visits, nStar, nObs)
 
         nZp = 1120
-        nGoodZp = 27
-        nOkZp = 27
-        nBadZp = 1093
+        nGoodZp = 123
+        nOkZp = 123
+        nBadZp = 997
         nStdStars = 237
-        nPlots = 59
+        nPlots = 62
 
         # We need an extra config file to turn off parquet format.
         extraConfigFile = os.path.join(self.testDir, "turn_off_parquet.py")
@@ -166,11 +166,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         )
 
         nZp = 1120
-        nGoodZp = 27
-        nOkZp = 27
-        nBadZp = 1093
+        nGoodZp = 123
+        nOkZp = 123
+        nBadZp = 997
         nStdStars = 222
-        nPlots = 59
+        nPlots = 62
 
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -223,7 +223,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I') and skymap='hsc_rings_v1'",
-                               visits, zpOffsets, 118, 57)
+                               visits, zpOffsets, 121, 60)
 
     def test_fgcmcalTractPipeline(self):
         # Set numpy seed for stability
@@ -244,8 +244,8 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         rawRepeatability = np.array([0.0,
                                      0.01201036876093324,
                                      0.003979326480379284])
-        filterNCalibMap = {'HSC-R': 12,
-                           'HSC-I': 15}
+        filterNCalibMap = {'HSC-R': 48,
+                           'HSC-I': 75}
 
         visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
         tract = 9697
