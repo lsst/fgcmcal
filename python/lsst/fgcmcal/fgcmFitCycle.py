@@ -1018,6 +1018,21 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         dtype=bool,
         default=False,
     )
+    useRetrievedPwv = pexConfig.Field(
+        doc="Use per-exposure ``retrieved`` PWV instead of full night model.",
+        dtype=bool,
+        default=False,
+    )
+    retrievedPwvSmoothingBlock = pexConfig.Field(
+        doc="Smoothing block width (in exposures) for ``retrieved`` PWV.",
+        dtype=int,
+        default=10,
+    )
+    retrievedPwvBands = pexConfig.ListField(
+        doc="Bands used for computing ``retrieved`` PWV.",
+        dtype=str,
+        default=["z", "y"],
+    )
     instrumentParsPerBand = pexConfig.Field(
         doc=("Model instrumental parameters per band? "
              "Otherwise, instrumental parameters (QE changes with time) are "
