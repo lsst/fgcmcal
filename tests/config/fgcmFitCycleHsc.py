@@ -66,6 +66,7 @@ config.nStarPerGrayRun = 50
 config.nObsPerRun = 500
 config.nObsPerGrayRun = 500
 config.nExpPerRun = 2
+config.minCcdPerExp = 3
 # Define r-i color as the primary way to split by color.
 config.colorSplitBands = ['r', 'i']
 config.freezeStdAtmosphere = True
@@ -106,6 +107,9 @@ config.deltaAperOuterRadiusArcsec = 2.89
 config.doComputeDeltaAperPerVisit = True
 config.doComputeDeltaAperMap = True
 config.doComputeDeltaAperPerCcd = True
+
+# Exercise this code.
+config.retrievedPwvBands = ["r", "i"]
 
 # Fit the r band chromaticity terms to exercise the code because
 # we only have r/i in the test data.  In actual running with HSC,
