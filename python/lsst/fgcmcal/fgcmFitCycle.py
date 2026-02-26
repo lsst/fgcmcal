@@ -331,6 +331,14 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                  "Plot",
                  "Plot of reference star residuals vs. color (reference star color cuts).",
                  bandDims),
+                ("DensityAllStarMap_Plot",
+                 "Plot",
+                 "Density map of all stars input to calibration.",
+                 bandDims),
+                ("DensityGoodStarMap_Plot",
+                 "Plot",
+                 "Density map of good stars constrainted after calibration.",
+                 bandDims),
             ]
         )
 
