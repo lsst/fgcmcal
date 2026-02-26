@@ -29,6 +29,12 @@ import os
 import tempfile
 import numpy as np
 
+# Need to import pyproj to prevent file handle leakage since importing
+# pyproj automatically opens proj.db and never closes it. We can not wait
+# for some dependent code to import it whilst the test is running since then
+# the leak checker will think it is a leak.
+import pyproj  # noqa: F401
+
 # Ensure that matplotlib doesn't try to open a display during testing.
 import matplotlib
 matplotlib.use("Agg")
@@ -103,7 +109,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nOkZp = 123
         nBadZp = 997
         nStdStars = 237
-        nPlots = 62
+        nPlots = 66
 
         # We need an extra config file to turn off parquet format.
         extraConfigFile = os.path.join(self.testDir, "turn_off_parquet.py")
@@ -170,7 +176,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         nOkZp = 123
         nBadZp = 997
         nStdStars = 222
-        nPlots = 62
+        nPlots = 66
 
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -223,7 +229,7 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I') and skymap='hsc_rings_v1'",
-                               visits, zpOffsets, 121, 60)
+                               visits, zpOffsets, 125, 64)
 
     def test_fgcmcalTractPipeline(self):
         # Set numpy seed for stability
