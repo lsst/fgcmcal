@@ -64,6 +64,8 @@ config.minStarPerExp = 5
 # Allow calibration to work with small number of stars in processing batches.
 config.nStarPerRun = 50
 config.nStarPerGrayRun = 50
+config.nObsPerRun = 500
+config.nObsPerGrayRun = 500
 config.nExpPerRun = 2
 # Define g-r color as the primary way to split by color.
 config.colorSplitBands = ["g", "r"]

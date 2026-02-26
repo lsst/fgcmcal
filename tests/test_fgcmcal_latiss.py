@@ -29,6 +29,12 @@ import os
 import tempfile
 import numpy as np
 
+# Need to import pyproj to prevent file handle leakage since importing
+# pyproj automatically opens proj.db and never closes it. We can not wait
+# for some dependent code to import it whilst the test is running since then
+# the leak checker will think it is a leak.
+import pyproj  # noqa: F401
+
 # Ensure that matplotlib doesn't try to open a display during testing.
 import matplotlib
 matplotlib.use("Agg")
@@ -127,7 +133,7 @@ class FgcmcalTestLatiss(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCa
         nOkZp = 13
         nBadZp = 7
         nStdStars = 48
-        nPlots = 48
+        nPlots = 52
 
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -211,8 +217,8 @@ class FgcmcalTestLatiss(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCa
             "band IN ('g', 'r', 'i')",
             visits,
             zpOffsets,
-            54,
-            46,
+            58,
+            50,
             refcatCollection="refcats/DM-33444",
         )
 
