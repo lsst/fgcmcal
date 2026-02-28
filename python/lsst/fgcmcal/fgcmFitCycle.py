@@ -331,6 +331,14 @@ class FgcmFitCycleConnections(pipeBase.PipelineTaskConnections,
                  "Plot",
                  "Plot of reference star residuals vs. color (reference star color cuts).",
                  bandDims),
+                ("DensityAllStarMap_Plot",
+                 "Plot",
+                 "Density map of all stars input to calibration.",
+                 bandDims),
+                ("DensityGoodStarMap_Plot",
+                 "Plot",
+                 "Density map of good stars constrainted after calibration.",
+                 bandDims),
             ]
         )
 
@@ -599,6 +607,18 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
             "value may increase the peak memory use significantly.",
         dtype=int,
         default=50000,
+    )
+    nObsPerRun = pexConfig.Field(
+        doc="Number of observations to run in each chunk. Larger values tend to be faster for large "
+            "datasets, at the expense of some memory overhead.",
+        dtype=int,
+        default=500000,
+    )
+    nObsPerGrayRun = pexConfig.Field(
+        doc="Number of observations to run in each chunk (including gray correction). Increasing this "
+            "value may increase the peak memory use significantly.",
+        dtype=int,
+        default=100000,
     )
     nExpPerRun = pexConfig.Field(
         doc="Number of exposures to run in each chunk",
@@ -1005,6 +1025,21 @@ class FgcmFitCycleConfig(pipeBase.PipelineTaskConfig,
         doc="Model PWV with a quadratic term for variation through the night?",
         dtype=bool,
         default=False,
+    )
+    useRetrievedPwv = pexConfig.Field(
+        doc="Use per-exposure ``retrieved`` PWV instead of full night model.",
+        dtype=bool,
+        default=False,
+    )
+    retrievedPwvSmoothingBlock = pexConfig.Field(
+        doc="Smoothing block width (in exposures) for ``retrieved`` PWV.",
+        dtype=int,
+        default=10,
+    )
+    retrievedPwvBands = pexConfig.ListField(
+        doc="Bands used for computing ``retrieved`` PWV.",
+        dtype=str,
+        default=["z", "y"],
     )
     instrumentParsPerBand = pexConfig.Field(
         doc=("Model instrumental parameters per band? "
@@ -2221,6 +2256,9 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
         parSchema.addField('epochMjdEnd', type='ArrayD',
                            doc='EpochMJD end times',
                            size=pars['EPOCHMJDEND'].size)
+        parSchema.addField('expFlag', type='ArrayI',
+                           doc='Exposure flag value',
+                           size=pars['EXPFLAG'].size)
         # superstarflat section
         parSchema.addField('superstarSize', type='ArrayI', doc='Superstar matrix size',
                            size=4)
@@ -2288,7 +2326,7 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                     'compRetrievedTauNight', 'compEpsilon', 'compMedDeltaAper',
                     'compGlobalEpsilon', 'compEpsilonMap', 'compEpsilonNStarMap',
                     'compEpsilonCcdMap', 'compEpsilonCcdNStarMap', 'compExpRefOffset',
-                    'epochMjdStart', 'epochMjdEnd']
+                    'epochMjdStart', 'epochMjdEnd', 'expFlag']
 
         for scalarName in scalarNames:
             rec[scalarName] = pars[scalarName.upper()][0]

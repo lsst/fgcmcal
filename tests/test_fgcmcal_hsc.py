@@ -29,6 +29,12 @@ import os
 import tempfile
 import numpy as np
 
+# Need to import pyproj to prevent file handle leakage since importing
+# pyproj automatically opens proj.db and never closes it. We can not wait
+# for some dependent code to import it whilst the test is running since then
+# the leak checker will think it is a leak.
+import pyproj  # noqa: F401
+
 # Ensure that matplotlib doesn't try to open a display during testing.
 import matplotlib
 matplotlib.use("Agg")
@@ -99,11 +105,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                                       visits, nStar, nObs)
 
         nZp = 1120
-        nGoodZp = 27
-        nOkZp = 27
-        nBadZp = 1093
+        nGoodZp = 123
+        nOkZp = 123
+        nBadZp = 997
         nStdStars = 237
-        nPlots = 59
+        nPlots = 66
 
         # We need an extra config file to turn off parquet format.
         extraConfigFile = os.path.join(self.testDir, "turn_off_parquet.py")
@@ -166,11 +172,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         )
 
         nZp = 1120
-        nGoodZp = 27
-        nOkZp = 27
-        nBadZp = 1093
+        nGoodZp = 123
+        nOkZp = 123
+        nBadZp = 997
         nStdStars = 222
-        nPlots = 59
+        nPlots = 66
 
         self._testFgcmFitCycle(instName, testName,
                                0, nZp, nGoodZp, nOkZp, nBadZp, nStdStars, nPlots, skipChecks=True)
@@ -219,11 +225,11 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
         # These are slightly different from above due to the configuration change
         # mid-way in the separate fits.
         zpOffsets = np.array([0.0011443052208051085,
-                              0.0019046493107452989])
+                              0.0015734810149297118])
 
         self._testFgcmMultiFit(instName, testName,
                                "physical_filter IN ('HSC-G', 'HSC-R', 'HSC-I') and skymap='hsc_rings_v1'",
-                               visits, zpOffsets, 118, 57)
+                               visits, zpOffsets, 125, 64)
 
     def test_fgcmcalTractPipeline(self):
         # Set numpy seed for stability
@@ -242,10 +248,10 @@ class FgcmcalTestHSC(fgcmcalTestBase.FgcmcalTestBase, lsst.utils.tests.TestCase)
                               nBand, i0Std, i0Recon, i10Std, i10Recon)
 
         rawRepeatability = np.array([0.0,
-                                     0.013999312239597281,
-                                     0.005144248063188913])
-        filterNCalibMap = {'HSC-R': 12,
-                           'HSC-I': 15}
+                                     0.01201036876093324,
+                                     0.003979326480379284])
+        filterNCalibMap = {'HSC-R': 48,
+                           'HSC-I': 75}
 
         visits = [34648, 34690, 34714, 34674, 34670, 36140, 35892, 36192, 36260, 36236]
         tract = 9697
