@@ -351,8 +351,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
             # Median delta aperture, to be measured from stars
             rec['deltaAper'] = -9999.0
             rec['deltaAperDetector'][:] = -9999.0
-            rec['psfSigma'] = psfSigma
-            rec['psfFwhm'] = psfFwhm
+            rec['psfSigma'] = float(psfSigma.item())
+            rec['psfFwhm'] = float(psfFwhm.item())
             # This is keyed by detector.
             rec['psfFwhmDetector'][summary["id"]] = psfFwhms
             rec['skyBackground'] = skyBackground
