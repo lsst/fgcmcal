@@ -33,7 +33,11 @@ import numpy as np
 # pyproj automatically opens proj.db and never closes it. We can not wait
 # for some dependent code to import it whilst the test is running since then
 # the leak checker will think it is a leak.
-import pyproj  # noqa: F401
+# TODO: Remove import after completing DM-54643. Use DM-54656
+try:
+    import pyproj  # noqa: F401
+except ImportError:
+    pass
 
 # Ensure that matplotlib doesn't try to open a display during testing.
 import matplotlib
