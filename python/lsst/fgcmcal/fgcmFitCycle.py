@@ -1620,7 +1620,10 @@ class FgcmFitCycleTask(pipeBase.PipelineTask):
                 flagFlag = None
 
             if _config.doReferenceCalibration:
-                refStars = handleDict['fgcmReferenceStars'].get()
+                parameters = None
+                if handleDict['fgcmReferenceStars'].ref.datasetType.storageClass_name == 'ArrowAstropy':
+                    parameters = {"strip_astropy_meta_yaml": False}
+                refStars = handleDict['fgcmReferenceStars'].get(parameters=parameters)
 
                 refMag, refMagErr = extractReferenceMags(
                     refStars,
