@@ -1,6 +1,3 @@
-import os.path
-
-
 config.connections.cycleNumber = 2
 
 config.doReferenceCalibration = True
@@ -19,6 +16,5 @@ config.physicalFilterMap = {
 config.photoCal.applyColorTerms = True
 config.photoCal.photoCatName = 'atlas_refcat2_20220201'
 
-configDir = os.path.join(os.path.dirname(__file__))
-config.photoCal.colorterms.load(os.path.join(configDir, 'colortermsLatiss.py'))
+config.photoCal.colorterms.load('colortermsLatiss.py')
 config.connections.refCat = 'atlas_refcat2_20220201'

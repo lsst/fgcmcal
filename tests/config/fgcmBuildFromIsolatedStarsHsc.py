@@ -1,4 +1,3 @@
-import os
 from lsst.obs.hsc.hscFilters import HSC_FILTER_DEFINITIONS
 
 config.instFluxField = 'apFlux_12_0_instFlux'
@@ -29,13 +28,12 @@ config.connections.isolated_star_sources = "isolated_star_sources"
 # This is set low enough to ensure that this code path is triggered.
 config.densityCutMaxPerPixel = 200
 
-configDir = os.path.join(os.path.dirname(__file__))
 config.physicalFilterMap = HSC_FILTER_DEFINITIONS.physical_to_band
 config.doSubtractLocalBackground = True
 config.sourceSelector["science"].flags.bad.append("localBackground_flag")
-config.fgcmLoadReferenceCatalog.load(os.path.join(configDir, 'filterMapHsc.py'))
+config.fgcmLoadReferenceCatalog.load('filterMapHsc.py')
 config.fgcmLoadReferenceCatalog.applyColorTerms = True
-config.fgcmLoadReferenceCatalog.colorterms.load(os.path.join(configDir, 'colortermsHsc.py'))
+config.fgcmLoadReferenceCatalog.colorterms.load('colortermsHsc.py')
 config.fgcmLoadReferenceCatalog.referenceSelector.doSignalToNoise = True
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.fluxField = 'i_flux'
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.errField = 'i_fluxErr'
