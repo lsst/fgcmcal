@@ -1,7 +1,6 @@
 # All camera defaults were copied from obs_subaru/config/fgcmBuildStarsTable.py
 # on 07/21/21, weekly w_2021_29.
 
-import os
 from lsst.obs.hsc.hscFilters import HSC_FILTER_DEFINITIONS
 
 # This override is to be consistent with the old tests
@@ -23,15 +22,14 @@ config.minPerBand = 2
 config.connections.refCat = "ps1_pv3_3pi_20170110"
 config.densityCutMaxPerPixel = 2000
 
-configDir = os.path.join(os.path.dirname(__file__))
 config.physicalFilterMap = HSC_FILTER_DEFINITIONS.physical_to_band
 config.doSubtractLocalBackground = True
 config.sourceSelector["science"].flags.bad.append("localBackground_flag")
 # Our test files do not have detect_isPrimary in the columns.
 config.sourceSelector["science"].doRequirePrimary = False
-config.fgcmLoadReferenceCatalog.load(os.path.join(configDir, 'filterMapHsc.py'))
+config.fgcmLoadReferenceCatalog.load('filterMapHsc.py')
 config.fgcmLoadReferenceCatalog.applyColorTerms = True
-config.fgcmLoadReferenceCatalog.colorterms.load(os.path.join(configDir, 'colortermsHsc.py'))
+config.fgcmLoadReferenceCatalog.colorterms.load('colortermsHsc.py')
 config.fgcmLoadReferenceCatalog.referenceSelector.doSignalToNoise = True
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.fluxField = 'i_flux'
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.errField = 'i_fluxErr'

@@ -1,4 +1,3 @@
-import os
 from lsst.obs.lsst.filters import LATISS_FILTER_DEFINITIONS
 
 # The filterMap and bands are for the small subset of bands used in the tests
@@ -23,16 +22,15 @@ config.connections.ref_cat = "atlas_refcat2_20220201"
 config.connections.isolated_star_cats = "isolated_star_cat"
 config.connections.isolated_star_sources = "isolated_star_sources"
 
-configDir = os.path.join(os.path.dirname(__file__))
 config.physicalFilterMap = LATISS_FILTER_DEFINITIONS.physical_to_band
 config.doSubtractLocalBackground = True
 config.sourceSelector["science"].flags.bad.append("localBackground_flag")
 config.sourceSelector["science"].signalToNoise.fluxField = "apFlux_35_0_instFlux"
 config.sourceSelector["science"].signalToNoise.errField = "apFlux_35_0_instFluxErr"
 config.sourceSelector["science"].signalToNoise.minimum = 11.0
-config.fgcmLoadReferenceCatalog.load(os.path.join(configDir, "filterMapLatiss.py"))
+config.fgcmLoadReferenceCatalog.load("filterMapLatiss.py")
 config.fgcmLoadReferenceCatalog.applyColorTerms = True
-config.fgcmLoadReferenceCatalog.colorterms.load(os.path.join(configDir, "colortermsLatiss.py"))
+config.fgcmLoadReferenceCatalog.colorterms.load("colortermsLatiss.py")
 config.fgcmLoadReferenceCatalog.referenceSelector.doSignalToNoise = True
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.fluxField = "i_flux"
 config.fgcmLoadReferenceCatalog.referenceSelector.signalToNoise.errField = "i_fluxErr"

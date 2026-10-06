@@ -1,13 +1,8 @@
 # All camera defaults were copied from obs_subaru/config/fgcmCalibrateTractTableHsc.py
 # on 07/21/21, weekly w_2021_29.
 
-import os.path
-
-
-configDir = os.path.join(os.path.dirname(__file__))
-
-config.fgcmBuildStars.load(os.path.join(configDir, 'fgcmBuildStarsTableHsc.py'))
-config.fgcmFitCycle.load(os.path.join(configDir, 'fgcmFitCycleHsc.py'))
+config.fgcmBuildStars.load('fgcmBuildStarsTableHsc.py')
+config.fgcmFitCycle.load('fgcmFitCycleHsc.py')
 
 config.maxFitCycles = 3
 config.fgcmFitCycle.aperCorrFitNBins = 0
