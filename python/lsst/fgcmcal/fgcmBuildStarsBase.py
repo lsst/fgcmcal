@@ -314,8 +314,8 @@ class FgcmBuildStarsBaseTask(pipeBase.PipelineTask, abc.ABC):
                 psfSigma = np.median(psfSigmas[goodSigma])
                 psfFwhm = np.median(psfFwhms[goodSigma])
             elif goodSigma.size > 0:
-                psfSigma = psfSigmas[goodSigma[0]]
-                psfFwhm = psfFwhms[goodSigma[0]]
+                psfSigma = psfSigmas[goodSigma][0]
+                psfFwhm = psfFwhms[goodSigma][0]
             else:
                 self.log.warning("Could not find any good summary psfSigma for visit %d", visit)
                 psfSigma = 0.0
